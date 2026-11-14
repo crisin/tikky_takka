@@ -1,9 +1,7 @@
 import 'package:drift/drift.dart';
-import 'package:drift/native.dart';
-import 'package:drift_flutter/drift_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'database_location.dart';
+import 'connection/connection.dart';
 import 'tables.dart';
 
 part 'app_database.g.dart';
@@ -25,20 +23,12 @@ class AppDatabase extends _$AppDatabase {
   /// Opens the on-device database file (`tikky_takka.sqlite`) in the app's
   /// private application-support directory - NOT the documents directory,
   /// which the OS synchronises (OneDrive, iCloud). A database created there
-  /// by an earlier version is moved over once, see [DatabaseLocation].
-  AppDatabase.defaults()
-    : super(
-        driftDatabase(
-          name: fileBaseName,
-          native: DriftNativeOptions(
-            databasePath: () =>
-                DatabaseLocation.resolveDatabasePath(fileBaseName),
-          ),
-        ),
-      );
+  /// by an earlier version is moved over once (see `DatabaseLocation`).
+  /// On the web: SQLite-WASM in the browser, see `connection_web.dart`.
+  AppDatabase.defaults() : super(openDefaultConnection(fileBaseName));
 
   /// Opens a fresh in-memory database. Use in tests.
-  AppDatabase.inMemory() : super(NativeDatabase.memory());
+  AppDatabase.inMemory() : super(openInMemoryConnection());
 
   static const int currentSchemaVersion = 1;
 

@@ -1,12 +1,12 @@
 {
-    "name": "tikky_takka",
-    "short_name": "tikky_takka",
+    "name": "Tikky Takka",
+    "short_name": "Tikky Takka",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
-    "orientation": "portrait-primary",
+    "background_color": "#161618",
+    "theme_color": "#161618",
+    "description": "Mehrere Timer gleichzeitig – alles lokal auf dem Gerät.",
+    "orientation": "any",
     "prefer_related_applications": false,
     "icons": [
         {

@@ -52,6 +52,30 @@ Nach Änderungen am Datenbankschema (`lib/core/db/tables.dart`):
 dart run build_runner build --delete-conflicting-outputs
 ```
 
+## Web (auch zum Testen auf iPhone / Android)
+
+```
+flutter build web --release
+python -m http.server 5180 --bind 0.0.0.0 --directory build/web
+```
+
+Dann im Browser `http://localhost:5180` – oder vom Handy im selben WLAN
+`http://<IP des PCs>:5180` (IP per `ipconfig`). Beim ersten Start fragt die
+Windows-Firewall nach, ob Python im privaten Netz lauschen darf: zulassen.
+
+Die Datenbank läuft im Browser als SQLite-WebAssembly
+(`web/sqlite3.wasm`, `web/drift_worker.js`, beide eingecheckt). Nach einem
+Update von `drift` bzw. `sqlite3` beide erneuern:
+
+```
+dart compile js -O4 -o web/drift_worker.js tools/drift_worker.dart
+gh release download sqlite3-<version> -R simolus3/sqlite3.dart -p sqlite3.wasm -D web --clobber
+```
+
+Im Web **nicht** verfügbar: Benachrichtigungen/Alarme bei geschlossener
+App, App-Sperre, Systemfarben. Daten bleiben pro Browser gespeichert
+(privater Modus oder „Websitedaten löschen“ verwirft sie).
+
 ## Android (später)
 
 1. [Android Studio](https://developer.android.com/studio) installieren; beim
