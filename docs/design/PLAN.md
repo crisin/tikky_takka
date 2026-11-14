@@ -102,6 +102,12 @@ genannten Entwurf legen.
 
 ### P1 · Farbrollen und Tokens
 
+**Stand: erledigt** (Zweig `pult`). Offen geblieben: `surface` von „Schwarz“
+ist in `tokens.json` `#141416`, in der App noch `#000000` (dort ist `#141416`
+heute `surfaceAlt`). Der Wechsel kommt mit P2, wenn die Spuren nicht mehr auf
+`surface` liegen; `surfaceAlt` braucht dann einen neuen Wert, den die Entwürfe
+nicht nennen.
+
 - **P1.1** `TikkyColors` um `warningText`, `onDanger`, `segment`; `fromJson`
   füllt Fehlendes aus der Vorlage. Vorlagen in `theme_presets.dart` auf die
   Werte aus `tokens.json` (auch `textMuted`).

@@ -623,7 +623,21 @@ class ContrastWarning extends StatelessWidget {
     ContrastPair.mutedOnBackground =>
       SettingsStrings.contrastMutedOnBackground,
     ContrastPair.onPrimaryOnPrimary => SettingsStrings.contrastOnPrimary,
+    ContrastPair.inkOnTint => SettingsStrings.contrastInkOnTint,
+    ContrastPair.inkOnStrong => SettingsStrings.contrastInkOnStrong,
+    ContrastPair.onOnSolid => SettingsStrings.contrastOnSolid,
+    ContrastPair.textOnStrong => SettingsStrings.contrastTextOnStrong,
+    ContrastPair.warningTextOnTint => SettingsStrings.contrastWarningOnTint,
   };
+
+  /// The pair, with the palette entry it belongs to.
+  static String issueName(ContrastIssue issue) {
+    final index = issue.paletteIndex;
+    final pair = pairName(issue.pair);
+    return index == null
+        ? pair
+        : SettingsStrings.contrastPaletteEntry(index + 1, pair);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -656,7 +670,7 @@ class ContrastWarning extends StatelessWidget {
                     for (final issue in issues)
                       Text(
                         SettingsStrings.contrastLine(
-                          pairName(issue.pair),
+                          issueName(issue),
                           issue.ratio,
                           issue.minimum,
                         ),

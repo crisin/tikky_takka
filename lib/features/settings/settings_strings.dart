@@ -113,6 +113,15 @@ abstract final class SettingsStrings {
   static const contrastMutedOnSurface = 'Gedämpfter Text auf Fläche';
   static const contrastMutedOnBackground = 'Gedämpfter Text auf Hintergrund';
   static const contrastOnPrimary = 'Symbol auf Akzent';
+  static const contrastInkOnTint = 'Schrift in Spurfarbe auf der Spur';
+  static const contrastInkOnStrong = 'Schrift in Spurfarbe auf der Füllung';
+  static const contrastOnSolid = 'Symbol auf der Spurfarbe';
+  static const contrastTextOnStrong = 'Text auf der Füllung';
+  static const contrastWarningOnTint = 'Warntext auf der Spur';
+
+  /// "Spurfarbe 3 · Text auf der Füllung"
+  static String contrastPaletteEntry(int number, String pair) =>
+      'Spurfarbe $number · $pair';
 
   /// "Text auf Fläche: 2,1:1 (empfohlen mindestens 4,5:1)"
   static String contrastLine(String pair, double ratio, double required) =>

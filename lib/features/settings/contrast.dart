@@ -1,15 +1,7 @@
 import 'dart:ui' show Color;
 
 import '../../theme/tikky_theme.dart';
-
-/// WCAG 2.x contrast ratio between two opaque colours (1.0 .. 21.0).
-double contrastRatio(Color a, Color b) {
-  final la = a.computeLuminance();
-  final lb = b.computeLuminance();
-  final lighter = la > lb ? la : lb;
-  final darker = la > lb ? lb : la;
-  return (lighter + 0.05) / (darker + 0.05);
-}
+import '../../theme/track_roles.dart';
 
 /// The colour pairs of a theme that must stay readable.
 enum ContrastPair {
@@ -18,6 +10,13 @@ enum ContrastPair {
   mutedOnSurface,
   mutedOnBackground,
   onPrimaryOnPrimary,
+
+  // Per track colour (see TrackRoles); the issue names the palette entry.
+  inkOnTint,
+  inkOnStrong,
+  onOnSolid,
+  textOnStrong,
+  warningTextOnTint,
 }
 
 /// A pair whose contrast is below the recommended minimum.
@@ -26,9 +25,14 @@ final class ContrastIssue {
     required this.pair,
     required this.ratio,
     required this.minimum,
+    this.paletteIndex,
   });
 
   final ContrastPair pair;
+
+  /// The entry of the track palette the pair belongs to; `null` for the
+  /// pairs of the base colours.
+  final int? paletteIndex;
 
   /// Measured contrast ratio.
   final double ratio;
@@ -63,7 +67,7 @@ List<ContrastIssue> contrastIssues(TikkyTheme theme) {
     ),
     (ContrastPair.onPrimaryOnPrimary, c.onPrimary, c.primary, minLargeContrast),
   ];
-  return [
+  final issues = [
     for (final (pair, foreground, background, minimum) in checks)
       if (contrastRatio(foreground, background) < minimum)
         ContrastIssue(
@@ -72,4 +76,32 @@ List<ContrastIssue> contrastIssues(TikkyTheme theme) {
           minimum: minimum,
         ),
   ];
+  for (var i = 0; i < theme.trackPalette.length; i++) {
+    final r = trackRolesFor(
+      theme.trackPalette[i],
+      background: c.background,
+      isDark: theme.isDark,
+    );
+    final roleChecks = <(ContrastPair, Color, Color)>[
+      (ContrastPair.inkOnTint, r.ink, r.tint),
+      (ContrastPair.inkOnStrong, r.ink, r.strong),
+      (ContrastPair.onOnSolid, r.on, r.solid),
+      (ContrastPair.textOnStrong, c.text, r.strong),
+      (ContrastPair.warningTextOnTint, c.warningText, r.tint),
+    ];
+    for (final (pair, foreground, background) in roleChecks) {
+      final ratio = contrastRatio(foreground, background);
+      if (ratio < minTextContrast) {
+        issues.add(
+          ContrastIssue(
+            pair: pair,
+            ratio: ratio,
+            minimum: minTextContrast,
+            paletteIndex: i,
+          ),
+        );
+      }
+    }
+  }
+  return issues;
 }

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../core/domain/track.dart';
 import 'theme_presets.dart';
 import 'tikky_theme.dart';
+import 'track_roles.dart';
 import 'ui_prefs.dart';
 
 /// Spacing scale (logical pixels), already adjusted for the density
@@ -25,6 +26,9 @@ final class TikkySpacing {
 
   /// Standard horizontal page padding.
   double get page => 16 * _factor;
+
+  /// Horizontal page padding of the lane list and the tap pad.
+  double get pageLanes => 12 * _factor;
 }
 
 /// Sizes of recurring elements (logical pixels), already adjusted for the
@@ -54,6 +58,17 @@ final class TikkySizes {
   /// Minimum height of a lane row.
   double get laneMinHeight => 84 * _density;
 
+  /// Height of a lane that shows its surface (running, paused, ringing,
+  /// due) and of one that is ready (outline only).
+  double get laneHeightActive => 101 * _density;
+  double get laneHeightIdle => 66 * _density;
+
+  /// Diameter of the lamp in the head line of a lane.
+  double get lamp => 8;
+
+  /// Height of the bottom pill and diameter of the plus button beside it.
+  double get navPill => 56;
+
   /// Minimum width of a lane tile / grid column on wide layouts.
   double get tileMinWidth => 300;
 
@@ -61,10 +76,13 @@ final class TikkySizes {
   double get tileMinHeight => 148 * _density;
 
   /// Diameter of the round primary button of a lane.
-  double get primaryButton => 56 * _prefs.buttonScale;
+  double get primaryButton => 60 * _prefs.buttonScale;
 
-  /// Size of the small secondary icon buttons of a lane.
-  double get secondaryButton => 40 * _prefs.buttonScale;
+  /// The primary button of a ready lane (outline only).
+  double get primaryButtonIdle => 48 * _prefs.buttonScale;
+
+  /// Diameter of the secondary button of a lane.
+  double get secondaryButton => 48 * _prefs.buttonScale;
 
   /// Extra large tap target (protocol entry sheet, usable while impaired).
   double get bigTapTarget => 64 * _prefs.buttonScale;
@@ -93,10 +111,14 @@ final class TikkySizes {
   double get secondaryIcon => 20 * _prefs.buttonScale;
 
   /// Font size of the large time / count of a lane.
-  double get digitsLarge => 44 * _prefs.digitScale;
+  double get digitsLarge => 32 * _prefs.digitScale;
 
-  /// Font size of secondary figures (lap time, per-label counts).
-  double get digitsMedium => 24 * _prefs.digitScale;
+  /// Font size of the time on the focus page.
+  double get digitsFocus => 56 * _prefs.digitScale;
+
+  /// Font size of secondary figures (lap time, per-label counts, the time
+  /// of a ready lane and on pad buttons).
+  double get digitsMedium => 22 * _prefs.digitScale;
 
   /// Font size of small figures inside sub-lines and lists.
   double get digitsSmall => 17 * _prefs.digitScale;
@@ -277,6 +299,29 @@ final class TikkyRadii {
 
   /// Rounded top corners (bottom sheets).
   BorderRadius get sheetTop => BorderRadius.vertical(top: Radius.circular(lg));
+
+  // Radii by role ("Pult"). With the default base of 12 these are the
+  // drawn 20 / 22 / 14 / 28; a theme with square corners keeps them square.
+
+  /// A lane.
+  double get lane => _base * 20 / 12;
+
+  /// A pad button, a card.
+  double get pad => _base * 22 / 12;
+
+  /// Label buttons, tiles inside a lane, input fields.
+  double get small => _base * 14 / 12;
+
+  /// The top corners of a sheet.
+  double get sheet => _base * 28 / 12;
+
+  /// Pills and round buttons; square when the theme has no rounding.
+  double get pill => _base <= 0 ? 0 : 999;
+
+  BorderRadius get laneAll => BorderRadius.circular(lane);
+  BorderRadius get padAll => BorderRadius.circular(pad);
+  BorderRadius get smallAll => BorderRadius.circular(small);
+  BorderRadius get pillAll => BorderRadius.circular(pill);
 }
 
 /// Animation timings.
@@ -375,6 +420,22 @@ class TikkyTokens extends ThemeExtension<TikkyTokens> {
 
   /// Colour for a palette index (wraps around).
   Color paletteColor(int index) => theme.paletteColor(index);
+
+  final Map<int, TrackRoles> _roles = {};
+
+  /// The five roles of a track colour in this theme (surface, fill, text,
+  /// ...). Text in a track colour is always `roles(c).ink`, never `c`.
+  TrackRoles roles(Color color) => _roles.putIfAbsent(
+    color.toARGB32(),
+    () => trackRolesFor(
+      color,
+      background: colors.background,
+      isDark: isDark,
+    ),
+  );
+
+  /// The roles of the colour of [track].
+  TrackRoles trackRoles(Track track) => roles(trackColor(track));
 
   /// Readable content colour (text or inverse) on top of [background].
   Color onColor(Color background) => background.computeLuminance() > 0.5
