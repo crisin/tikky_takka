@@ -30,6 +30,7 @@ class HistoryScreen extends ConsumerWidget {
     final view = ref.watch(historyViewProvider);
     return AdaptivePageScaffold(
       title: const Text(Strings.historyTitle),
+      largeTitle: true,
       actions: [
         AdaptiveIconButton(
           icon: AdaptiveIcons.export(context),
@@ -37,7 +38,7 @@ class HistoryScreen extends ConsumerWidget {
           onPressed: () => showExportSheet(context),
         ),
       ],
-      body: HistoryContentWidth(
+      belowTitle: HistoryContentWidth(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -61,15 +62,15 @@ class HistoryScreen extends ConsumerWidget {
                 ),
               ),
             ),
-            Expanded(
-              child: switch (view) {
-                HistoryView.sessions => const HistorySessionList(),
-                HistoryView.daily => const HistorySumsView(weekly: false),
-                HistoryView.weekly => const HistorySumsView(weekly: true),
-              },
-            ),
           ],
         ),
+      ),
+      body: HistoryContentWidth(
+        child: switch (view) {
+          HistoryView.sessions => const HistorySessionList(),
+          HistoryView.daily => const HistorySumsView(weekly: false),
+          HistoryView.weekly => const HistorySumsView(weekly: true),
+        },
       ),
     );
   }

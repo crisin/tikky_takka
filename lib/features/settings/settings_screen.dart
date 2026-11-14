@@ -33,6 +33,7 @@ class SettingsScreen extends ConsumerWidget {
     final hooks = ref.watch(settingsHooksProvider);
     return AdaptivePageScaffold(
       title: const Text(Strings.settingsTitle),
+      largeTitle: true,
       body: SettingsBody(
         children: [
           const _AppearanceSection(),

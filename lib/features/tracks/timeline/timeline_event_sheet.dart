@@ -306,7 +306,14 @@ class _EventSheetState extends ConsumerState<_EventSheet> {
                 ),
               ),
               SizedBox(height: t.space.lg),
-              Row(
+              // Side by side; one below the other when large text needs
+              // the room.
+              Wrap(
+                alignment: _deletable
+                    ? WrapAlignment.spaceBetween
+                    : WrapAlignment.end,
+                spacing: t.space.sm,
+                runSpacing: t.space.sm,
                 children: [
                   if (_deletable)
                     KeyedSubtree(
@@ -318,7 +325,6 @@ class _EventSheetState extends ConsumerState<_EventSheet> {
                             Navigator.of(context).pop(const _Delete()),
                       ),
                     ),
-                  const Spacer(),
                   KeyedSubtree(
                     key: EventSheetKeys.save,
                     child: AdaptiveFilledButton(

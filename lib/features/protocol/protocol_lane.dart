@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -636,8 +637,7 @@ class _PersonCards extends ConsumerWidget {
           for (final id in info.keys)
             if (!scenePersonIds.contains(id)) id,
           for (final p in active)
-            if (!scenePersonIds.contains(p.id) && !info.containsKey(p.id))
-              p.id,
+            if (!scenePersonIds.contains(p.id) && !info.containsKey(p.id)) p.id,
         ];
         final shown = <String?>[
           ...scenePersonIds,
@@ -692,7 +692,10 @@ class _PersonCards extends ConsumerWidget {
                 padding: EdgeInsets.only(bottom: t.space.xs),
                 child: Semantics(
                   header: true,
-                  child: Text(ProtocolStrings.whoAreYou, style: t.text.headline),
+                  child: Text(
+                    ProtocolStrings.whoAreYou,
+                    style: t.text.headline,
+                  ),
                 ),
               ),
             if (info.isEmpty)
@@ -848,6 +851,18 @@ class _PersonCard extends StatelessWidget {
       );
     }
     final lastEntry = info?.lastEntry;
+    // Room for the name and the line of the last entry from the start, so
+    // a card does not grow - and push the cards below away from a finger -
+    // when its person logs the first entry.
+    final scaler = MediaQuery.textScalerOf(context);
+    double lineHeight(TextStyle style) =>
+        scaler.scale(style.fontSize ?? 14) * (style.height ?? 1.2);
+    final twoLines = t.prefs.showSubLine
+        ? lineHeight(t.text.headline) +
+              lineHeight(t.text.subLine) +
+              2 * t.space.xs
+        : 0.0;
+    final minHeight = math.max(t.sizes.bigTapTarget, twoLines);
 
     return Semantics(
       button: true,
@@ -862,7 +877,7 @@ class _PersonCard extends StatelessWidget {
         child: InkWell(
           onTap: onTap,
           child: ConstrainedBox(
-            constraints: BoxConstraints(minHeight: t.sizes.bigTapTarget),
+            constraints: BoxConstraints(minHeight: minHeight),
             child: Padding(
               padding: EdgeInsets.symmetric(
                 horizontal: t.space.md,
@@ -882,7 +897,12 @@ class _PersonCard extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(headlineText, style: t.text.headline),
+                        Text(
+                          headlineText,
+                          style: t.text.headline,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                         if (t.prefs.showSubLine && lastEntry != null)
                           Text(
                             entrySummary(lastEntry, substances),
@@ -1175,9 +1195,7 @@ class _SubstanceButton extends StatelessWidget {
                           child: Text(
                             remaining,
                             style: t.text.label.copyWith(
-                              color: justLogged
-                                  ? foreground
-                                  : t.colors.warning,
+                              color: justLogged ? foreground : t.colors.warning,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,

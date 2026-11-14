@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:tikky_takka/adaptive/adaptive.dart';
 import 'package:tikky_takka/core/repo/repo.dart';
 import 'package:tikky_takka/core/services/lock_service.dart';
 import 'package:tikky_takka/features/settings/display_settings_screen.dart';
@@ -443,7 +444,9 @@ void main() {
     try {
       final h = await SettingsHarness.create(tester);
       await h.pump(tester, const SettingsScreen());
-      expect(find.byType(CupertinoNavigationBar), findsOneWidget);
+      // The large title of the iOS system apps.
+      expect(find.byType(CupertinoSliverNavigationBar), findsOneWidget);
+      expect(find.byKey(AdaptivePageScaffold.largeTitleKey), findsOneWidget);
 
       await h.reveal(tester, find.text(Strings.prefHaptics));
       await tester.tap(find.text(Strings.prefHaptics));

@@ -155,7 +155,9 @@ class _HistorySessionListState extends ConsumerState<HistorySessionList> {
                   Dismissible(
                     key: ValueKey(item.session.id),
                     direction: DismissDirection.endToStart,
-                    background: const _DeleteBackground(),
+                    background: const SwipeDeleteBackground(
+                      semanticLabel: Strings.deleteSession,
+                    ),
                     onDismissed: (_) =>
                         unawaited(_delete(item.session.id, hide: true)),
                     child: SessionTile(
@@ -170,31 +172,6 @@ class _HistorySessionListState extends ConsumerState<HistorySessionList> {
           },
         );
       },
-    );
-  }
-}
-
-/// What shows behind a row while it is swiped away.
-class _DeleteBackground extends StatelessWidget {
-  const _DeleteBackground();
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.tikky;
-    return ColoredBox(
-      color: t.colors.danger,
-      child: Align(
-        alignment: AlignmentDirectional.centerEnd,
-        child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: t.space.lg),
-          child: Icon(
-            AdaptiveIcons.delete(context),
-            color: t.onColor(t.colors.danger),
-            size: t.sizes.iconMd,
-            semanticLabel: Strings.deleteSession,
-          ),
-        ),
-      ),
     );
   }
 }

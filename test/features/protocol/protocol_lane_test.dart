@@ -162,6 +162,38 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('the entry list shows the time between entries and deletes '
+      'with a swipe, with undo', (tester) async {
+    final f = await ProtocolFixture.pump(tester);
+    final alex = await f.person('Alex');
+    final water = await f.substance('Wasser');
+    await f.entry(personId: alex.id, substanceId: water.id, amount: '0,5 l');
+    await f.advance(const Duration(minutes: 25));
+    await f.entry(personId: alex.id, substanceId: water.id, amount: '1 l');
+    await f.settle();
+    await f.tap(find.byTooltip(ProtocolStrings.showEntries));
+
+    // Newest first, the gap between them.
+    final gap = find.text(ProtocolStrings.gapEarlier('25 min'));
+    expect(gap, findsOneWidget);
+    final newer = find.text('Alex · Wasser · 1 l');
+    final older = find.text('Alex · Wasser · 0,5 l');
+    expect(tester.getTopLeft(newer).dy, lessThan(tester.getTopLeft(gap).dy));
+    expect(tester.getTopLeft(gap).dy, lessThan(tester.getTopLeft(older).dy));
+
+    // Swipe to the leading edge: gone at once, "Rückgängig" brings it back.
+    await tester.drag(newer, const Offset(-500, 0));
+    await f.settle();
+    expect(newer, findsNothing);
+    expect(gap, findsNothing);
+    expect(find.text(Strings.protocolDeleted), findsOneWidget);
+    expect(await f.entries(), hasLength(1));
+    await f.tap(find.text(Strings.undo));
+    expect(newer, findsOneWidget);
+    expect(await f.entries(), hasLength(2));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('left-handed layout puts the primary button on the left', (
     tester,
   ) async {

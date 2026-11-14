@@ -175,6 +175,11 @@ class SettingsHarness {
     bool up = false,
   }) async {
     await tester.scrollUntilVisible(finder, up ? -120 : 120, scrollable: list);
+    // Into the middle: on iOS the list scrolls on under the collapsed
+    // large-title bar, so an item at the very top would sit beneath it.
+    await tester.runAsync(
+      () => Scrollable.ensureVisible(tester.element(finder), alignment: 0.5),
+    );
     await tester.pump();
   }
 }

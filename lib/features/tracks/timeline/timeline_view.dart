@@ -512,7 +512,7 @@ class _RowTile extends StatelessWidget {
                       ),
                       SizedBox(width: t.space.md),
                       if (muted)
-                        what
+                        Flexible(child: what)
                       else
                         Expanded(
                           flex: 3,
@@ -525,15 +525,25 @@ class _RowTile extends StatelessWidget {
                     ],
                   );
                 }
-                // A phone: the track's name above what happened.
+                // A phone: time and the track's name above what happened
+                // (the name moves below the time when both do not fit).
                 return Row(
                   children: [
-                    ...lead,
+                    ColorDot(color: t.trackColor(row.track)),
+                    SizedBox(width: t.space.sm),
                     Expanded(
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [name, what, ?noteText],
+                        children: [
+                          Wrap(
+                            spacing: t.space.sm,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [timeText, name],
+                          ),
+                          what,
+                          ?noteText,
+                        ],
                       ),
                     ),
                   ],

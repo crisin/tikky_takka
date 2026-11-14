@@ -246,6 +246,12 @@ abstract final class TracksStrings {
   /// Semantics of the name of a lane: "Zelt, Jacke".
   static String stripSubLane(String track, String title) => '$track, $title';
 
+  /// Screen reader text of the timer of a substance lane.
+  static String stripTimerSemantics(String elapsed) => 'seit $elapsed';
+
+  /// Detail of an entry on a substance lane: time since the one before.
+  static String stripSincePrevious(String gap) => '$gap nach dem vorherigen';
+
   // -------------------------------------------------------- event editor
   static const eventEditTitle = 'Ereignis bearbeiten';
   static const eventTime = 'Zeitpunkt';

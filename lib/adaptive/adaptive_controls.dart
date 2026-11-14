@@ -399,23 +399,34 @@ class AdaptiveSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tikky;
+    // iOS: the inset grouped lists of the system apps - small capitals
+    // above the group, the separators start where the text starts.
+    final cupertino = isCupertino(context);
+    final headerText = header == null
+        ? null
+        : cupertino
+        ? Text(
+            header!.toUpperCase(),
+            style: t.text.caption.copyWith(letterSpacing: 0.3),
+          )
+        : Text(header!, style: t.text.laneTitle);
     return Padding(
       padding: EdgeInsets.fromLTRB(
         t.space.page,
-        t.space.md,
+        cupertino ? t.space.lg : t.space.md,
         t.space.page,
         t.space.sm,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (header != null)
+          if (headerText != null)
             Padding(
-              padding: EdgeInsets.only(left: t.space.xs, bottom: t.space.sm),
-              child: Semantics(
-                header: true,
-                child: Text(header!, style: t.text.laneTitle),
+              padding: EdgeInsets.only(
+                left: cupertino ? t.space.lg : t.space.xs,
+                bottom: cupertino ? t.space.xs : t.space.sm,
               ),
+              child: Semantics(header: true, child: headerText),
             ),
           DecoratedBox(
             decoration: t.surfaceDecoration(),
@@ -438,7 +449,11 @@ class AdaptiveSection extends StatelessWidget {
           ),
           if (footer != null)
             Padding(
-              padding: EdgeInsets.only(left: t.space.xs, top: t.space.sm),
+              padding: EdgeInsets.only(
+                left: cupertino ? t.space.lg : t.space.xs,
+                right: cupertino ? t.space.lg : 0,
+                top: t.space.sm,
+              ),
               child: Text(footer!, style: t.text.caption),
             ),
         ],
@@ -496,6 +511,27 @@ class AdaptiveTile extends StatelessWidget {
         ],
       );
     }
+    if (isCupertino(context)) {
+      // A row of the iOS system lists: 17 pt text, at least 48 px high,
+      // grey subtitle, no ripple.
+      return ListTile(
+        leading: leading,
+        title: Text(
+          title,
+          style: destructive
+              ? t.text.body.copyWith(color: t.colors.danger)
+              : t.text.body,
+        ),
+        subtitle: subtitle == null
+            ? null
+            : Text(subtitle!, style: t.text.subLine),
+        trailing: end,
+        onTap: onTap,
+        minTileHeight: t.sizes.minTapTarget,
+        splashColor: Colors.transparent,
+        contentPadding: EdgeInsets.symmetric(horizontal: t.space.lg),
+      );
+    }
     return ListTile(
       leading: leading,
       title: Text(
@@ -507,6 +543,35 @@ class AdaptiveTile extends StatelessWidget {
       subtitle: subtitle == null ? null : Text(subtitle!),
       trailing: end,
       onTap: onTap,
+    );
+  }
+}
+
+/// What shows behind a list row while it is swiped away to delete it (the
+/// iOS system lists: red, the bin at the trailing edge). Use as the
+/// `background` of a [Dismissible] with `DismissDirection.endToStart`.
+class SwipeDeleteBackground extends StatelessWidget {
+  const SwipeDeleteBackground({required this.semanticLabel, super.key});
+
+  final String semanticLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tikky;
+    return ColoredBox(
+      color: t.colors.danger,
+      child: Align(
+        alignment: AlignmentDirectional.centerEnd,
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: t.space.lg),
+          child: Icon(
+            AdaptiveIcons.delete(context),
+            color: t.onColor(t.colors.danger),
+            size: t.sizes.iconMd,
+            semanticLabel: semanticLabel,
+          ),
+        ),
+      ),
     );
   }
 }

@@ -59,6 +59,35 @@ Offen dazu: Linkshänder-Layout spiegelt nur die Rückgängig-Leiste, nicht das
 Knopfraster. Zum Löschen eines Sets bleibt dessen gemerkte Ansicht als
 ungenutzter Eintrag in den Einstellungen liegen.
 
+## Aus dem ersten Handytest am 14.11. (iPhone 12 mini, Safari)
+
+| Nr. | Idee | Status | Stand in der App |
+|---|---|---|---|
+| 13 | **Unter-Spuren pro Substanz mit Timer im Streifen:** jede Substanz der Protokoll-Spur bekommt im „Streifen“ eine eigene Unter-Spur, mit eigenem Timer. | gebaut | Unter der Protokoll-Spur eine Unter-Spur pro Substanz (Reihenfolge des ersten Eintrags). Bei mehreren Personen steht jede Person als eigene Zeile darüber, ihre Substanzen eingerückt darunter; Einträge ohne Substanz bleiben auf der Personenzeile. Links neben jeder Substanz läuft die Zeit seit ihrem letzten Eintrag (`mm:ss` bzw. `h:mm:ss`), in Warnfarbe solange eine selbst eingestellte Sperrzeit läuft; nur bei offener Sitzung. |
+| 14 | **Zeit zwischen zwei Einträgen anzeigen.** | gebaut | Im Streifen steht auf jeder Substanz-Unter-Spur zwischen zwei Markern der Abstand („25 min“) und vom letzten Marker bis zur Jetzt-Linie die laufende Zeit (umrandet) – jeweils nur, wo der Text Platz hat; auf dem Handy oft erst beim Hineinzoomen. Antippen eines Markers zeigt immer „25 min nach dem vorherigen“. Die Listen-Zeitleiste behält ihren Hinweis ab fünf Minuten Abstand. |
+| 15 | **Größer, an iOS orientiert.** | teilweise | Schriftgrößen folgen jetzt den iOS-Textstilen (Apple HIG, Standardgröße): Text und Überschriften 17, Beschriftungen 16, Nebenzeilen 15, Fußnoten 13, Titel 22; große Zahlen 44. Streifen-Spuren 52/44 px hoch, Marker größer, Namensspalte am Handy breiter. Tippziele bleiben ≥ 48 px. Auf iOS außerdem: große Titel bei „Verlauf“ und „Einstellungen“, die beim Scrollen in die Leiste wandern (Filter und Umschalter des Verlaufs scrollen mit dem Titel weg, wie das Suchfeld in Mail); Abschnitte wie die Einstellungen-App (Kopf in Großbuchstaben, 17-pt-Zeilen, kein Ripple); in der Eintragsliste einer Protokoll-Sitzung Wischen zum Löschen (mit Rückgängig) und zwischen zwei Einträgen der Abstand („25 min früher“). Offen: Kontextmenüs bei langem Druck, große Titel auf dem Spuren-Bildschirm (dort steht der Set-Umschalter), Ansicht auf einem echten iPhone. |
+
+## Aus der Recherche zu Open-Source-Apps (14.11.)
+
+Quelle: `docs/ideen/INSPIRATION.md` (dort mit Screenshots-Beschreibung, Lizenzen
+und Herkunft). Nur gesammelt, nichts entschieden oder gebaut.
+
+| Nr. | Idee | Status | Stand in der App |
+|---|---|---|---|
+| 16 | **Laufende-Timer-Dock:** feste Leiste mit allen laufenden Spuren, auf jedem Reiter sichtbar; Tipp = pausieren/stoppen. (babytracker) | offen | Laufende Timer stehen nur in der Zeitleiste in einer festen Zeile (Nr. 8). |
+| 17 | **„Fortsetzen“ mit einem Tipp** auf gerade beendeten Sitzungen in Verlauf und Zeitleiste. (babytracker) | offen | – |
+| 18 | **„Gestartet vor …“:** beim Erfassen die Startzeit um Minuten nach hinten schieben (Chips 5 / 10 / 30 min). (babytracker) | offen | Zeit lässt sich über „Details“ ändern (Nr. 2), aber ohne Schnellwahl. |
+| 19 | **Fisheye-Streifen:** leere Zeit stauchen, belegte dehnen; Verbindungslinien zwischen Übersicht und Detail. (TimeTagger) | offen | Der Streifen hat gleichmäßige Zeitachse mit Zoom (Nr. 13/14). |
+| 20 | **Segmentbalken statt Zahl** für „n von m“ (Sitzungen, Runden, Intervalle). (Flex) | offen | – |
+| 21 | **Schwebende Pillen-Navigation:** nur der gewählte Reiter mit Label, Hauptknopf schwebt darüber. (Flex) | offen | Material: NavigationBar, iOS: Cupertino-Leiste, ab 720 px Rail. |
+| 22 | **Großer Ring** für Timer und Intervall mit Restzeit in der Mitte. (Flex) | offen | Dünne Fortschrittsleiste (3 px) und große Ziffern. |
+| 23 | **Farbwähler mit „an Theme anpassen“** im Design-Editor. (Table Habit) | offen | Farbwähler vorhanden, ohne Anpassung an das Theme. |
+| 24 | **Einklappbare Gruppen** mit Anzahl und Gruppenfarbe. (Table Habit) | offen | Sets gruppieren Spuren, ohne Einklappen. |
+| 25 | **Kalender-Heatmap und Serien** auf der Detailseite einer Spur oder Substanz. (Loop Habit Tracker) | offen | Verlauf mit Tages- und Wochensummen (Nr. 10 deckt nur den Abend ab). |
+| 26 | **Einstellungen als Listenzeilen** mit Icon, Titel, Untertitel und Suche. (Flex, Ice Cubes) | offen | Teil von Nr. 15 („gruppierte Listen“). |
+| 27 | **„Seit …“-Zeile / Wachfenster** pro Spur („zuletzt vor 1 h 45 min“). (babytracker) | offen | Protokoll-Spur zeigt Zeit seit dem letzten Eintrag (Nr. 3, 13); andere Spuren nicht. |
+| 28 | **Zen-Modus:** nur große Knöpfe auf schwarzem Grund, alles andere aus. (babytracker) | offen | Tippfeld (Nr. 11) und Theme „Schwarz“ gibt es getrennt. |
+
 ## Früher festgehalten
 
 | Idee | Status | Quelle |

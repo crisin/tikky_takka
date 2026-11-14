@@ -170,6 +170,17 @@ class AdaptiveAppBar extends StatelessWidget implements PreferredSizeWidget {
 
 /// A page with an [AdaptiveAppBar]. The body is kept inside the safe area
 /// (the top is handled by the bar).
+///
+/// With [largeTitle] a top-level page gets the large title of the iOS
+/// system apps on iOS / macOS: big under the bar, shrinking into it while
+/// the body scrolls (the body's vertical list must use the primary scroll
+/// controller, i.e. no controller of its own). Other platforms keep the
+/// regular bar.
+///
+/// [belowTitle] (filters, a segmented switch) sits above the body. With the
+/// large title it scrolls away together with the title, like the search
+/// field of the iOS system apps; content would otherwise end up under the
+/// collapsed bar.
 class AdaptivePageScaffold extends StatelessWidget {
   const AdaptivePageScaffold({
     required this.body,
@@ -179,6 +190,8 @@ class AdaptivePageScaffold extends StatelessWidget {
     this.floatingActionButton,
     this.automaticallyImplyLeading = true,
     this.resizeToAvoidBottomInset = true,
+    this.largeTitle = false,
+    this.belowTitle,
     super.key,
   });
 
@@ -189,9 +202,49 @@ class AdaptivePageScaffold extends StatelessWidget {
   final Widget? floatingActionButton;
   final bool automaticallyImplyLeading;
   final bool resizeToAvoidBottomInset;
+  final bool largeTitle;
+  final Widget? belowTitle;
+
+  /// The large-title bar (for tests).
+  static const largeTitleKey = ValueKey('adaptive-large-title');
 
   @override
   Widget build(BuildContext context) {
+    final title = this.title;
+    if (largeTitle && title != null && isCupertino(context)) {
+      final t = context.tikky;
+      return Scaffold(
+        resizeToAvoidBottomInset: resizeToAvoidBottomInset,
+        floatingActionButton: floatingActionButton,
+        body: NestedScrollView(
+          headerSliverBuilder: (context, _) => [
+            CupertinoSliverNavigationBar(
+              key: AdaptivePageScaffold.largeTitleKey,
+              // Several bars live side by side in the shell's IndexedStack;
+              // hero transitions between them would clash.
+              transitionBetweenRoutes: false,
+              automaticallyImplyLeading: automaticallyImplyLeading,
+              // Like the system apps: bar background and hairline only once
+              // the content scrolls under the bar.
+              automaticBackgroundVisibility: true,
+              stretch: true,
+              backgroundColor: t.colors.background,
+              border: Border(bottom: t.hairline),
+              leading: leading,
+              largeTitle: DefaultTextStyle.merge(
+                style: TextStyle(color: t.colors.text),
+                child: title,
+              ),
+              trailing: actions.isEmpty
+                  ? null
+                  : Row(mainAxisSize: MainAxisSize.min, children: actions),
+            ),
+            if (belowTitle case final below?) SliverToBoxAdapter(child: below),
+          ],
+          body: SafeArea(top: false, child: body),
+        ),
+      );
+    }
     return Scaffold(
       resizeToAvoidBottomInset: resizeToAvoidBottomInset,
       appBar: AdaptiveAppBar(
@@ -201,7 +254,18 @@ class AdaptivePageScaffold extends StatelessWidget {
         automaticallyImplyLeading: automaticallyImplyLeading,
       ),
       floatingActionButton: floatingActionButton,
-      body: SafeArea(top: false, child: body),
+      body: SafeArea(
+        top: false,
+        child: belowTitle == null
+            ? body
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  belowTitle!,
+                  Expanded(child: body),
+                ],
+              ),
+      ),
     );
   }
 }
@@ -234,11 +298,7 @@ class AdaptiveEmptyState extends StatelessWidget {
             children: [
               Icon(icon, size: t.sizes.iconXl, color: t.colors.textMuted),
               SizedBox(height: t.space.lg),
-              Text(
-                title,
-                style: t.text.headline,
-                textAlign: TextAlign.center,
-              ),
+              Text(title, style: t.text.headline, textAlign: TextAlign.center),
               if (message != null) ...[
                 SizedBox(height: t.space.sm),
                 Text(

@@ -30,7 +30,17 @@ class StripStyle {
     // Lanes grow with the text so a label never leaves its lane.
     final textHeight = scaler.scale(t.text.caption.fontSize ?? 12) * 1.5;
     final laneHeight = math.max(s.lane, textHeight + t.space.sm);
-    final subLaneHeight = math.max(s.subLane, textHeight + t.space.xs);
+    // A substance lane shows its name and its timer in the gutter.
+    double lineHeight(TextStyle style) =>
+        scaler.scale(style.fontSize ?? 12) * (style.height ?? 1.2);
+    final twoLines =
+        lineHeight(t.text.caption) +
+        lineHeight(t.text.digitsSmall) +
+        t.space.xs;
+    final subLaneHeight = math.max(
+      s.subLane,
+      math.max(textHeight + t.space.xs, twoLines),
+    );
     final sample = TextPainter(
       text: TextSpan(
         text: Fmt.time(
@@ -163,6 +173,11 @@ class StripLanesPainter extends CustomPainter {
 
   Color _rowColor(StripRowData row) => style.tokens.trackColor(row.track);
 
+  /// The colour of the lane's own thing (person, substance), else the
+  /// track's.
+  Color _laneColor(StripRowData row) =>
+      row.dotArgb == null ? _rowColor(row) : Color(row.dotArgb!);
+
   @override
   void paint(Canvas canvas, Size size) {
     final t = style.tokens;
@@ -242,6 +257,8 @@ class StripLanesPainter extends CustomPainter {
           if (!bar.thin) _hatch(canvas, rrect, color);
       }
     }
+
+    _paintGaps(canvas, size, layout);
 
     final labelStyle = t.text.caption.copyWith(color: t.colors.text);
     final outline = Paint()
@@ -374,6 +391,54 @@ class StripLanesPainter extends CustomPainter {
       );
     }
     canvas.restore();
+  }
+
+  /// The time between two markers, written on a small pill in the middle
+  /// of the visible part of the stretch; the running timer of a lane
+  /// (from its last marker up to "now") stands out. Left out where the
+  /// text does not fit.
+  void _paintGaps(Canvas canvas, Size size, StripLayout layout) {
+    if (layout.gaps.isEmpty) return;
+    final t = style.tokens;
+    final s = t.strip;
+    final m = style.metrics;
+    final quiet = t.text.caption.copyWith(
+      fontFeatures: const [FontFeature.tabularFigures()],
+    );
+    final loud = quiet.copyWith(
+      color: t.colors.text,
+      fontWeight: FontWeight.w600,
+    );
+    final pillPaint = Paint()..color = t.colors.surface;
+    final inset = m.markerRadius + s.labelGap;
+    for (final gap in layout.gaps) {
+      final from = math.max(gap.fromX, 0.0) + inset;
+      final to = math.min(gap.toX, size.width) - inset;
+      if (to <= from) continue;
+      final text = _texts.get(Fmt.compact(gap.ms), gap.live ? loud : quiet);
+      final pillWidth = text.width + 2 * s.labelGap;
+      if (pillWidth > to - from) continue;
+      final rect = Rect.fromCenter(
+        center: Offset((from + to) / 2, gap.centerY),
+        width: pillWidth,
+        height: text.height,
+      );
+      final pill = RRect.fromRectAndRadius(
+        rect,
+        Radius.circular(rect.height / 2),
+      );
+      canvas.drawRRect(pill, pillPaint);
+      if (gap.live) {
+        canvas.drawRRect(
+          pill,
+          Paint()
+            ..color = _laneColor(data.rows[gap.rowIndex])
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = s.nowLine,
+        );
+      }
+      text.paint(canvas, Offset(rect.left + s.labelGap, rect.top));
+    }
   }
 
   void _hatch(Canvas canvas, RRect rrect, Color color) {

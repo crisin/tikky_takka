@@ -594,7 +594,13 @@ void main() {
             ),
           ),
         );
-        expect(find.text('Darstellung'), findsOneWidget);
+        // Apple platforms: the small capitals of the iOS grouped lists.
+        expect(
+          find.text(
+            platform == TargetPlatform.macOS ? 'DARSTELLUNG' : 'Darstellung',
+          ),
+          findsOneWidget,
+        );
         expect(find.text('Dunkel'), findsOneWidget);
         expect(find.text('Leer'), findsOneWidget);
         await tester.tap(find.text('Design'));

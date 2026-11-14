@@ -6,6 +6,7 @@ import '../../core/domain/domain.dart';
 import '../../core/engine/engine.dart';
 import '../../core/now_ticker.dart';
 import '../../core/repo/repo.dart';
+import '../../l10n/formatters.dart';
 import '../../l10n/strings.dart';
 import '../../theme/theme.dart';
 import 'protocol_entry_sheet.dart';
@@ -121,20 +122,35 @@ class ProtocolSessionScreen extends ConsumerWidget {
                       style: t.text.bodyMuted,
                     ),
                   ),
-                for (final entry in entries)
-                  _EntryRow(
-                    key: ValueKey('entry-${entry.id}'),
-                    entry: entry,
-                    nowMs: nowMs,
-                    persons: persons,
-                    substances: substances,
-                    onEdit: () => showProtocolEntrySheet(
-                      context,
-                      track: track,
-                      existing: entry,
+                for (var i = 0; i < entries.length; i++) ...[
+                  // Newest first: the time back to the entry below.
+                  if (i > 0)
+                    _EntryGap(
+                      key: ValueKey('gap-${entries[i].id}'),
+                      ms: entries[i - 1].at - entries[i].at,
                     ),
-                    onDelete: () => _delete(context, ref, entry),
+                  Dismissible(
+                    key: ValueKey('swipe-${entries[i].id}'),
+                    direction: DismissDirection.endToStart,
+                    background: const SwipeDeleteBackground(
+                      semanticLabel: ProtocolStrings.deleteEntry,
+                    ),
+                    onDismissed: (_) => _delete(context, ref, entries[i]),
+                    child: _EntryRow(
+                      key: ValueKey('entry-${entries[i].id}'),
+                      entry: entries[i],
+                      nowMs: nowMs,
+                      persons: persons,
+                      substances: substances,
+                      onEdit: () => showProtocolEntrySheet(
+                        context,
+                        track: track,
+                        existing: entries[i],
+                      ),
+                      onDelete: () => _delete(context, ref, entries[i]),
+                    ),
                   ),
+                ],
                 const ProtocolNeutralNote(),
               ],
             );
@@ -203,6 +219,40 @@ class ProtocolSessionScreen extends ConsumerWidget {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+/// "25 min früher": the time between two neighbouring entries of the
+/// list, quietly between their rows.
+class _EntryGap extends StatelessWidget {
+  const _EntryGap({required this.ms, super.key});
+
+  final int ms;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tikky;
+    final line = Expanded(
+      child: Divider(height: t.sizes.hairline, color: t.colors.border),
+    );
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: t.space.page),
+      child: Row(
+        children: [
+          line,
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: t.space.md),
+            child: Text(
+              ProtocolStrings.gapEarlier(Fmt.compact(ms)),
+              style: t.text.caption.copyWith(
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+          ),
+          line,
+        ],
       ),
     );
   }

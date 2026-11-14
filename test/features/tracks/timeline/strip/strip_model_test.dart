@@ -353,19 +353,23 @@ void main() {
       );
     }
 
-    test('one lane per track in track order; a protocol gets one sub-lane '
-        'per person, a counter one per label', () {
+    test('one lane per track in track order; a protocol gets a sub-lane '
+        'per person and below it one per substance, a counter one per '
+        'label', () {
       final data = mixed();
       expect(
-        [for (final r in data.rows) '${r.isSub ? '  ' : ''}${r.title}'],
+        [for (final r in data.rows) '${'  ' * r.indent}${r.title}'],
         [
           'Vögel',
-          '  Reiher',
-          '  Ente',
+          'Reiher',
+          'Ente',
           'Zelt',
           '  Mo',
+          '    Wasser',
           '  Jacke',
+          '    GBL',
           '  ${Strings.protocolNoPerson}',
+          '    Wasser',
           'Uhr',
         ],
       );
@@ -375,14 +379,18 @@ void main() {
         'birds/l/Ente',
         'tent',
         'tent/p/p2',
+        'tent/p/p2/s/water',
         'tent/p/p1',
+        'tent/p/p1/s/gbl',
         'tent/p/',
+        'tent/p//s/water',
         'watch',
       ]);
-      // The person's own colour marks the sub-lane.
-      expect(data.rows[5].dotArgb, 0xFF00AA00);
+      // The person's and the substance's own colours mark the sub-lanes.
+      expect(data.rows[6].dotArgb, 0xFF00AA00);
+      expect(data.rows[5].dotArgb, 0xFF445566);
       expect(data.rows[0].dotArgb, isNull);
-      expect(data.contentHeight(_metrics), 3 * 40 + 5 * 30);
+      expect(data.contentHeight(_metrics), 3 * 40 + 8 * 30);
       // Unlabelled taps stay on the track's own lane.
       expect(data.rows[0].events.single.row.text, 'Tipp 3');
       // Per label the marker carries the running count.
@@ -414,14 +422,21 @@ void main() {
     test('entries: the substance names the marker and gives its colour; '
         'the amount is only ever shown', () {
       final data = mixed();
+      // The person's own lane keeps what has no substance (the amount is
+      // its text); the substance lane names the substance, so its markers
+      // need no text.
       final moRow = data.rows[4];
-      expect(moRow.events.map((e) => e.label), ['Wasser', 'ein Schluck']);
-      expect(moRow.events.first.colorArgb, 0xFF445566);
-      expect(moRow.events.last.colorArgb, isNull);
-      expect(moRow.events.map((e) => e.kind).toSet(), {StripMarkerKind.entry});
-      final jackeRow = data.rows[5];
+      expect(moRow.events.map((e) => e.label), ['ein Schluck']);
+      expect(moRow.events.single.colorArgb, isNull);
+      final moWater = data.rows[5];
+      expect(moWater.events.single.label, isNull);
+      expect(moWater.events.single.colorArgb, 0xFF445566);
+      expect(moWater.events.map((e) => e.kind).toSet(), {
+        StripMarkerKind.entry,
+      });
+      final jackeRow = data.rows[7];
       expect(jackeRow.events.single.row.text, 'Jacke · GBL · 1 ml');
-      expect(jackeRow.events.single.label, 'GBL');
+      expect(jackeRow.events.single.label, isNull);
       // The protocol's own lane carries the bar, no entries.
       expect(data.rows[3].events, isEmpty);
       expect(data.rows[3].sessions, hasLength(1));
@@ -475,6 +490,7 @@ void main() {
         'birds/l/Reiher',
         'tent',
         'tent/p/',
+        'tent/p//s/water',
         'tent/p/p2',
         'watch',
       ]);
@@ -656,28 +672,39 @@ void main() {
 
     test('only where the user set a lockout on the substance', () {
       final data = protocol(substances);
-      final jackeRow = data.rows[1];
-      expect(jackeRow.title, 'Jacke');
-      expect(jackeRow.bands, hasLength(1));
-      expect(jackeRow.bands.single.from, 10 * min);
-      expect(jackeRow.bands.single.to, 10 * min + 2 * hour);
-      expect(jackeRow.bands.single.colorArgb, 0xFF112233);
-      expect(jackeRow.events.first.lockoutUntil, 10 * min + 2 * hour);
-      expect(jackeRow.events[1].lockoutUntil, isNull);
-      expect(jackeRow.events[2].lockoutUntil, isNull);
-      // Mo only had water: nothing.
-      expect(data.rows[2].bands, isEmpty);
+      expect(data.rows.map((r) => r.id), [
+        'tent',
+        'tent/p/p1',
+        'tent/p/p1/s/gbl',
+        'tent/p/p1/s/water',
+        'tent/p/p2',
+        'tent/p/p2/s/water',
+      ]);
+      final gblRow = data.rows[2];
+      expect(gblRow.title, 'GBL');
+      expect(gblRow.bands, hasLength(1));
+      expect(gblRow.bands.single.from, 10 * min);
+      expect(gblRow.bands.single.to, 10 * min + 2 * hour);
+      expect(gblRow.bands.single.colorArgb, 0xFF112233);
+      expect(gblRow.lockoutUntil, 10 * min + 2 * hour);
+      expect(gblRow.events.single.lockoutUntil, 10 * min + 2 * hour);
+      // Water has no lockout, an entry without a substance neither.
+      expect(data.rows[3].bands, isEmpty);
+      expect(data.rows[3].lockoutUntil, isNull);
+      expect(data.rows[1].events.single.lockoutUntil, isNull);
+      expect(data.rows[1].bands, isEmpty);
+      expect(data.rows[5].bands, isEmpty);
       expect(data.rows[0].bands, isEmpty);
 
       final layout = _layout(data, nowMs: hour);
       final band = layout.bands.single;
-      expect(band.rowIndex, 1);
+      expect(band.rowIndex, 2);
       expect(band.rect.left, 100);
       // Two hours later - beyond the viewport, clipped at its margin.
       expect(band.rect.right, 648);
-      // The whole height of the person's lane.
-      expect(band.rect.top, 40);
-      expect(band.rect.bottom, 70);
+      // The whole height of the substance's lane.
+      expect(band.rect.top, 70);
+      expect(band.rect.bottom, 100);
       expect(band.colorArgb, 0xFF112233);
     });
 
@@ -714,6 +741,91 @@ void main() {
         nowMs: 4 * hour,
       );
       expect(after.bands, isEmpty);
+    });
+  });
+
+  group('substance lanes: timer and the time between entries', () {
+    // One person: the substance lanes follow the track directly.
+    StripData single({bool stopped = false}) {
+      final log = _log(tent)
+        ..start(0)
+        ..entry(10 * min, person: 'p1', substance: 'gbl')
+        ..entry(11 * min, person: 'p1', substance: 'gbl')
+        ..entry(40 * min, person: 'p1', substance: 'gbl')
+        ..entry(20 * min, person: 'p1', substance: 'water');
+      if (stopped) log.stop(50 * min);
+      return buildStripData(
+        tracks: [tent],
+        sessions: [_session(tent, log)],
+        nowMs: hour,
+        persons: persons,
+        substances: substances,
+      );
+    }
+
+    test('one person: no person lane, a lane per substance with a timer '
+        'from its last entry while the session is open', () {
+      final data = single();
+      expect(
+        [for (final r in data.rows) '${'  ' * r.indent}${r.title}'],
+        ['Zelt', '  GBL', '  Wasser'],
+      );
+      expect(data.rows[1].timerFrom, 40 * min);
+      expect(data.rows[2].timerFrom, 20 * min);
+      expect(data.rows[0].timerFrom, isNull);
+      expect(data.rows[1].showGaps, isTrue);
+      expect(data.rows[0].showGaps, isFalse);
+      // Each entry knows the one before it on its lane.
+      expect(data.rows[1].events.map((e) => e.previousAt), [
+        null,
+        10 * min,
+        11 * min,
+      ]);
+      expect(data.rows[2].events.single.previousAt, isNull);
+      // A finished session has nothing that counts on.
+      expect(single(stopped: true).rows[1].timerFrom, isNull);
+    });
+
+    test('the time between neighbours where it has room, and the running '
+        'time from the last entry up to now', () {
+      final layout = _layout(single(), nowMs: hour);
+      final gbl = [
+        for (final g in layout.gaps)
+          if (g.rowIndex == 1) g,
+      ];
+      // 10 -> 11 min is 10 px: too close for a text. 11 -> 40 min is 29
+      // minutes; 40 min -> now the running timer.
+      expect(gbl.map((g) => (g.ms, g.live)), [
+        (29 * min, false),
+        (20 * min, true),
+      ]);
+      expect(gbl.first.fromX, 110);
+      expect(gbl.first.toX, 400);
+      expect(gbl.last.toX, layout.nowX);
+      expect(gbl.first.centerY, 40 + 15);
+      // Water: a single entry, only its timer.
+      final water = [
+        for (final g in layout.gaps)
+          if (g.rowIndex == 2) g,
+      ];
+      expect(water.single.live, isTrue);
+      expect(water.single.ms, 40 * min);
+      // The track's own lane has none.
+      expect(layout.gaps.where((g) => g.rowIndex == 0), isEmpty);
+    });
+
+    test('no timer and no running gap after the session ended; gaps only '
+        'for what touches the viewport', () {
+      final stopped = _layout(single(stopped: true), nowMs: hour);
+      expect(stopped.gaps.where((g) => g.live), isEmpty);
+      expect(stopped.gaps.where((g) => g.rowIndex == 1), hasLength(1));
+      final later = _layout(
+        single(),
+        startMs: 2 * hour.toDouble(),
+        nowMs: 3 * hour,
+      );
+      // Only the running timer reaches into a viewport after the entries.
+      expect(later.gaps.every((g) => g.live), isTrue);
     });
   });
 

@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -36,6 +37,48 @@ abstract final class StripKeys {
 
   /// The name of a lane in the gutter; [rowId] is `StripRowData.id`.
   static Key lane(String rowId) => ValueKey('strip-lane-$rowId');
+
+  /// The timer of a lane in the gutter.
+  static Key timer(String rowId) => ValueKey('strip-timer-$rowId');
+}
+
+/// The timer of a substance lane: time since its last entry, in the
+/// warning colour while a lockout the user set is still running.
+class _LaneTimer extends StatelessWidget {
+  const _LaneTimer({
+    required this.ticker,
+    required this.from,
+    required this.lockoutUntil,
+    super.key,
+  });
+
+  final ValueListenable<int> ticker;
+  final int from;
+  final int? lockoutUntil;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tikky;
+    return ValueListenableBuilder<int>(
+      valueListenable: ticker,
+      builder: (context, now, _) {
+        final elapsed = math.max(0, now - from);
+        final locked = lockoutUntil != null && lockoutUntil! > now;
+        return Semantics(
+          label: TracksStrings.stripTimerSemantics(Fmt.compact(elapsed)),
+          excludeSemantics: true,
+          child: Text(
+            Fmt.clock(elapsed),
+            style: t.text.digitsSmall.copyWith(
+              color: locked ? t.colors.warning : t.colors.text,
+              fontWeight: FontWeight.w600,
+            ),
+            maxLines: 1,
+          ),
+        );
+      },
+    );
+  }
 }
 
 /// Fires when the "now" line has moved far enough to be worth a frame:
@@ -446,34 +489,58 @@ class StripViewState extends ConsumerState<StripView> {
     ),
   );
 
-  Widget _gutterRow(TikkyTokens t, StripRowData row, double height) {
+  Widget _gutterRow(
+    TikkyTokens t,
+    StripRowData row,
+    double height,
+    NowTicker ticker,
+  ) {
     final color = row.dotArgb == null
         ? t.trackColor(row.track)
         : Color(row.dotArgb!);
+    final indent = row.indent > 0 ? row.indent : (row.isSub ? 1 : 0);
+    final title = Text(
+      row.title,
+      style: row.isSub
+          ? t.text.caption.copyWith(color: t.colors.text)
+          : t.text.label,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    );
+    final from = row.timerFrom;
     return SizedBox(
       key: StripKeys.lane(row.id),
       height: height,
       child: Padding(
         padding: EdgeInsets.only(
-          left: t.space.sm + (row.isSub ? t.strip.subIndent : 0),
+          left: t.space.sm + indent * t.strip.subIndent,
           right: t.space.xs,
         ),
         child: Semantics(
           label: row.isSub
               ? TracksStrings.stripSubLane(row.track.name, row.title)
               : row.title,
-          excludeSemantics: true,
+          excludeSemantics: from == null,
           child: Row(
             children: [
               ColorDot(color: color),
               SizedBox(width: t.space.xs),
               Expanded(
-                child: Text(
-                  row.title,
-                  style: row.isSub ? t.text.caption : t.text.label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
+                child: from == null
+                    ? title
+                    : Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          ExcludeSemantics(child: title),
+                          _LaneTimer(
+                            key: StripKeys.timer(row.id),
+                            ticker: ticker,
+                            from: from,
+                            lockoutUntil: row.lockoutUntil,
+                          ),
+                        ],
+                      ),
               ),
             ],
           ),
@@ -707,7 +774,12 @@ class StripViewState extends ConsumerState<StripView> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       for (var i = 0; i < data.rows.length; i++)
-                        _gutterRow(t, data.rows[i], layout.rowHeights[i]),
+                        _gutterRow(
+                          t,
+                          data.rows[i],
+                          layout.rowHeights[i],
+                          ticker,
+                        ),
                     ],
                   ),
                 ),

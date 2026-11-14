@@ -52,7 +52,7 @@ final class TikkySizes {
   double get progressBar => 3;
 
   /// Minimum height of a lane row.
-  double get laneMinHeight => 76 * _density;
+  double get laneMinHeight => 84 * _density;
 
   /// Minimum width of a lane tile / grid column on wide layouts.
   double get tileMinWidth => 300;
@@ -81,8 +81,8 @@ final class TikkySizes {
   /// Fixed height of the undo bar at the top of the tap pad.
   double get undoBarHeight => 56;
 
-  double get iconSm => 18;
-  double get iconMd => 22;
+  double get iconSm => 20;
+  double get iconMd => 24;
   double get iconLg => 28;
   double get iconXl => 44;
 
@@ -93,17 +93,17 @@ final class TikkySizes {
   double get secondaryIcon => 20 * _prefs.buttonScale;
 
   /// Font size of the large time / count of a lane.
-  double get digitsLarge => 38 * _prefs.digitScale;
+  double get digitsLarge => 44 * _prefs.digitScale;
 
   /// Font size of secondary figures (lap time, per-label counts).
-  double get digitsMedium => 22 * _prefs.digitScale;
+  double get digitsMedium => 24 * _prefs.digitScale;
 
   /// Font size of small figures inside sub-lines and lists.
-  double get digitsSmall => 15 * _prefs.digitScale;
+  double get digitsSmall => 17 * _prefs.digitScale;
 
   /// Diameter of colour swatches (palette, person / substance dots).
   double get swatch => 28;
-  double get dot => 10;
+  double get dot => 12;
 
   /// From this width on the app uses the navigation rail and a grid.
   double get wideBreakpoint => TikkyTokens.wideBreakpoint;
@@ -174,26 +174,26 @@ final class TikkyStripTokens {
   final double _density;
 
   /// Height of the lane of a track.
-  double get lane => 44 * _density;
+  double get lane => 52 * _density;
 
   /// Height of a sub-lane (a person of a protocol, a label of a counter).
-  double get subLane => 32 * _density;
+  double get subLane => 44 * _density;
 
   /// Height of the time axis above the lanes.
   double get axis => 30;
 
   /// Thickness of a session bar in a lane / in a sub-lane.
-  double get bar => 20 * _density;
-  double get subBar => 12 * _density;
+  double get bar => 22 * _density;
+  double get subBar => 14 * _density;
 
   /// Diameter of an event marker.
-  double get marker => 11;
+  double get marker => 13;
 
   /// How far around a marker a tap or the pointer still counts.
   double get hitSlop => 14;
 
   /// Markers closer than this (centre to centre) become a cluster.
-  double get markerGap => 16;
+  double get markerGap => 18;
 
   /// Height and smallest width of the pill of a cluster.
   double get clusterHeight => 20;
@@ -210,7 +210,7 @@ final class TikkyStripTokens {
 
   /// Width of the fixed track names: wide, and on a phone.
   double get gutter => 184;
-  double get gutterNarrow => 96;
+  double get gutterNarrow => 124;
 
   /// Below this width of the whole strip the narrow gutter is used.
   double get narrowBreakpoint => 560;
@@ -404,6 +404,9 @@ class TikkyTokens extends ThemeExtension<TikkyTokens> {
 
   List<String> get fontFamilyFallback => TikkyFonts.fallback(theme.fontFamily);
 
+  /// The text sizes follow the iOS text styles at the default size
+  /// (Apple HIG): body and headline 17, callout 16, subhead 15, footnote
+  /// 13, title 2 22. The system text size scales them further.
   TikkyTextStyles _buildText() {
     final family = fontFamily;
     final fallbackFamilies = fontFamilyFallback;
@@ -446,15 +449,15 @@ class TikkyTokens extends ThemeExtension<TikkyTokens> {
       digitsLarge: digits(sizes.digitsLarge, colors.text),
       digitsMedium: digits(sizes.digitsMedium, colors.text),
       digitsSmall: digits(sizes.digitsSmall, colors.textMuted),
-      laneTitle: base(13, FontWeight.w500, colors.textMuted, height: 1.2),
-      subLine: base(13, FontWeight.w400, colors.textMuted, height: 1.25),
-      title: base(20, FontWeight.w600, colors.text, height: 1.2),
-      headline: base(16, FontWeight.w600, colors.text, height: 1.25),
-      body: base(15, FontWeight.w400, colors.text, height: 1.35),
-      bodyMuted: base(15, FontWeight.w400, colors.textMuted, height: 1.35),
-      label: base(14, FontWeight.w500, colors.text, height: 1.25),
-      caption: base(12, FontWeight.w400, colors.textMuted, height: 1.3),
-      button: base(15, FontWeight.w600, colors.text, height: 1.2),
+      laneTitle: base(15, FontWeight.w500, colors.textMuted, height: 1.2),
+      subLine: base(15, FontWeight.w400, colors.textMuted, height: 1.25),
+      title: base(22, FontWeight.w600, colors.text, height: 1.2),
+      headline: base(17, FontWeight.w600, colors.text, height: 1.25),
+      body: base(17, FontWeight.w400, colors.text, height: 1.35),
+      bodyMuted: base(17, FontWeight.w400, colors.textMuted, height: 1.35),
+      label: base(16, FontWeight.w500, colors.text, height: 1.25),
+      caption: base(13, FontWeight.w400, colors.textMuted, height: 1.3),
+      button: base(17, FontWeight.w600, colors.text, height: 1.2),
     );
   }
 

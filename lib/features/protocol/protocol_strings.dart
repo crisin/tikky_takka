@@ -97,6 +97,9 @@ abstract final class ProtocolStrings {
       'In dieser Sitzung gibt es noch keinen Eintrag.';
   static String sessionSince(String dateTime) => 'Sitzung seit $dateTime';
   static const deleteEntry = 'Eintrag löschen';
+
+  /// Between two entries of the session list (newest first).
+  static String gapEarlier(String duration) => '$duration früher';
   static const editEntry = 'Eintrag bearbeiten';
 
   // ------------------------------------------------- persons / substances

@@ -263,7 +263,9 @@ void main() {
       h.timer.id,
       tent.id,
       '${tent.id}/p/${jacke.id}',
+      '${tent.id}/p/${jacke.id}/s/${gbl.id}',
       '${tent.id}/p/${mo.id}',
+      '${tent.id}/p/${mo.id}/s/${water.id}',
       birds.id,
       '${birds.id}/l/Reiher',
       '${birds.id}/l/Ente',
@@ -286,11 +288,44 @@ void main() {
     expect(h.inStripLane(tent.id, 'Zelt'), findsOneWidget);
     expect(h.inStripLane('${tent.id}/p/${jacke.id}', 'Jacke'), findsOneWidget);
     expect(h.inStripLane('${birds.id}/l/Reiher', 'Reiher'), findsOneWidget);
-    // Sub-lanes are indented.
+    // Sub-lanes are indented, a person's substances further.
+    final gblLane = '${tent.id}/p/${jacke.id}/s/${gbl.id}';
     expect(
       tester.getTopLeft(h.inStripLane('${tent.id}/p/${jacke.id}', 'Jacke')).dx,
       greaterThan(tester.getTopLeft(h.inStripLane(tent.id, 'Zelt')).dx),
     );
+    expect(
+      tester.getTopLeft(h.inStripLane(gblLane, 'GBL')).dx,
+      greaterThan(
+        tester
+            .getTopLeft(h.inStripLane('${tent.id}/p/${jacke.id}', 'Jacke'))
+            .dx,
+      ),
+    );
+    // Every substance lane has its timer: time since its last entry, in
+    // the warning colour while the lockout the user set is running.
+    final gblTimer = find.byKey(StripKeys.timer(gblLane));
+    expect(
+      find.descendant(of: gblTimer, matching: find.text('04:00')),
+      findsOneWidget,
+    );
+    expect(
+      tester
+          .widget<Text>(
+            find.descendant(of: gblTimer, matching: find.byType(Text)),
+          )
+          .style!
+          .color,
+      TikkyTokens.fallback.colors.warning,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(StripKeys.timer('${tent.id}/p/${mo.id}/s/${water.id}')),
+        matching: find.text('01:00'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.byKey(StripKeys.timer(tent.id)), findsNothing);
     // Wide: the buttons say what they do.
     expect(find.text(TracksStrings.stripFit), findsOneWidget);
     expect(find.text(TracksStrings.stripNow), findsOneWidget);
@@ -322,13 +357,13 @@ void main() {
       layout.markers.where((m) => m.rowIndex == 0).single.kind,
       StripMarkerKind.lap,
     );
-    expect(h.markerOf(ticks[0])!.rowIndex, 6);
-    expect(h.markerOf(ticks[1])!.rowIndex, 7);
-    expect(h.markerOf(withLockout)!.rowIndex, 3);
-    expect(h.markerOf(plain)!.rowIndex, 4);
+    expect(h.markerOf(ticks[0])!.rowIndex, 8);
+    expect(h.markerOf(ticks[1])!.rowIndex, 9);
+    expect(h.markerOf(withLockout)!.rowIndex, 4);
+    expect(h.markerOf(plain)!.rowIndex, 6);
     expect(h.markerOf(withLockout)!.event!.colorArgb, 0xFF112233);
     expect(layout.bands, hasLength(1));
-    expect(layout.bands.single.rowIndex, 3);
+    expect(layout.bands.single.rowIndex, 4);
     expect(layout.bands.single.colorArgb, 0xFF112233);
     expect(
       layout.bands.single.rect.left,
@@ -439,6 +474,38 @@ void main() {
           .text,
       '1 ml',
     );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('an entry of a substance lane tells the time since the one '
+      'before it', (tester) async {
+    final h = await TracksHarness.start(tester);
+    final people = h.container.read(peopleRepositoryProvider);
+    final jacke = await h.run(() => people.createPerson(name: 'Jacke'));
+    final water = await h.run(() => people.createSubstance(name: 'Wasser'));
+    final tent = await h.addTrack(const ProtocolConfig(), name: 'Zelt');
+    Future<TrackEvent> drink() async => (await h.run<TrackEvent?>(
+      () => h.commands.addEntry(
+        tent.id,
+        personId: jacke.id,
+        substanceId: water.id,
+      ),
+    ))!;
+    final first = await drink();
+    await h.advance(const Duration(minutes: 25));
+    final second = await drink();
+    await h.advance(const Duration(minutes: 5));
+    await h.showTimeline();
+
+    await h.tapMarker(second);
+    expect(
+      find.text(TracksStrings.stripSincePrevious('25 min')),
+      findsOneWidget,
+    );
+    await tester.tapAt(const Offset(10, 10));
+    await h.settle();
+    await h.tapMarker(first);
+    expect(find.byKey(StripDetailKeys.sincePrevious), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

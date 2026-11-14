@@ -1,8 +1,12 @@
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:tikky_takka/adaptive/adaptive.dart';
 import 'package:tikky_takka/core/domain/domain.dart';
 import 'package:tikky_takka/core/repo/repo.dart';
+import 'package:tikky_takka/features/history/history_filter_bar.dart';
 import 'package:tikky_takka/features/history/history_screen.dart';
 import 'package:tikky_takka/features/history/history_session_list.dart';
 import 'package:tikky_takka/features/history/history_strings.dart';
@@ -75,6 +79,46 @@ void main() {
     expect(find.text('30:00'), findsOneWidget);
     expect(find.text('1:00:00'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('iOS: a large title; the filters scroll away with it', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    try {
+      await setUpApp(tester);
+      await fx.run(tester, fx.seedTwoDays);
+      await pumpHistory(tester);
+
+      expect(find.byKey(AdaptivePageScaffold.largeTitleKey), findsOneWidget);
+      expect(find.byType(CupertinoSliverNavigationBar), findsOneWidget);
+      // The filters live under the title, not in the list.
+      expect(
+        find.ancestor(
+          of: find.byType(HistoryFilterBar),
+          matching: find.byType(SliverToBoxAdapter),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        tester.getRect(find.byType(HistoryFilterBar)).top,
+        greaterThan(44),
+      );
+
+      await tester.drag(find.byType(SessionTile).first, const Offset(0, -600));
+      await settleUi(tester, app);
+      // Collapsed: the filters went up with the title, the sessions follow
+      // right below the small bar.
+      expect(find.byType(HistoryFilterBar), findsNothing);
+      expect(
+        find.byType(HistoryFilterBar, skipOffstage: false),
+        findsOneWidget,
+      );
+      expect(find.byType(SessionTile), findsNWidgets(3));
+      expect(tester.takeException(), isNull);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
   });
 
   testWidgets('wide layout keeps the content readable', (tester) async {
@@ -346,6 +390,7 @@ void main() {
       final more = find.byTooltip(HistoryStrings.eventActions);
       expect(more, findsNWidgets(3));
       await tester.ensureVisible(more.at(1));
+      await settleUi(tester, app);
       await tester.tap(more.at(1));
       await settleUi(tester, app);
       await tester.tap(find.text(Strings.deleteEvent));
@@ -354,6 +399,9 @@ void main() {
       expect(find.text('Tipp 2 · Hund'), findsNothing);
       expect(find.text('Tipp 2 · Reiher'), findsOneWidget);
       expect(find.text(Strings.eventDeleted), findsOneWidget);
+      // Back to the figures at the top of the list.
+      await tester.drag(find.byType(ListView), const Offset(0, 2000));
+      await settleUi(tester, app);
       expect(find.text('Reiher 2'), findsOneWidget);
 
       await tester.tap(find.text(Strings.undo));
@@ -412,6 +460,7 @@ void main() {
       // A note on a single event.
       final more = find.byTooltip(HistoryStrings.eventActions);
       await tester.ensureVisible(more.first);
+      await settleUi(tester, app);
       await tester.tap(more.first);
       await settleUi(tester, app);
       await tester.tap(find.text(HistoryStrings.addNote));
@@ -496,6 +545,7 @@ void main() {
       // Entries are edited in the protocol sheet, not with a plain note.
       final more = find.byTooltip(HistoryStrings.eventActions);
       await tester.ensureVisible(more.first);
+      await settleUi(tester, app);
       await tester.tap(more.first);
       await settleUi(tester, app);
       expect(find.text(HistoryStrings.editEntry), findsOneWidget);

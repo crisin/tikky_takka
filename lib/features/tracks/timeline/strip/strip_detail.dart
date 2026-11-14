@@ -17,6 +17,7 @@ abstract final class StripDetailKeys {
   static const edit = ValueKey('strip-detail-edit');
   static const delete = ValueKey('strip-detail-delete');
   static const session = ValueKey('strip-session');
+  static const sincePrevious = ValueKey('strip-detail-since-previous');
 }
 
 enum _DetailAction { edit, delete }
@@ -65,6 +66,7 @@ class _EventDetail extends StatelessWidget {
     final row = event.row;
     final note = row.note;
     final lockout = stripLockoutText(event, nowMs);
+    final previous = event.previousAt;
     return SingleChildScrollView(
       key: StripDetailKeys.event,
       padding: EdgeInsets.fromLTRB(
@@ -89,6 +91,16 @@ class _EventDetail extends StatelessWidget {
                 '${Fmt.time(row.at, use24h: t.prefs.use24h, seconds: true)}',
                 style: t.text.digitsSmall,
               ),
+              if (previous != null) ...[
+                SizedBox(height: t.space.sm),
+                Text(
+                  TracksStrings.stripSincePrevious(
+                    Fmt.compact(row.at - previous),
+                  ),
+                  key: StripDetailKeys.sincePrevious,
+                  style: t.text.body,
+                ),
+              ],
               if (note != null && note.isNotEmpty) ...[
                 SizedBox(height: t.space.sm),
                 Text(note, style: t.text.body),
