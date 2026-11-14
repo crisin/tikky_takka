@@ -2,9 +2,10 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../theme/tokens.dart';
+import 'adaptive_controls.dart';
 import 'platform.dart';
 
-/// One top-level destination of the app.
+//// One top-level destination of the app.
 @immutable
 class AdaptiveDestination {
   const AdaptiveDestination({
@@ -18,20 +19,41 @@ class AdaptiveDestination {
   final IconData selectedIcon;
 }
 
-/// The app's top-level navigation:
+/// A button next to the navigation: the round "+" beside the pill, or an
+/// entry below the destinations of the rail ("Einstellungen").
+@immutable
+class AdaptiveNavAction {
+  const AdaptiveNavAction({
+    required this.label,
+    required this.icon,
+    required this.onPressed,
+    this.key,
+  });
+
+  final String label;
+  final IconData icon;
+  final VoidCallback onPressed;
+  final Key? key;
+}
+
+/// The app's navigation ("Pult"):
 ///
-/// * phone, Material: [NavigationBar] at the bottom;
-/// * phone, Cupertino: [CupertinoTabBar] at the bottom;
-/// * wide (>= 720 px), any platform: [NavigationRail] at the leading edge.
+/// * phone: the [NavPill] at the bottom - one word per destination, the
+///   selected one inverted - and the round [action] beside it, both within
+///   thumb reach;
+/// * wide (>= 720 px): a [NavigationRail] at the leading edge with the
+///   [action] above the destinations and [railActions] below them.
 ///
-/// [body] is the page for [selectedIndex] (the shell keeps pages alive with
-/// an `IndexedStack`). Pages bring their own [AdaptivePageScaffold].
+/// The look is the same on every platform. [body] is the page for
+/// [selectedIndex].
 class AdaptiveNavScaffold extends StatelessWidget {
   const AdaptiveNavScaffold({
     required this.destinations,
     required this.selectedIndex,
     required this.onDestinationSelected,
     required this.body,
+    this.action,
+    this.railActions = const [],
     super.key,
   });
 
@@ -39,10 +61,15 @@ class AdaptiveNavScaffold extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int> onDestinationSelected;
   final Widget body;
+  final AdaptiveNavAction? action;
+
+  /// Further entries of the rail (wide layouts only).
+  final List<AdaptiveNavAction> railActions;
 
   @override
   Widget build(BuildContext context) {
     final t = context.tikky;
+    final action = this.action;
     if (isWide(context)) {
       return Scaffold(
         body: Row(
@@ -53,6 +80,34 @@ class AdaptiveNavScaffold extends StatelessWidget {
                 selectedIndex: selectedIndex,
                 onDestinationSelected: onDestinationSelected,
                 labelType: NavigationRailLabelType.all,
+                leading: action == null
+                    ? null
+                    : Padding(
+                        padding: EdgeInsets.only(bottom: t.space.sm),
+                        child: NavRoundButton(action: action),
+                      ),
+                trailing: railActions.isEmpty
+                    ? null
+                    : Expanded(
+                        child: Align(
+                          alignment: Alignment.bottomCenter,
+                          child: Padding(
+                            padding: EdgeInsets.only(bottom: t.space.lg),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                for (final a in railActions)
+                                  AdaptiveIconButton(
+                                    key: a.key,
+                                    icon: a.icon,
+                                    semanticLabel: a.label,
+                                    onPressed: a.onPressed,
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
                 destinations: [
                   for (final d in destinations)
                     NavigationRailDestination(
@@ -74,43 +129,172 @@ class AdaptiveNavScaffold extends StatelessWidget {
       );
     }
 
-    final Widget bar;
-    if (isCupertino(context)) {
-      bar = CupertinoTabBar(
-        currentIndex: selectedIndex,
-        onTap: onDestinationSelected,
-        backgroundColor: t.colors.surface,
-        activeColor: t.colors.text,
-        inactiveColor: t.colors.textMuted,
-        border: Border(top: t.hairline),
-        items: [
-          for (final d in destinations)
-            BottomNavigationBarItem(
-              icon: Icon(d.icon),
-              activeIcon: Icon(d.selectedIcon),
-              label: d.label,
+    final bar = SafeArea(
+      top: false,
+      minimum: EdgeInsets.only(bottom: t.space.lg),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          t.space.pageLanes,
+          t.space.sm,
+          t.space.pageLanes,
+          t.space.sm,
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: NavPill(
+                labels: [for (final d in destinations) d.label],
+                selectedIndex: selectedIndex,
+                onSelected: onDestinationSelected,
+              ),
             ),
-        ],
-      );
-    } else {
-      bar = DecoratedBox(
-        decoration: BoxDecoration(border: Border(top: t.hairline)),
-        child: NavigationBar(
-          selectedIndex: selectedIndex,
-          onDestinationSelected: onDestinationSelected,
-          destinations: [
-            for (final d in destinations)
-              NavigationDestination(
-                icon: Icon(d.icon),
-                selectedIcon: Icon(d.selectedIcon),
-                label: d.label,
-                tooltip: d.label,
+            if (action != null) ...[
+              SizedBox(width: t.space.sm),
+              NavRoundButton(action: action),
+            ],
+          ],
+        ),
+      ),
+    );
+    return Scaffold(body: body, bottomNavigationBar: bar);
+  }
+}
+
+/// The pill at the bottom of a phone: one word per entry, the selected one
+/// inverted. Every entry is at least a tap target high.
+class NavPill extends StatelessWidget {
+  const NavPill({
+    required this.labels,
+    required this.selectedIndex,
+    required this.onSelected,
+    super.key,
+  });
+
+  /// Key of the entry [index] (for tests).
+  static Key entryKey(int index) => ValueKey('nav-pill-$index');
+
+  final List<String> labels;
+  final int selectedIndex;
+  final ValueChanged<int> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tikky;
+    return Semantics(
+      container: true,
+      child: Container(
+        height: t.sizes.navPill,
+        // Thin, so every entry stays a full tap target.
+        padding: EdgeInsets.all(t.space.xxs),
+        decoration: BoxDecoration(
+          color: t.colors.surface,
+          borderRadius: t.radii.pillAll,
+          border: t.sizes.hairline > 0
+              ? Border.all(color: t.colors.border, width: t.sizes.hairline)
+              : null,
+        ),
+        child: Row(
+          children: [
+            for (var i = 0; i < labels.length; i++)
+              Expanded(
+                child: _PillEntry(
+                  key: entryKey(i),
+                  label: labels[i],
+                  selected: i == selectedIndex,
+                  onTap: () => onSelected(i),
+                ),
               ),
           ],
         ),
-      );
-    }
-    return Scaffold(body: body, bottomNavigationBar: bar);
+      ),
+    );
+  }
+}
+
+class _PillEntry extends StatelessWidget {
+  const _PillEntry({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    super.key,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tikky;
+    return Semantics(
+      button: true,
+      selected: selected,
+      inMutuallyExclusiveGroup: true,
+      child: Material(
+        color: selected ? t.colors.primary : Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: t.radii.pillAll),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          splashFactory: isCupertino(context) ? NoSplash.splashFactory : null,
+          onTap: onTap,
+          child: Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: t.space.xs),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  style: t.text.navLabel.copyWith(
+                    color: selected ? t.colors.onPrimary : t.colors.text,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The round, inverted button beside the pill ("Neue Spur").
+class NavRoundButton extends StatelessWidget {
+  const NavRoundButton({required this.action, super.key});
+
+  final AdaptiveNavAction action;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tikky;
+    return Semantics(
+      button: true,
+      label: action.label,
+      excludeSemantics: true,
+      onTap: action.onPressed,
+      child: Tooltip(
+        message: action.label,
+        excludeFromSemantics: true,
+        child: Material(
+          key: action.key,
+          color: t.colors.primary,
+          shape: RoundedRectangleBorder(borderRadius: t.radii.pillAll),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            splashFactory: isCupertino(context) ? NoSplash.splashFactory : null,
+            onTap: action.onPressed,
+            child: SizedBox.square(
+              dimension: t.sizes.navPill,
+              child: Icon(
+                action.icon,
+                size: t.sizes.iconLg,
+                color: t.colors.onPrimary,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

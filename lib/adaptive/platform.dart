@@ -32,8 +32,11 @@ bool isWide(BuildContext context) =>
 /// Icons that differ between Material and Cupertino. Use these for common
 /// actions so each platform shows its familiar glyphs.
 abstract final class AdaptiveIcons {
-  static IconData _pick(BuildContext c, IconData material, IconData cupertino) =>
-      isCupertino(c) ? cupertino : material;
+  static IconData _pick(
+    BuildContext c,
+    IconData material,
+    IconData cupertino,
+  ) => isCupertino(c) ? cupertino : material;
 
   // Navigation destinations.
   static IconData tracks(BuildContext c) =>
@@ -58,8 +61,11 @@ abstract final class AdaptiveIcons {
       _pick(c, Icons.stop_rounded, CupertinoIcons.stop_fill);
   static IconData lap(BuildContext c) =>
       _pick(c, Icons.flag_outlined, CupertinoIcons.flag);
-  static IconData reset(BuildContext c) =>
-      _pick(c, Icons.restart_alt_rounded, CupertinoIcons.arrow_counterclockwise);
+  static IconData reset(BuildContext c) => _pick(
+    c,
+    Icons.restart_alt_rounded,
+    CupertinoIcons.arrow_counterclockwise,
+  );
   static IconData undo(BuildContext c) =>
       _pick(c, Icons.undo_rounded, CupertinoIcons.arrow_uturn_left);
   static IconData plusOne(BuildContext c) =>
@@ -76,6 +82,10 @@ abstract final class AdaptiveIcons {
       _pick(c, Icons.add_rounded, CupertinoIcons.add);
   static IconData more(BuildContext c) =>
       _pick(c, Icons.more_vert_rounded, CupertinoIcons.ellipsis_circle);
+
+  /// "···" in the head of the tracks screen: the same on every platform.
+  static IconData moreHorizontal(BuildContext c) =>
+      _pick(c, Icons.more_horiz_rounded, CupertinoIcons.ellipsis);
   static IconData edit(BuildContext c) =>
       _pick(c, Icons.edit_outlined, CupertinoIcons.pencil);
   static IconData delete(BuildContext c) =>

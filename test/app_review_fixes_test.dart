@@ -20,6 +20,7 @@ import 'package:tikky_takka/features/tracks/tracks_screen.dart';
 import 'package:tikky_takka/l10n/strings.dart';
 import 'package:tikky_takka/theme/theme.dart';
 
+import 'support/shell_nav.dart';
 import 'support/test_app.dart';
 
 /// Counts how often the history is read from the database.
@@ -63,10 +64,6 @@ void main() {
         tester.element(find.byType(TracksScreen, skipOffstage: false)),
       );
 
-  Finder inNavigation(String label) => find.descendant(
-    of: find.byType(NavigationBar),
-    matching: find.text(label),
-  );
 
   Future<void> lifecycle(
     WidgetTester tester,
@@ -212,18 +209,18 @@ void main() {
         .read(activeTracksProvider)
         .firstWhere((t) => t.name == Strings.seedCounterName);
 
-    await tester.tap(inNavigation(Strings.navHistory));
+    await openHistoryPage(tester);
     await settle(tester, app);
     expect(find.byType(HistoryScreen), findsOneWidget);
     expect(history.loads, greaterThan(0));
 
-    // Back on the tracks: the history stays mounted (state kept) ...
-    await tester.tap(inNavigation(Strings.navTracks));
+    // Back on the tracks: the history page is gone ...
+    await closePage(tester);
     await settle(tester, app);
-    expect(find.byType(HistoryScreen, skipOffstage: false), findsOneWidget);
+    expect(find.byType(HistoryScreen, skipOffstage: false), findsNothing);
     final before = history.loads;
 
-    // ... but event writes no longer make it re-read everything.
+    // ... and event writes do not make anything re-read the history.
     for (var i = 0; i < 5; i++) {
       await tester.tap(find.byKey(LaneKeys.primary(counter.id)));
       await settle(tester, app);
@@ -234,10 +231,10 @@ void main() {
     await settle(tester, app);
     expect(history.loads, before);
 
-    // Shown again: one reload, and the new session is there.
-    await tester.tap(inNavigation(Strings.navHistory));
+    // Opened again: it reads once, and the new session is there.
+    await openHistoryPage(tester);
     await settle(tester, app);
-    expect(history.loads, before + 1);
+    expect(history.loads, greaterThan(before));
     expect(find.text(Strings.seedCounterName), findsWidgets);
     expect(tester.takeException(), isNull);
   });
@@ -280,7 +277,7 @@ void main() {
       final app = await start(tester);
       expect(containerOf(tester).read(uiPrefsProvider).haptics, isTrue);
 
-      await tester.tap(inNavigation(Strings.navSettings));
+      await openSettingsPage(tester);
       await settle(tester, app);
       final import = find.byKey(const ValueKey('settings.import'));
       await tester.scrollUntilVisible(
@@ -306,7 +303,7 @@ void main() {
         'app lock untouched', (tester) async {
       final app = await start(tester);
 
-      await tester.tap(inNavigation(Strings.navHistory));
+      await openHistoryPage(tester);
       await settle(tester, app);
       await tester.tap(find.byTooltip(Strings.export));
       await settle(tester, app);

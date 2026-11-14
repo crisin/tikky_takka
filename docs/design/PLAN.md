@@ -203,6 +203,21 @@ Entwürfe `1-2-spuren`, `1-3-zustaende`, `5-1-hell-oliv-test`.
 
 Entwürfe `1-2-spuren`, `2-7-sets-und-szene`.
 
+**Stand: erledigt** (Zweig `pult`), mit diesen Abweichungen:
+
+- **E3 entschieden wie vorgeschlagen:** ab 720 px Seitenleiste mit „Neue
+  Spur“ oben, den drei Ansichten und „Einstellungen“ unten.
+- **`ShellDestination` entfällt ganz.** Einstellungen und Verlauf sind
+  Seiten, die über „···“ geöffnet werden (breit: Einstellungen auch aus der
+  Seitenleiste). Ein Tipp auf eine Benachrichtigung schließt offene Seiten.
+- Die Pille ist auf allen Plattformen gleich (kein `CupertinoTabBar`,
+  `NavigationBar` mehr); ihr Innenabstand ist 2 statt 4, damit jedes Wort
+  ein volles Tippziel von 48 bleibt.
+- In niedrigen Fenstern (unter 560 px, Telefon quer) ist der Kopf kompakt:
+  Titel 24, ohne Zählzeile.
+- „Sets und Szene“ zeigt die Szene nur für ein Set mit Protokoll-Spur oder
+  gesetzter Szene. Der Griff zum Sortieren der Sets bleibt.
+
 - **P3.1** `adaptive_scaffold.dart`: neues Widget `NavPill` (drei Wörter, 56
   hoch, gewählter Reiter in `primary` / `onPrimary`) und runder Plus-Knopf 56;
   12 zum Rand, 30 nach unten plus sichere Zone. Ersetzt in schmaler Breite

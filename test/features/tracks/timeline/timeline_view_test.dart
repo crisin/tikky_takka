@@ -1,6 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:tikky_takka/app.dart';
 import 'package:tikky_takka/core/domain/domain.dart';
 import 'package:tikky_takka/core/engine/engine.dart';
 import 'package:tikky_takka/core/repo/repo.dart';
@@ -582,28 +583,26 @@ void main() {
     });
   });
 
-  testWidgets('the stream rests while another destination is shown and '
+  testWidgets('the stream rests while a page covers the tracks screen and '
       'catches up afterwards', (tester) async {
     final h = await TracksHarness.start(tester);
     final (birds, ticks) = await _birds(h);
     await h.showTimeline();
-    bool tickerMode() => tester
-        .widget<TickerMode>(
-          find
-              .descendant(
-                of: find.byKey(TimelineKeys.view, skipOffstage: false),
-                matching: find.byType(TickerMode, skipOffstage: false),
-              )
-              .first,
-        )
-        .enabled;
+    // The ticker mode in effect inside the timeline (the page on top turns
+    // it off for everything below).
+    bool tickerMode() => TickerMode.valuesOf(
+      tester.element(
+        find
+            .descendant(
+              of: find.byKey(TimelineKeys.view, skipOffstage: false),
+              matching: find.byType(TickerMode, skipOffstage: false),
+            )
+            .first,
+      ),
+    ).enabled;
     expect(tickerMode(), isTrue);
 
-    await h.run(
-      () async => h.container
-          .read(shellDestinationProvider.notifier)
-          .go(ShellDestination.settings),
-    );
+    unawaited(openSettings(tester.element(find.byType(TracksScreen))));
     await h.settle();
     expect(tickerMode(), isFalse);
     final later = await h.tick(birds, label: 'Ente');
@@ -613,11 +612,7 @@ void main() {
       findsNothing,
     );
 
-    await h.run(
-      () async => h.container
-          .read(shellDestinationProvider.notifier)
-          .go(ShellDestination.tracks),
-    );
+    tester.state<NavigatorState>(find.byType(Navigator).first).pop();
     await h.settle();
     expect(tickerMode(), isTrue);
     expect(h.inRow(later, 'Ente · 2'), findsOneWidget);

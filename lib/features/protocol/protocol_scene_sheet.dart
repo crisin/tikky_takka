@@ -28,16 +28,77 @@ Future<void> showSceneEditor(BuildContext context, {required String setId}) {
   );
 }
 
-class _SceneSheet extends ConsumerStatefulWidget {
+class _SceneSheet extends StatelessWidget {
   const _SceneSheet({required this.setId});
 
   final String setId;
 
   @override
-  ConsumerState<_SceneSheet> createState() => _SceneSheetState();
+  Widget build(BuildContext context) {
+    final t = context.tikky;
+    return Center(
+      heightFactor: 1,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: t.sizes.sheetMaxWidth),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Flexible(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.symmetric(horizontal: t.space.page),
+                child: SceneEditor(setId: setId),
+              ),
+            ),
+            SceneDoneButton(onPressed: () => Navigator.of(context).pop()),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
-class _SceneSheetState extends ConsumerState<_SceneSheet> {
+/// The "Fertig" button at the bottom of a scene sheet.
+class SceneDoneButton extends StatelessWidget {
+  const SceneDoneButton({required this.onPressed, super.key});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tikky;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        t.space.page,
+        t.space.sm,
+        t.space.page,
+        t.space.lg,
+      ),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(minHeight: t.sizes.bigTapTarget),
+        child: AdaptiveFilledButton(
+          key: const ValueKey('scene-done'),
+          label: Strings.done,
+          icon: AdaptiveIcons.check(context),
+          onPressed: onPressed,
+        ),
+      ),
+    );
+  }
+}
+
+/// The scene of a set: "Wer ist dabei?" and "Was ist dran?" as chips. Used
+/// in its own sheet and in "Sets und Szene".
+class SceneEditor extends ConsumerStatefulWidget {
+  const SceneEditor({required this.setId, super.key});
+
+  final String setId;
+
+  @override
+  ConsumerState<SceneEditor> createState() => _SceneEditorState();
+}
+
+class _SceneEditorState extends ConsumerState<SceneEditor> {
   final _newPerson = TextEditingController();
   final _newSubstance = TextEditingController();
 
@@ -148,149 +209,113 @@ class _SceneSheetState extends ConsumerState<_SceneSheet> {
             for (final id in substanceIds)
               if (substances.any((s) => s.id == id)) id,
           ];
-    final hasScene =
-        ready && (personIds.isNotEmpty || substanceIds.isNotEmpty);
+    final hasScene = ready && (personIds.isNotEmpty || substanceIds.isNotEmpty);
 
-    return Center(
-      heightFactor: 1,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: t.sizes.sheetMaxWidth),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Semantics(
+          header: true,
+          child: Text(
+            set == null
+                ? ProtocolStrings.scene
+                : ProtocolStrings.sceneOf(set.name),
+            style: t.text.title,
+          ),
+        ),
+        SizedBox(height: t.space.xs),
+        Text(ProtocolStrings.sceneHint, style: t.text.caption),
+
+        // ---------------------------------------------- who
+        const ProtocolSectionLabel(ProtocolStrings.sceneWho),
+        Wrap(
+          spacing: t.space.sm,
+          runSpacing: t.space.sm,
           children: [
-            Flexible(
-              child: SingleChildScrollView(
-                padding: EdgeInsets.symmetric(horizontal: t.space.page),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Semantics(
-                      header: true,
-                      child: Text(
-                        set == null
-                            ? ProtocolStrings.scene
-                            : ProtocolStrings.sceneOf(set.name),
-                        style: t.text.title,
-                      ),
-                    ),
-                    SizedBox(height: t.space.xs),
-                    Text(ProtocolStrings.sceneHint, style: t.text.caption),
-
-                    // ---------------------------------------------- who
-                    const ProtocolSectionLabel(ProtocolStrings.sceneWho),
-                    Wrap(
-                      spacing: t.space.sm,
-                      runSpacing: t.space.sm,
-                      children: [
-                        if (ready)
-                          for (final p in persons)
-                            ProtocolChoice(
-                              key: ValueKey('scene-person-${p.id}'),
-                              label: p.name,
-                              color: Color(p.color),
-                              selected: personIds.contains(p.id),
-                              onTap: () => _toggle(personIds, p.id),
-                            ),
-                        if (ready && !_addingPerson)
-                          ProtocolChoice(
-                            key: const ValueKey('scene-add-person'),
-                            label: ProtocolStrings.addPersonShort,
-                            semanticLabel: Strings.protocolAddPerson,
-                            icon: AdaptiveIcons.add(context),
-                            onTap: () => setState(() => _addingPerson = true),
-                          ),
-                      ],
-                    ),
-                    if (_addingPerson)
-                      ProtocolInlineAdd(
-                        key: const ValueKey('scene-new-person'),
-                        controller: _newPerson,
-                        hint: ProtocolStrings.newPersonHint,
-                        onSubmit: _commitNewPerson,
-                        onCancel: () => setState(() {
-                          _newPerson.clear();
-                          _addingPerson = false;
-                        }),
-                      ),
-
-                    // --------------------------------------------- what
-                    const ProtocolSectionLabel(ProtocolStrings.sceneWhat),
-                    Wrap(
-                      spacing: t.space.sm,
-                      runSpacing: t.space.sm,
-                      children: [
-                        if (ready)
-                          for (final s in substances)
-                            ProtocolChoice(
-                              key: ValueKey('scene-substance-${s.id}'),
-                              label: shownSubstances.contains(s.id)
-                                  ? ProtocolStrings.sceneOrdered(
-                                      shownSubstances.indexOf(s.id) + 1,
-                                      s.name,
-                                    )
-                                  : s.name,
-                              color: Color(s.color),
-                              selected: substanceIds.contains(s.id),
-                              onTap: () => _toggle(substanceIds, s.id),
-                            ),
-                        if (ready && !_addingSubstance)
-                          ProtocolChoice(
-                            key: const ValueKey('scene-add-substance'),
-                            label: ProtocolStrings.addSubstanceShort,
-                            semanticLabel: Strings.protocolAddSubstance,
-                            icon: AdaptiveIcons.add(context),
-                            onTap: () =>
-                                setState(() => _addingSubstance = true),
-                          ),
-                      ],
-                    ),
-                    if (_addingSubstance)
-                      ProtocolInlineAdd(
-                        key: const ValueKey('scene-new-substance'),
-                        controller: _newSubstance,
-                        hint: ProtocolStrings.newSubstanceHint,
-                        onSubmit: _commitNewSubstance,
-                        onCancel: () => setState(() {
-                          _newSubstance.clear();
-                          _addingSubstance = false;
-                        }),
-                      ),
-                    SizedBox(height: t.space.sm),
-                    Align(
-                      alignment: AlignmentDirectional.centerStart,
-                      child: AdaptiveTextButton(
-                        key: const ValueKey('scene-clear'),
-                        label: ProtocolStrings.sceneClear,
-                        destructive: true,
-                        onPressed: hasScene ? _clear : null,
-                      ),
-                    ),
-                  ],
+            if (ready)
+              for (final p in persons)
+                ProtocolChoice(
+                  key: ValueKey('scene-person-${p.id}'),
+                  label: p.name,
+                  color: Color(p.color),
+                  selected: personIds.contains(p.id),
+                  onTap: () => _toggle(personIds, p.id),
                 ),
+            if (ready && !_addingPerson)
+              ProtocolChoice(
+                key: const ValueKey('scene-add-person'),
+                label: ProtocolStrings.addPersonShort,
+                semanticLabel: Strings.protocolAddPerson,
+                icon: AdaptiveIcons.add(context),
+                onTap: () => setState(() => _addingPerson = true),
               ),
-            ),
-            Padding(
-              padding: EdgeInsets.fromLTRB(
-                t.space.page,
-                t.space.sm,
-                t.space.page,
-                t.space.lg,
-              ),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: t.sizes.bigTapTarget),
-                child: AdaptiveFilledButton(
-                  key: const ValueKey('scene-done'),
-                  label: Strings.done,
-                  icon: AdaptiveIcons.check(context),
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-              ),
-            ),
           ],
         ),
-      ),
+        if (_addingPerson)
+          ProtocolInlineAdd(
+            key: const ValueKey('scene-new-person'),
+            controller: _newPerson,
+            hint: ProtocolStrings.newPersonHint,
+            onSubmit: _commitNewPerson,
+            onCancel: () => setState(() {
+              _newPerson.clear();
+              _addingPerson = false;
+            }),
+          ),
+
+        // --------------------------------------------- what
+        const ProtocolSectionLabel(ProtocolStrings.sceneWhat),
+        Wrap(
+          spacing: t.space.sm,
+          runSpacing: t.space.sm,
+          children: [
+            if (ready)
+              for (final s in substances)
+                ProtocolChoice(
+                  key: ValueKey('scene-substance-${s.id}'),
+                  label: shownSubstances.contains(s.id)
+                      ? ProtocolStrings.sceneOrdered(
+                          shownSubstances.indexOf(s.id) + 1,
+                          s.name,
+                        )
+                      : s.name,
+                  color: Color(s.color),
+                  selected: substanceIds.contains(s.id),
+                  onTap: () => _toggle(substanceIds, s.id),
+                ),
+            if (ready && !_addingSubstance)
+              ProtocolChoice(
+                key: const ValueKey('scene-add-substance'),
+                label: ProtocolStrings.addSubstanceShort,
+                semanticLabel: Strings.protocolAddSubstance,
+                icon: AdaptiveIcons.add(context),
+                onTap: () => setState(() => _addingSubstance = true),
+              ),
+          ],
+        ),
+        if (_addingSubstance)
+          ProtocolInlineAdd(
+            key: const ValueKey('scene-new-substance'),
+            controller: _newSubstance,
+            hint: ProtocolStrings.newSubstanceHint,
+            onSubmit: _commitNewSubstance,
+            onCancel: () => setState(() {
+              _newSubstance.clear();
+              _addingSubstance = false;
+            }),
+          ),
+        SizedBox(height: t.space.sm),
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: AdaptiveTextButton(
+            key: const ValueKey('scene-clear'),
+            label: ProtocolStrings.sceneClear,
+            destructive: true,
+            onPressed: hasScene ? _clear : null,
+          ),
+        ),
+      ],
     );
   }
 }

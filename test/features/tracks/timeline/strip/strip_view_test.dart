@@ -219,7 +219,7 @@ void main() {
   testWidgets('lanes and a fixed gutter for mixed track types', (tester) async {
     final h = await TracksHarness.start(
       tester,
-      surfaceSize: const Size(1270, 720),
+      surfaceSize: const Size(1270, 800),
     );
     final people = h.container.read(peopleRepositoryProvider);
     final jacke = await h.run(() => people.createPerson(name: 'Jacke'));

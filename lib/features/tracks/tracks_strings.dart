@@ -18,6 +18,12 @@ abstract final class TracksStrings {
   static const emptySetTitle = 'Dieses Set ist noch leer';
   static const createSet = 'Set anlegen';
   static String setTrackCount(int n) => n == 1 ? '1 Spur' : '$n Spuren';
+
+  /// "5 Spuren · 4 aktiv" under the set's name.
+  static String setSummary(int tracks, int active) => active == 0
+      ? setTrackCount(tracks)
+      : '${setTrackCount(tracks)}$separator$active aktiv';
+  static const moreMenu = 'Mehr: Einstellungen, Verlauf';
   static String deleteSetQuestion(String name) => '„$name“ löschen?';
   static const deleteSetBody =
       'Alle Spuren dieses Sets und ihr Verlauf werden gelöscht.';

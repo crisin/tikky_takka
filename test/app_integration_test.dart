@@ -16,7 +16,9 @@ import 'package:tikky_takka/features/settings/theme_list_screen.dart';
 import 'package:tikky_takka/features/settings/widgets/setting_rows.dart';
 import 'package:tikky_takka/features/tracks/track_editor_sheet.dart';
 import 'package:tikky_takka/features/tracks/track_lane.dart';
+import 'package:tikky_takka/features/tracks/pad/tap_pad.dart';
 import 'package:tikky_takka/features/tracks/tracks_screen.dart';
+import 'package:tikky_takka/features/tracks/tracks_strings.dart';
 import 'package:tikky_takka/l10n/strings.dart';
 import 'package:tikky_takka/main.dart' show productionOverrides;
 
@@ -80,10 +82,15 @@ void main() {
     await tester.pump();
   }
 
-  Finder inNavigation(String label) => find.descendant(
-    of: find.byType(NavigationBar),
-    matching: find.text(label),
-  );
+  /// Opens settings or history through "···" on the tracks screen.
+  Future<void> openFromMore(WidgetTester tester, String label) async {
+    await tester.tap(find.byKey(TracksScreenKeys.more));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    await tester.tap(find.text(label).last);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+  }
 
   testWidgets('tracks: the track editor opens for new and existing tracks', (
     tester,
@@ -110,7 +117,7 @@ void main() {
   ) async {
     final app = await start(tester);
 
-    await tester.tap(inNavigation(Strings.navHistory));
+    await openFromMore(tester, Strings.navHistory);
     await settle(tester, app);
     expect(find.byType(HistoryScreen), findsOneWidget);
 
@@ -136,7 +143,7 @@ void main() {
       'are reachable', (tester) async {
     final app = await start(tester);
 
-    await tester.tap(inNavigation(Strings.navSettings));
+    await openFromMore(tester, Strings.navSettings);
     await settle(tester, app);
     expect(find.byType(SettingsScreen), findsOneWidget);
 
@@ -187,7 +194,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('wide layout: all three destinations through the rail', (
+  testWidgets('wide layout: the views and the settings through the rail', (
     tester,
   ) async {
     final app = await start(tester, size: TestApp.desktopSize);
@@ -196,15 +203,20 @@ void main() {
       matching: find.text(label),
     );
 
-    await tester.tap(inRail(Strings.navHistory));
+    await tester.tap(inRail(TracksStrings.viewPad));
     await settle(tester, app);
-    expect(find.byType(HistoryScreen), findsOneWidget);
-    await tester.tap(inRail(Strings.navSettings));
+    expect(find.byType(TapPad), findsOneWidget);
+    await tester.tap(inRail(TracksStrings.viewLanes));
+    await settle(tester, app);
+    expect(find.byType(TrackLane), findsWidgets);
+    await tester.tap(find.byKey(TracksScreenKeys.settings));
     await settle(tester, app);
     expect(find.byType(SettingsScreen), findsOneWidget);
-    await tester.tap(inRail(Strings.navTracks));
+    await pop(tester, app);
+    expect(find.byType(SettingsScreen), findsNothing);
+    await openFromMore(tester, Strings.navHistory);
     await settle(tester, app);
-    expect(find.byType(TracksScreen), findsOneWidget);
+    expect(find.byType(HistoryScreen), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -264,7 +276,7 @@ void main() {
     // (missing plugin), which is "unknown" and deliberately not reported
     // as "not available on this device": a failed check must never be
     // mistaken for a definite no (it would open a locked app).
-    await tester.tap(inNavigation(Strings.navSettings));
+    await openFromMore(tester, Strings.navSettings);
     await settle();
     await reveal(tester, find.byType(AppLockTile));
     await settle();

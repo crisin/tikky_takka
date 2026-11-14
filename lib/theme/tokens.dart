@@ -70,6 +70,10 @@ final class TikkySizes {
   /// Height of the bottom pill and diameter of the plus button beside it.
   double get navPill => 56;
 
+  /// Below this window height (a phone held sideways) the head of the
+  /// tracks screen is compact: a smaller title, no count below it.
+  double get compactHeight => 560;
+
   /// Minimum width of a lane tile / grid column on wide layouts.
   double get tileMinWidth => 300;
 
@@ -178,6 +182,9 @@ final class TikkyTextStyles {
     required this.laneDigitsIdle,
     required this.laneLabelCount,
     required this.laneLabel,
+    required this.navLabel,
+    required this.pageTitle,
+    required this.pageTitleCompact,
     required this.title,
     required this.headline,
     required this.body,
@@ -215,6 +222,13 @@ final class TikkyTextStyles {
   /// The count on a label button of a counter, and its label.
   final TextStyle laneLabelCount;
   final TextStyle laneLabel;
+
+  /// An entry of the navigation pill.
+  final TextStyle navLabel;
+
+  /// The large title at the top of the tracks screen (the set's name).
+  final TextStyle pageTitle;
+  final TextStyle pageTitleCompact;
 
   /// Screen and sheet titles.
   final TextStyle title;
@@ -583,6 +597,21 @@ class TikkyTokens extends ThemeExtension<TikkyTokens> {
       laneDigitsIdle: laneDigits(sizes.digitsMedium, 26 / 22, colors.textMuted),
       laneLabelCount: laneDigits(15, 1.2, colors.text),
       laneLabel: base(15, FontWeight.w600, colors.text, height: 1.2),
+      navLabel: base(15, FontWeight.w600, colors.text, height: 1.2),
+      pageTitle: base(
+        30,
+        FontWeight.w700,
+        colors.text,
+        height: 34 / 30,
+        letterSpacing: 30 * -0.02,
+      ),
+      pageTitleCompact: base(
+        24,
+        FontWeight.w700,
+        colors.text,
+        height: 28 / 24,
+        letterSpacing: 24 * -0.02,
+      ),
       digitsLarge: digits(sizes.digitsLarge, colors.text),
       digitsMedium: digits(sizes.digitsMedium, colors.text),
       digitsSmall: digits(sizes.digitsSmall, colors.textMuted),
