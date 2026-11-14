@@ -389,7 +389,7 @@ abstract final class Strings {
   static const prefDigitScale = 'Größe der Ziffern';
   static const prefButtonScale = 'Größe der Knöpfe';
   static const prefShowTenths = 'Zehntelsekunden anzeigen';
-  static const prefShowProgress = 'Fortschrittsbalken anzeigen';
+  static const prefShowProgress = 'Fortschritt in der Spur zeigen';
   static const prefShowSubLine = 'Zusatzzeile anzeigen';
   static const prefLeftHanded = 'Linkshänder-Layout';
   static const prefLeftHandedHint = 'Hauptknopf auf der linken Seite.';

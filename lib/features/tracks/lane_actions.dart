@@ -3,10 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../adaptive/adaptive.dart';
 import '../../core/domain/domain.dart';
+import '../../core/engine/engine.dart';
 import '../../core/now_ticker.dart';
 import '../../core/repo/repo.dart';
 import '../../core/services/haptics.dart';
-import '../../l10n/strings.dart';
+import '../../l10n/formatters.dart';
+import 'lane_undo.dart';
 import 'lane_view.dart';
 import 'tracks_strings.dart';
 
@@ -83,32 +85,42 @@ class LaneActions {
   }
 
   /// Ends the run and puts the lane back to idle. The run stays in the
-  /// history; "Rückgängig" lets it continue as if nothing had happened.
-  Future<void> reset(BuildContext context, Track track) async {
+  /// history; "Rückgängig" in the bar above the lanes lets it continue as
+  /// if nothing had happened.
+  Future<void> stop(Track track) async {
     final before = await _commands.resetTrack(track.id);
     _refresh();
     if (before == null) return;
     _haptics.heavy();
-    if (!context.mounted) return;
-    showUndoSnackBar(
-      context,
-      message: Strings.sessionStopped,
-      onUndo: () async {
-        await _commands.reopenSession(before.session.id);
-        _refresh();
-      },
+    final now = _ref.read(nowTickerProvider).value;
+    final snapshot = deriveSnapshot(
+      config: before.session.config,
+      events: before.events,
+      nowMs: now,
     );
+    _ref
+        .read(laneUndoProvider.notifier)
+        .offer(
+          message: TracksStrings.trackStopped(track.name),
+          detail: switch (snapshot) {
+            CounterSnapshot(:final count) => TracksStrings.ticksKept(count),
+            StopwatchSnapshot(:final elapsedMs) => TracksStrings.timeKept(
+              Fmt.clock(elapsedMs),
+            ),
+            _ => null,
+          },
+          onUndo: () async {
+            await _commands.reopenSession(before.session.id);
+            _refresh();
+          },
+        );
   }
 
-  /// One of the small secondary buttons.
-  Future<void> secondary(
-    BuildContext context,
-    Track track,
-    LaneSecondaryKind kind,
-  ) => switch (kind) {
+  /// The secondary button of a lane.
+  Future<void> secondary(Track track, LaneSecondaryKind kind) => switch (kind) {
     LaneSecondaryKind.lap => lap(track),
     LaneSecondaryKind.restart => restart(track),
-    LaneSecondaryKind.reset || LaneSecondaryKind.stop => reset(context, track),
+    LaneSecondaryKind.reset || LaneSecondaryKind.stop => stop(track),
     LaneSecondaryKind.undo => undoTick(track),
     LaneSecondaryKind.ackEarly => ack(track),
   };

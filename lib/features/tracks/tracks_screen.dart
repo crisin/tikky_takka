@@ -13,6 +13,7 @@ import '../alarms/alarms.dart';
 import '../protocol/protocol_entry_sheet.dart';
 import '../protocol/protocol_lane.dart';
 import 'lane_actions.dart';
+import 'lane_undo.dart';
 import 'now_selector.dart';
 import 'pad/pad_actions.dart';
 import 'pad/pad_model.dart';
@@ -255,8 +256,7 @@ class _TrackLanesState extends ConsumerState<TrackLanes> {
     final tracks = widget.tracks;
     if (pending == null) return tracks;
     final byId = {for (final t in tracks) t.id: t};
-    if (pending.length != tracks.length ||
-        !pending.every(byId.containsKey)) {
+    if (pending.length != tracks.length || !pending.every(byId.containsKey)) {
       return tracks;
     }
     return [for (final id in pending) byId[id]!];
@@ -296,11 +296,11 @@ class _TrackLanesState extends ConsumerState<TrackLanes> {
     final t = context.tikky;
     final layout = t.prefs.layout;
     final tracks = _ordered;
-    return LayoutBuilder(
+    final lanes = LayoutBuilder(
       builder: (context, constraints) {
         final columns = laneColumns(
           layout: layout,
-          width: constraints.maxWidth - 2 * t.space.page,
+          width: constraints.maxWidth - 2 * t.space.pageLanes,
           tileMinWidth: t.sizes.tileMinWidth,
           wide: isWide(context),
         );
@@ -309,13 +309,34 @@ class _TrackLanesState extends ConsumerState<TrackLanes> {
             : _grid(context, tracks, layout, columns);
       },
     );
+    // "Rückgängig" after a stop sits above the lanes, never over them.
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: EdgeInsets.fromLTRB(
+            t.space.pageLanes,
+            t.space.sm,
+            t.space.pageLanes,
+            0,
+          ),
+          child: const LaneUndoBar(),
+        ),
+        Expanded(child: lanes),
+      ],
+    );
   }
 
   Widget _list(BuildContext context, List<Track> tracks, LaneLayout layout) {
     final t = context.tikky;
     return ReorderableListView.builder(
       key: TracksScreenKeys.list,
-      padding: EdgeInsets.all(t.space.page),
+      padding: EdgeInsets.fromLTRB(
+        t.space.pageLanes,
+        t.space.xs,
+        t.space.pageLanes,
+        t.space.pageLanes,
+      ),
       buildDefaultDragHandles: false,
       itemCount: tracks.length,
       onReorderItem: _move,
@@ -351,7 +372,12 @@ class _TrackLanesState extends ConsumerState<TrackLanes> {
     final theme = Theme.of(context);
     return ListView.builder(
       key: TracksScreenKeys.grid,
-      padding: EdgeInsets.all(t.space.page),
+      padding: EdgeInsets.fromLTRB(
+        t.space.pageLanes,
+        t.space.xs,
+        t.space.pageLanes,
+        t.space.pageLanes,
+      ),
       itemCount: rowCount,
       itemBuilder: (context, rowIndex) {
         final start = rowIndex * columns;
@@ -421,7 +447,7 @@ class _GridCell extends StatelessWidget {
         decoration: candidates.isEmpty
             ? const BoxDecoration()
             : BoxDecoration(
-                borderRadius: t.radii.mdAll,
+                borderRadius: t.radii.laneAll,
                 border: Border.all(
                   color: t.colors.primary,
                   width: t.sizes.progressBar,
@@ -458,7 +484,10 @@ class _DragFeedback extends StatelessWidget {
       color: t.colors.surface,
       shape: RoundedRectangleBorder(
         borderRadius: t.radii.smAll,
-        side: BorderSide(color: t.trackColor(track), width: t.sizes.progressBar),
+        side: BorderSide(
+          color: t.trackColor(track),
+          width: t.sizes.progressBar,
+        ),
       ),
       child: Padding(
         padding: EdgeInsets.symmetric(

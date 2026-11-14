@@ -73,6 +73,11 @@ Je Fall: Timer starten, dann wie angegeben verlassen.
 - [ ] Tastatur verdeckt keine Eingabefelder (Spur-Editor, Notiz im
       Protokoll).
 - [ ] Haptik bei Start / Stopp spürbar.
+- [ ] Langer Druck auf den Hauptknopf einer laufenden Spur stoppt sie
+      (Haptik, Leiste „… gestoppt“ oben); langer Druck auf die Fläche
+      öffnet weiter Bearbeiten.
+- [ ] Lampe einer laufenden Spur pulsiert ruhig; mit „Bewegung
+      reduzieren“ steht sie still.
 
 ## 6. Android-Eigenheiten
 

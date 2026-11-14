@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -277,18 +276,64 @@ class _ProtocolLaneState extends ConsumerState<ProtocolLane> {
       pick = _Pick(scenePersonIds.single);
     }
 
-    final title = Text(
-      [
-        track.name,
-        Strings.modeProtocol,
-        if (entryCount > 0) ProtocolStrings.entryCount(entryCount),
-      ].join(' · '),
-      style: t.text.laneTitle,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
+    final roles = t.trackRoles(track);
+    final chosen = pick;
+    // Step 1 asks in the head line; otherwise it names the mode.
+    final asks = chosen == null && active.isNotEmpty;
+    final title = Row(
+      children: [
+        ExcludeSemantics(
+          child: SizedBox.square(
+            dimension: t.sizes.lamp,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: open == null ? null : roles.solid,
+                borderRadius: t.radii.pillAll,
+                border: open == null
+                    ? Border.all(
+                        color: roles.solid,
+                        width: t.sizes.laneButtonOutline,
+                      )
+                    : null,
+              ),
+            ),
+          ),
+        ),
+        SizedBox(width: t.space.sm),
+        Flexible(
+          child: Text(
+            track.name,
+            style: t.text.laneName.copyWith(
+              color: open == null ? t.colors.text : roles.ink,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        SizedBox(width: t.space.sm),
+        Expanded(
+          child: Semantics(
+            header: asks,
+            child: Text(
+              asks ? ProtocolStrings.whoAreYou : Strings.modeProtocol,
+              style: t.text.laneMode.copyWith(color: roles.ink),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ),
+        if (entryCount > 0)
+          Flexible(
+            child: Text(
+              ProtocolStrings.entryCount(entryCount),
+              style: t.text.laneSub.copyWith(color: roles.ink),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+      ],
     );
 
-    final chosen = pick;
     final Widget step = chosen == null
         ? _PersonCards(
             track: track,
@@ -313,6 +358,7 @@ class _ProtocolLaneState extends ConsumerState<ProtocolLane> {
           );
 
     final primary = _PrimaryButton(
+      roles: roles,
       onPressed: () => _openSheet(chosen?.personId),
     );
 
@@ -323,14 +369,14 @@ class _ProtocolLaneState extends ConsumerState<ProtocolLane> {
               icon: ProtocolIcons.entries(context),
               semanticLabel: ProtocolStrings.showEntries,
               size: t.sizes.secondaryIcon,
-              color: t.colors.textMuted,
+              color: roles.ink,
               onPressed: () => openProtocolSession(context, track: track),
             ),
             AdaptiveIconButton(
               icon: AdaptiveIcons.stop(context),
               semanticLabel: ProtocolStrings.finishSession,
               size: t.sizes.secondaryIcon,
-              color: t.colors.textMuted,
+              color: roles.ink,
               onPressed: _finish,
             ),
           ];
@@ -363,48 +409,43 @@ class _ProtocolLaneState extends ConsumerState<ProtocolLane> {
         ? TextDirection.rtl
         : TextDirection.ltr;
 
+    // A surface in the track colour while a session is open, otherwise
+    // the thin outline of a ready lane.
     return Semantics(
       container: true,
       label: track.name,
       child: Material(
-        color: t.colors.surface,
+        color: open == null ? t.colors.background : roles.tint,
         shape: RoundedRectangleBorder(
-          borderRadius: t.radii.mdAll,
-          side: t.hairline,
+          borderRadius: t.radii.laneAll,
+          side: open == null
+              ? BorderSide(
+                  color: t.colors.border,
+                  width: t.sizes.laneOutlineIdle,
+                )
+              : BorderSide.none,
         ),
         clipBehavior: Clip.antiAlias,
         child: ConstrainedBox(
-          constraints: BoxConstraints(minHeight: t.sizes.laneMinHeight),
-          child: Stack(
-            fit: StackFit.passthrough,
-            children: [
-              PositionedDirectional(
-                start: 0,
-                top: 0,
-                bottom: 0,
-                width: t.sizes.colorBar,
-                child: ColoredBox(color: t.trackColor(track)),
-              ),
-              Padding(
-                padding: EdgeInsetsDirectional.fromSTEB(
-                  t.sizes.colorBar + t.space.md,
-                  t.space.md,
-                  t.space.md,
-                  t.space.md,
-                ),
-                // The tracks screen never measures this lane intrinsically
-                // (see its grid), so the layout may depend on the width.
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final stacked =
-                        constraints.maxWidth < t.sizes.tileMinWidth * 1.5;
-                    return stacked
-                        ? _stacked(t, constraints, info, secondary, primary)
-                        : _sideBySide(t, info, secondary, primary, direction);
-                  },
-                ),
-              ),
-            ],
+          constraints: BoxConstraints(minHeight: t.sizes.laneHeightIdle),
+          child: Padding(
+            padding: EdgeInsetsDirectional.fromSTEB(
+              t.space.lg,
+              t.space.md,
+              t.space.md,
+              t.space.md,
+            ),
+            // The tracks screen never measures this lane intrinsically
+            // (see its grid), so the layout may depend on the width.
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final stacked =
+                    constraints.maxWidth < t.sizes.tileMinWidth * 1.5;
+                return stacked
+                    ? _stacked(t, constraints, info, secondary, primary)
+                    : _sideBySide(t, info, secondary, primary, direction);
+              },
+            ),
           ),
         ),
       ),
@@ -486,8 +527,9 @@ class _ProtocolLaneState extends ConsumerState<ProtocolLane> {
 
 /// The round "add entry" button, at least `bigTapTarget` across.
 class _PrimaryButton extends StatelessWidget {
-  const _PrimaryButton({required this.onPressed});
+  const _PrimaryButton({required this.roles, required this.onPressed});
 
+  final TrackRoles roles;
   final VoidCallback onPressed;
 
   @override
@@ -504,8 +546,8 @@ class _PrimaryButton extends StatelessWidget {
         label: Strings.actionAddEntry,
         excludeSemantics: true,
         child: Material(
-          color: t.colors.primary,
-          shape: const CircleBorder(),
+          color: roles.solid,
+          shape: RoundedRectangleBorder(borderRadius: t.radii.pillAll),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
             key: const ValueKey('protocol-add'),
@@ -515,7 +557,7 @@ class _PrimaryButton extends StatelessWidget {
               child: Icon(
                 AdaptiveIcons.add(context),
                 size: t.sizes.primaryIcon,
-                color: t.colors.onPrimary,
+                color: roles.on,
               ),
             ),
           ),
@@ -578,9 +620,12 @@ class _PersonCards extends ConsumerWidget {
   static int _since(int nowMs, int? at) =>
       at == null || at > nowMs ? 0 : nowMs - at;
 
+  static const int _tilesPerRow = 2;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = context.tikky;
+    final roles = t.trackRoles(track);
     final lockouts = ref.watch(lockoutsProvider);
     // Without any lockout set there is nothing to look up across sessions.
     final facts = lockouts.isEmpty
@@ -646,15 +691,36 @@ class _PersonCards extends ConsumerWidget {
 
         final cards = [
           for (final id in shown)
+            _PersonCard(
+              key: ValueKey('person-card-${id ?? 'none'}'),
+              personId: id,
+              info: info[id],
+              persons: persons,
+              substances: substances,
+              roles: roles,
+              onTap: () => onChoose(id),
+            ),
+        ];
+        // Two tiles side by side where they fit; a row is as high as its
+        // taller tile, so every tile of a row is the same size.
+        List<Widget> rowsFor(int perRow) => [
+          for (var i = 0; i < cards.length; i += perRow)
             Padding(
-              padding: EdgeInsets.only(bottom: t.space.xs),
-              child: _PersonCard(
-                key: ValueKey('person-card-${id ?? 'none'}'),
-                personId: id,
-                info: info[id],
-                persons: persons,
-                substances: substances,
-                onTap: () => onChoose(id),
+              padding: EdgeInsets.only(bottom: t.space.sm),
+              child: IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (var j = 0; j < perRow; j++) ...[
+                      if (j > 0) SizedBox(width: t.space.sm),
+                      Expanded(
+                        child: i + j < cards.length
+                            ? cards[i + j]
+                            : const SizedBox.shrink(),
+                      ),
+                    ],
+                  ],
+                ),
               ),
             ),
         ];
@@ -670,6 +736,7 @@ class _PersonCards extends ConsumerWidget {
                 semanticLabel: ProtocolStrings.showOthers,
                 icon: AdaptiveIcons.person(context),
                 minHeight: t.sizes.primaryButton,
+                roles: roles,
                 onTap: onShowOthers,
               ),
             _FooterButton(
@@ -678,6 +745,7 @@ class _PersonCards extends ConsumerWidget {
               semanticLabel: ProtocolStrings.sceneEdit,
               icon: ProtocolIcons.scene(context),
               minHeight: t.sizes.minTapTarget,
+              roles: roles,
               onTap: onEditScene,
             ),
           ],
@@ -687,17 +755,6 @@ class _PersonCards extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (cards.isNotEmpty)
-              Padding(
-                padding: EdgeInsets.only(bottom: t.space.xs),
-                child: Semantics(
-                  header: true,
-                  child: Text(
-                    ProtocolStrings.whoAreYou,
-                    style: t.text.headline,
-                  ),
-                ),
-              ),
             if (info.isEmpty)
               Padding(
                 padding: EdgeInsets.only(bottom: t.space.xs),
@@ -707,11 +764,18 @@ class _PersonCards extends ConsumerWidget {
                   prominent: cards.isEmpty,
                 ),
               ),
-            // Full width, one below the other: always the same place.
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: cards,
+            // In a fixed order: a tile never changes its place.
+            LayoutBuilder(
+              builder: (context, constraints) => Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: rowsFor(
+                  constraints.maxWidth >=
+                          _tilesPerRow * t.sizes.personTileMinWidth
+                      ? _tilesPerRow
+                      : 1,
+                ),
+              ),
             ),
             footer,
           ],
@@ -728,6 +792,7 @@ class _FooterButton extends StatelessWidget {
     required this.semanticLabel,
     required this.icon,
     required this.minHeight,
+    required this.roles,
     required this.onTap,
     super.key,
   });
@@ -736,6 +801,7 @@ class _FooterButton extends StatelessWidget {
   final String semanticLabel;
   final IconData icon;
   final double minHeight;
+  final TrackRoles roles;
   final VoidCallback onTap;
 
   @override
@@ -746,11 +812,8 @@ class _FooterButton extends StatelessWidget {
       label: semanticLabel,
       excludeSemantics: true,
       child: Material(
-        color: t.colors.surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: t.radii.mdAll,
-          side: t.hairline,
-        ),
+        color: roles.strong,
+        shape: RoundedRectangleBorder(borderRadius: t.radii.smallAll),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
@@ -764,7 +827,7 @@ class _FooterButton extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(icon, size: t.sizes.iconSm, color: t.colors.textMuted),
+                  Icon(icon, size: t.sizes.iconSm, color: roles.ink),
                   SizedBox(width: t.space.sm),
                   Flexible(
                     child: Text(
@@ -814,13 +877,15 @@ class _EmptyStatus extends StatelessWidget {
   }
 }
 
-/// One person of step 1: a large card, the whole of it is the button.
+//// One person of step 1: a tile with the initial, the name and the last
+/// entry; the whole of it is the button.
 class _PersonCard extends StatelessWidget {
   const _PersonCard({
     required this.personId,
     required this.info,
     required this.persons,
     required this.substances,
+    required this.roles,
     required this.onTap,
     super.key,
   });
@@ -831,6 +896,9 @@ class _PersonCard extends StatelessWidget {
   final _PersonInfo? info;
   final Map<String, Person> persons;
   final Map<String, Substance> substances;
+
+  /// The roles of the lane's colour.
+  final TrackRoles roles;
   final VoidCallback onTap;
 
   @override
@@ -839,74 +907,73 @@ class _PersonCard extends StatelessWidget {
     final person = personId == null ? null : persons[personId];
     final name = personLabel(personId, persons);
     final info = this.info;
-    final String headlineText;
-    if (info == null) {
-      headlineText = name;
-    } else if (info.sinceMs < 60000) {
-      headlineText = ProtocolStrings.personJustNow(name);
-    } else {
-      headlineText = Strings.protocolPersonSince(
-        name,
-        Fmt.coarse(info.sinceMs),
-      );
-    }
     final lastEntry = info?.lastEntry;
-    // Room for the name and the line of the last entry from the start, so
-    // a card does not grow - and push the cards below away from a finger -
-    // when its person logs the first entry.
-    final scaler = MediaQuery.textScalerOf(context);
-    double lineHeight(TextStyle style) =>
-        scaler.scale(style.fontSize ?? 14) * (style.height ?? 1.2);
-    final twoLines = t.prefs.showSubLine
-        ? lineHeight(t.text.headline) +
-              lineHeight(t.text.subLine) +
-              2 * t.space.xs
-        : 0.0;
-    final minHeight = math.max(t.sizes.bigTapTarget, twoLines);
+    final String headline;
+    if (info == null) {
+      headline = name;
+    } else if (info.sinceMs < 60000) {
+      headline = ProtocolStrings.personJustNow(name);
+    } else {
+      headline = Strings.protocolPersonSince(name, Fmt.coarse(info.sinceMs));
+    }
+    final detail = lastEntry == null ? '' : entrySummary(lastEntry, substances);
+    final personRoles = person == null ? null : t.roles(Color(person.color));
+    final initial = name.isEmpty ? '' : name.characters.first.toUpperCase();
 
     return Semantics(
       button: true,
       hint: ProtocolStrings.choosePerson(name),
       child: Material(
-        color: t.colors.surfaceAlt,
-        shape: RoundedRectangleBorder(
-          borderRadius: t.radii.mdAll,
-          side: t.hairline,
-        ),
+        color: roles.strong,
+        shape: RoundedRectangleBorder(borderRadius: t.radii.smallAll),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
           child: ConstrainedBox(
-            constraints: BoxConstraints(minHeight: minHeight),
+            constraints: BoxConstraints(minHeight: t.sizes.personTile),
             child: Padding(
               padding: EdgeInsets.symmetric(
-                horizontal: t.space.md,
+                horizontal: t.space.sm,
                 vertical: t.space.xs,
               ),
               child: Row(
                 children: [
-                  ColorDot(
-                    color: person == null
-                        ? t.colors.textMuted
-                        : Color(person.color),
-                    size: t.sizes.iconSm,
+                  ExcludeSemantics(
+                    child: Container(
+                      width: t.sizes.personAvatar,
+                      height: t.sizes.personAvatar,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: personRoles?.solid ?? t.colors.textMuted,
+                        borderRadius: t.radii.pillAll,
+                      ),
+                      child: Text(
+                        initial,
+                        style: t.text.laneLabel.copyWith(
+                          color:
+                              personRoles?.on ?? t.onColor(t.colors.textMuted),
+                        ),
+                      ),
+                    ),
                   ),
-                  SizedBox(width: t.space.md),
+                  SizedBox(width: t.space.sm),
                   Expanded(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          headlineText,
-                          style: t.text.headline,
+                          headline,
+                          style: t.text.laneLabel,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        if (t.prefs.showSubLine && lastEntry != null)
+                        if (t.prefs.showSubLine && detail.isNotEmpty)
                           Text(
-                            entrySummary(lastEntry, substances),
-                            style: t.text.subLine,
+                            detail,
+                            style: t.text.laneSub.copyWith(color: roles.ink),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         // The user's own lockouts; always shown in full.
                         for (final lockout
@@ -917,8 +984,8 @@ class _PersonCard extends StatelessWidget {
                                   Strings.unknown,
                               formatRemaining(lockout.remainingMs),
                             ),
-                            style: t.text.subLine.copyWith(
-                              color: t.colors.warning,
+                            style: t.text.laneSub.copyWith(
+                              color: t.colors.warningText,
                             ),
                           ),
                       ],

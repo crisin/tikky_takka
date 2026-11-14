@@ -69,12 +69,14 @@ class SampleLaneData {
   ];
 }
 
-/// A non-interactive lane that mirrors the look of the real lanes on the
-/// tracks screen: colour bar, name + mode line, large digits, progress bar,
-/// sub-line, round primary button and a secondary icon button.
+//// A non-interactive lane that mirrors the look of the real lanes on the
+/// tracks screen: a surface in the track colour (an outline when paused,
+/// the alarm colour when ringing), lamp, name and mode, large digits, the
+/// fill of the time left, sub-line, round primary button and one secondary
+/// button.
 ///
 /// Everything is read from `context.tikky`, so it reacts to the theme and
-/// to every UI preference (layout, density, scales, tenths, progress bar,
+/// to every UI preference (layout, density, scales, tenths, fill,
 /// sub-line, left-handed).
 class SampleLane extends StatelessWidget {
   const SampleLane({required this.data, super.key});
@@ -85,76 +87,104 @@ class SampleLane extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.tikky;
     final prefs = t.prefs;
-    final trackColor = t.paletteColor(data.colorIndex);
+    final roles = t.roles(t.paletteColor(data.colorIndex));
+    final c = t.colors;
     final ringing = data.state == SampleLaneState.ringing;
     final paused = data.state == SampleLaneState.paused;
     final tiles = prefs.layout == LaneLayout.tiles;
 
+    final ink = ringing ? c.onDanger : roles.ink;
     final digits = data.mode == TrackMode.stopwatch
         ? Fmt.clock(data.valueMs, tenths: prefs.showTenths)
         : Fmt.remaining(data.valueMs, tenths: prefs.showTenths);
-    final digitColor = ringing
-        ? t.colors.danger
-        : (paused ? t.colors.textMuted : t.colors.text);
 
     final info = Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          '${data.name} · ${Strings.modeName(data.mode)}',
-          style: t.text.laneTitle,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
+        Row(
+          children: [
+            SizedBox.square(
+              dimension: t.sizes.lamp,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: paused ? null : (ringing ? c.onDanger : roles.solid),
+                  borderRadius: t.radii.pillAll,
+                  border: paused
+                      ? Border.all(
+                          color: roles.solid,
+                          width: t.sizes.laneButtonOutline,
+                        )
+                      : null,
+                ),
+              ),
+            ),
+            SizedBox(width: t.space.sm),
+            Flexible(
+              child: Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text: data.name,
+                      style: t.text.laneName.copyWith(color: ink),
+                    ),
+                    TextSpan(
+                      text: '  ${Strings.modeName(data.mode)}',
+                      style: t.text.laneMode.copyWith(color: ink),
+                    ),
+                  ],
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
         ),
+        SizedBox(height: t.space.xxs),
         FittedBox(
           fit: BoxFit.scaleDown,
           alignment: AlignmentDirectional.centerStart,
           child: Text(
             digits,
-            style: t.text.digitsLarge.copyWith(color: digitColor),
+            style: t.text.laneDigits.copyWith(
+              color: ringing ? c.onDanger : c.text,
+            ),
             maxLines: 1,
           ),
         ),
-        if (prefs.showProgressBar && data.progress != null)
-          Padding(
-            padding: EdgeInsets.only(top: t.space.xs),
-            child: _SampleProgress(
-              value: data.progress!,
-              color: ringing ? t.colors.danger : trackColor,
-            ),
-          ),
         if (prefs.showSubLine)
-          Padding(
-            padding: EdgeInsets.only(top: t.space.xs),
-            child: Text(
-              data.subLine,
-              style: t.text.subLine,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
+          Text(
+            data.subLine,
+            style: t.text.laneSub.copyWith(color: ink),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
       ],
     );
 
-    final primary = _SamplePrimaryButton(
+    final primary = _SampleButton(
       icon: switch (data.state) {
         SampleLaneState.running => AdaptiveIcons.pause(context),
         SampleLaneState.paused => AdaptiveIcons.play(context),
         SampleLaneState.ringing => AdaptiveIcons.stop(context),
       },
-      background: ringing ? t.colors.danger : t.colors.primary,
-      foreground: ringing ? t.onColor(t.colors.danger) : t.colors.onPrimary,
+      diameter: t.sizes.primaryButton,
+      iconSize: t.sizes.primaryIcon,
+      background: ringing ? c.onDanger : roles.solid,
+      foreground: ringing ? c.danger : roles.on,
     );
-    final secondary = SizedBox.square(
-      dimension: t.sizes.secondaryButton,
-      child: Icon(
-        data.mode == TrackMode.stopwatch
-            ? AdaptiveIcons.lap(context)
-            : AdaptiveIcons.reset(context),
-        size: t.sizes.secondaryIcon,
-        color: t.colors.textMuted,
-      ),
+    final secondary = _SampleButton(
+      icon: switch (data.state) {
+        SampleLaneState.running when data.mode == TrackMode.stopwatch =>
+          AdaptiveIcons.lap(context),
+        SampleLaneState.paused => AdaptiveIcons.stop(context),
+        _ => AdaptiveIcons.reset(context),
+      },
+      diameter: t.sizes.secondaryButton,
+      iconSize: t.sizes.secondaryIcon,
+      background: ringing ? null : roles.strong,
+      foreground: ringing ? c.onDanger : c.text,
+      outline: ringing ? c.onDanger : null,
     );
     final gap = SizedBox(width: t.space.sm);
     final buttons = prefs.leftHanded
@@ -178,52 +208,54 @@ class SampleLane extends StatelessWidget {
         ],
       );
     } else {
-      final spacer = SizedBox(width: t.space.md);
       content = Row(
         children: prefs.leftHanded
-            ? [...buttons, spacer, Expanded(child: info)]
-            : [Expanded(child: info), spacer, ...buttons],
+            ? [...buttons, gap, Expanded(child: info)]
+            : [Expanded(child: info), gap, ...buttons],
       );
     }
 
-    final decoration = t.surfaceDecoration();
-    return DecoratedBox(
-      decoration: ringing && t.sizes.hairline > 0
-          ? decoration.copyWith(
+    final progress = data.progress;
+    final showFill = prefs.showProgressBar && progress != null && !ringing;
+    return Container(
+      decoration: BoxDecoration(
+        color: ringing ? c.danger : (paused ? null : roles.tint),
+        borderRadius: t.radii.laneAll,
+      ),
+      foregroundDecoration: paused
+          ? BoxDecoration(
+              borderRadius: t.radii.laneAll,
               border: Border.all(
-                color: t.colors.danger,
-                width: t.sizes.hairline,
+                color: roles.strong,
+                width: t.sizes.laneOutlinePaused,
               ),
             )
-          : decoration,
-      child: ClipRRect(
-        borderRadius: t.radii.mdAll,
+          : null,
+      clipBehavior: Clip.antiAlias,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          minHeight: tiles ? t.sizes.tileMinHeight : t.sizes.laneHeightActive,
+        ),
         child: Stack(
+          alignment: AlignmentDirectional.centerStart,
           children: [
-            ConstrainedBox(
-              constraints: BoxConstraints(
-                minHeight: tiles ? t.sizes.tileMinHeight : t.sizes.laneMinHeight,
-              ),
-              child: Padding(
-                padding: EdgeInsetsDirectional.fromSTEB(
-                  t.sizes.colorBar + t.space.md,
-                  t.space.sm,
-                  t.space.md,
-                  t.space.sm,
-                ),
-                child: Align(
+            if (showFill)
+              Positioned.fill(
+                child: FractionallySizedBox(
                   alignment: AlignmentDirectional.centerStart,
+                  widthFactor: (1 - progress).clamp(0, 1).toDouble(),
                   heightFactor: 1,
-                  child: content,
+                  child: ColoredBox(color: roles.strong),
                 ),
               ),
-            ),
-            PositionedDirectional(
-              start: 0,
-              top: 0,
-              bottom: 0,
-              width: t.sizes.colorBar,
-              child: ColoredBox(color: trackColor),
+            Padding(
+              padding: EdgeInsetsDirectional.fromSTEB(
+                t.space.lg,
+                t.space.md,
+                t.space.md,
+                t.space.md,
+              ),
+              child: content,
             ),
           ],
         ),
@@ -232,52 +264,38 @@ class SampleLane extends StatelessWidget {
   }
 }
 
-class _SamplePrimaryButton extends StatelessWidget {
-  const _SamplePrimaryButton({
+class _SampleButton extends StatelessWidget {
+  const _SampleButton({
     required this.icon,
+    required this.diameter,
+    required this.iconSize,
     required this.background,
     required this.foreground,
+    this.outline,
   });
 
   final IconData icon;
-  final Color background;
+  final double diameter;
+  final double iconSize;
+  final Color? background;
   final Color foreground;
+  final Color? outline;
 
   @override
   Widget build(BuildContext context) {
     final t = context.tikky;
+    final outline = this.outline;
     return Container(
-      width: t.sizes.primaryButton,
-      height: t.sizes.primaryButton,
-      decoration: BoxDecoration(color: background, shape: BoxShape.circle),
-      child: Icon(icon, size: t.sizes.primaryIcon, color: foreground),
-    );
-  }
-}
-
-class _SampleProgress extends StatelessWidget {
-  const _SampleProgress({required this.value, required this.color});
-
-  final double value;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.tikky;
-    return ClipRRect(
-      borderRadius: t.radii.smAll,
-      child: SizedBox(
-        width: double.infinity,
-        height: t.sizes.progressBar,
-        child: ColoredBox(
-          color: t.colors.surfaceAlt,
-          child: FractionallySizedBox(
-            alignment: AlignmentDirectional.centerStart,
-            widthFactor: value.clamp(0, 1).toDouble(),
-            child: ColoredBox(color: color),
-          ),
-        ),
+      width: diameter,
+      height: diameter,
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: t.radii.pillAll,
+        border: outline == null
+            ? null
+            : Border.all(color: outline, width: t.sizes.laneButtonOutline),
       ),
+      child: Icon(icon, size: iconSize, color: foreground),
     );
   }
 }

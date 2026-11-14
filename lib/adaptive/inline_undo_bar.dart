@@ -19,9 +19,14 @@ import 'platform.dart';
 ///   nothing below the bar may ever move (the tap pad). Without it the bar
 ///   is as high as its content, at least one tap target.
 /// * [muted]: an idle hint instead of a message.
+/// * [detail]: a smaller second line under the message.
+/// * [remaining]: 0..1 share of the undo time that is left, drawn as a
+///   thin bar along the lower edge.
 class InlineUndoBar extends StatelessWidget {
   const InlineUndoBar({
     required this.message,
+    this.detail,
+    this.remaining,
     this.onUndo,
     this.undoLabel = Strings.undo,
     this.secondaryLabel,
@@ -41,6 +46,8 @@ class InlineUndoBar extends StatelessWidget {
   static const secondaryKey = ValueKey('inline-undo-secondary');
 
   final String message;
+  final String? detail;
+  final double? remaining;
   final VoidCallback? onUndo;
   final String undoLabel;
   final String? secondaryLabel;
@@ -52,14 +59,30 @@ class InlineUndoBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.tikky;
     final hasSecondary = secondaryLabel != null && onSecondary != null;
+    final detail = this.detail;
+    final title = Text(
+      message,
+      style: muted ? t.text.caption : t.text.label,
+      maxLines: height == null && detail == null ? 2 : 1,
+      overflow: TextOverflow.ellipsis,
+    );
     final text = Semantics(
       liveRegion: !muted,
-      child: Text(
-        message,
-        style: muted ? t.text.caption : t.text.label,
-        maxLines: height == null ? 2 : 1,
-        overflow: TextOverflow.ellipsis,
-      ),
+      child: detail == null
+          ? title
+          : Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                title,
+                Text(
+                  detail,
+                  style: t.text.caption,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
     );
     final buttons = [
       if (hasSecondary)
@@ -137,6 +160,32 @@ class InlineUndoBar extends StatelessWidget {
         ),
       ),
     );
-    return height == null ? bar : SizedBox(height: height, child: bar);
+    final remaining = this.remaining;
+    final timed = remaining == null
+        ? bar
+        : Stack(
+            fit: StackFit.passthrough,
+            children: [
+              bar,
+              Positioned.fill(
+                child: ExcludeSemantics(
+                  child: Align(
+                    alignment: AlignmentDirectional.bottomStart,
+                    child: FractionallySizedBox(
+                      widthFactor: remaining.clamp(0, 1).toDouble(),
+                      child: SizedBox(
+                        height: t.sizes.undoTimeBar,
+                        child: ColoredBox(color: t.colors.textMuted),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+    final clipped = remaining == null
+        ? timed
+        : ClipRRect(borderRadius: t.radii.mdAll, child: timed);
+    return height == null ? clipped : SizedBox(height: height, child: clipped);
   }
 }

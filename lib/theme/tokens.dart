@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../core/domain/track.dart';
+import 'bundled_fonts.dart';
 import 'theme_presets.dart';
 import 'tikky_theme.dart';
 import 'track_roles.dart';
@@ -99,6 +100,30 @@ final class TikkySizes {
   /// Fixed height of the undo bar at the top of the tap pad.
   double get undoBarHeight => 56;
 
+  /// Thickness of the time bar at the lower edge of an undo bar.
+  double get undoTimeBar => 3;
+
+  /// Outline of a ready lane, a paused one and a due one.
+  double get laneOutlineIdle => 1;
+  double get laneOutlinePaused => 1.5;
+  double get laneOutlineDue => 2;
+
+  /// Outline of the primary button of a ready lane, of the lamp of a
+  /// paused / ready lane and of a secondary button on a ringing lane.
+  double get laneButtonOutline => 1.5;
+
+  /// The widest the time of a ready lane gets before it shrinks.
+  double get laneDigitsIdleMax => 120;
+
+  /// Height of a round segment of an interval lane.
+  double get laneSegment => 8;
+
+  /// Height of a person tile in a protocol lane, diameter of its initial,
+  /// and the width below which the tiles go one per row.
+  double get personTile => 60 * _prefs.buttonScale;
+  double get personAvatar => 32;
+  double get personTileMinWidth => 140;
+
   double get iconSm => 20;
   double get iconMd => 24;
   double get iconLg => 28;
@@ -146,6 +171,13 @@ final class TikkyTextStyles {
     required this.digitsSmall,
     required this.laneTitle,
     required this.subLine,
+    required this.laneName,
+    required this.laneMode,
+    required this.laneSub,
+    required this.laneDigits,
+    required this.laneDigitsIdle,
+    required this.laneLabelCount,
+    required this.laneLabel,
     required this.title,
     required this.headline,
     required this.body,
@@ -169,6 +201,20 @@ final class TikkyTextStyles {
 
   /// Muted sub-line of a lane (lap info, status).
   final TextStyle subLine;
+
+  /// Head line of a lane: the name, the mode next to it, the line under
+  /// the digits. Coloured by the lane (`roles(..).ink`).
+  final TextStyle laneName;
+  final TextStyle laneMode;
+  final TextStyle laneSub;
+
+  /// The time / count of an active lane and of a ready one.
+  final TextStyle laneDigits;
+  final TextStyle laneDigitsIdle;
+
+  /// The count on a label button of a counter, and its label.
+  final TextStyle laneLabelCount;
+  final TextStyle laneLabel;
 
   /// Screen and sheet titles.
   final TextStyle title;
@@ -337,6 +383,10 @@ final class TikkyMotion {
   /// Blink period of a ringing lane.
   Duration get ringBlink => const Duration(milliseconds: 600);
 
+  /// Half a period of the lamp of a running lane, and how far it dims.
+  Duration get lampPulse => const Duration(seconds: 1);
+  double get lampDim => 0.35;
+
   /// How long the "Rückgängig" snackbar stays.
   Duration get undoWindow => const Duration(seconds: 5);
 
@@ -427,11 +477,7 @@ class TikkyTokens extends ThemeExtension<TikkyTokens> {
   /// ...). Text in a track colour is always `roles(c).ink`, never `c`.
   TrackRoles roles(Color color) => _roles.putIfAbsent(
     color.toARGB32(),
-    () => trackRolesFor(
-      color,
-      background: colors.background,
-      isDark: isDark,
-    ),
+    () => trackRolesFor(color, background: colors.background, isDark: isDark),
   );
 
   /// The roles of the colour of [track].
@@ -459,6 +505,9 @@ class TikkyTokens extends ThemeExtension<TikkyTokens> {
             ? Border.all(color: colors.border, width: sizes.hairline)
             : null,
       );
+
+  /// Letter spacing of the lane digits, as a share of their size.
+  static const double _laneDigitTracking = -0.05;
 
   /// Font family for regular text; `null` = platform default.
   String? get fontFamily => TikkyFonts.family(theme.fontFamily, platform);
@@ -506,7 +555,34 @@ class TikkyTokens extends ThemeExtension<TikkyTokens> {
       fontFeatures: digit.tabular ? const [FontFeature.tabularFigures()] : null,
     );
 
+    // The lanes show their digits in Martian Mono (bundled), unless the
+    // theme asks for the platform's monospace font.
+    final laneFamily = digit.monospace ? digitFamily : BundledFonts.martianMono;
+    final laneFallback = digit.monospace
+        ? digitFallback
+        : TikkyFonts.fallback(TikkyFonts.mono);
+    TextStyle laneDigits(double size, double lineHeight, Color color) =>
+        TextStyle(
+          fontFamily: laneFamily,
+          fontFamilyFallback: laneFallback.isEmpty ? null : laneFallback,
+          fontSize: size,
+          fontWeight: FontWeight.w500,
+          color: color,
+          height: lineHeight,
+          letterSpacing: size * _laneDigitTracking,
+          fontFeatures: digit.tabular
+              ? const [FontFeature.tabularFigures()]
+              : null,
+        );
+
     return TikkyTextStyles._(
+      laneName: base(14, FontWeight.w600, colors.text, height: 17 / 14),
+      laneMode: base(14, FontWeight.w400, colors.text, height: 17 / 14),
+      laneSub: base(13, FontWeight.w400, colors.textMuted, height: 16 / 13),
+      laneDigits: laneDigits(sizes.digitsLarge, 38 / 32, colors.text),
+      laneDigitsIdle: laneDigits(sizes.digitsMedium, 26 / 22, colors.textMuted),
+      laneLabelCount: laneDigits(15, 1.2, colors.text),
+      laneLabel: base(15, FontWeight.w600, colors.text, height: 1.2),
       digitsLarge: digits(sizes.digitsLarge, colors.text),
       digitsMedium: digits(sizes.digitsMedium, colors.text),
       digitsSmall: digits(sizes.digitsSmall, colors.textMuted),

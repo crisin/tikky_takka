@@ -28,11 +28,7 @@ void main() {
 
     test('remaining time per person and substance, longest first', () {
       final at = hourMs + 10 * minuteMs;
-      final running = deriveLockouts(
-        facts,
-        at,
-        lockoutMsBySubstance: lockouts,
-      );
+      final running = deriveLockouts(facts, at, lockoutMsBySubstance: lockouts);
       expect(running.keys.toSet(), {'alex', null});
       final alex = running['alex']!;
       expect(alex.map((l) => l.substanceId), ['water', 'tea']);
@@ -139,7 +135,8 @@ void main() {
     await f.tap(find.byTooltip(ProtocolStrings.finishSession));
     expect(await f.run(() => f.commands.getOpenSession(f.track.id)), isNull);
     expect(find.byTooltip(ProtocolStrings.finishSession), findsNothing);
-    expect(find.text('Zelt · ${Strings.modeProtocol}'), findsOneWidget);
+    expect(find.text('Zelt'), findsOneWidget);
+    expect(find.text(ProtocolStrings.whoAreYou), findsOneWidget);
     expect(find.text(Strings.protocolEmpty), findsNothing);
     expect(find.text('Alex · vor 1 h'), findsOneWidget);
     expect(
@@ -188,8 +185,9 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('the entry sheet shows the lockout of an earlier session',
-      (tester) async {
+  testWidgets('the entry sheet shows the lockout of an earlier session', (
+    tester,
+  ) async {
     final f = await ProtocolFixture.pump(tester);
     final alex = await f.person('Alex');
     final water = await f.substance('Wasser', lockoutMs: 2 * hourMs);

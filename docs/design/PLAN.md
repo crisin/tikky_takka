@@ -143,6 +143,31 @@ nicht nennen.
 
 Entwürfe `1-2-spuren`, `1-3-zustaende`, `5-1-hell-oliv-test`.
 
+**Stand: erledigt** (Zweig `pult`), mit diesen Abweichungen:
+
+- **E2 entschieden wie vorgeschlagen:** langer Druck auf den Hauptknopf
+  stoppt, „pausiert“ zeigt den Stopp-Knopf, langer Druck auf die Fläche
+  bleibt Bearbeiten; dazu „Sitzung beenden“ im Bearbeiten-Blatt und die
+  Screenreader-Aktion „Stoppen und sichern“.
+- **„+1′“, „+10′“ und „nächste Runde“ fehlen noch.** Sie brauchen eigene
+  Ereignisse (Engine, Alarmplan) und kommen als eigener Schritt **P2.9**.
+  Bis dahin: Timer und Intervall zeigen „neu starten“, auch beim Klingeln;
+  eine fällige Erinnerung hat keinen Nebenknopf.
+- Die Kopfzeile zeigt Name und Art; der Zustand („pausiert“, „fertig“)
+  steht wie bisher in der Nebenzeile, nicht in der Kopfzeile.
+- Auch die Erinnerung bekommt die Füllung (vorher Fortschrittsleiste).
+- Die Füllung des Intervalls zeigt die laufende Phase, nicht das ganze
+  Programm (wie die Ziffern).
+- Protokoll-Spur: Kacheln je Person (zwei nebeneinander, ab 140 px Breite)
+  mit Kürzel; Name und „vor …“ in der ersten Zeile, letzter Eintrag in der
+  zweiten. „Wer bist du?“ steht in der Kopfzeile. Plus, Einträge, Beenden,
+  „Andere“ und „Szene“ bleiben bis P4 erhalten.
+- Der Griff zum Sortieren bleibt an der Vorderkante (nicht gezeichnet).
+
+- **P2.9** (offen) Neue Ereignisse für „+1′“ (Timer klingelt), „+10′“
+  (Erinnerung fällig) und „nächste Runde“ (Intervall); Engine, Alarmplan,
+  `LaneControls.secondary`, Tests.
+
 - **P2.1** `lane_view.dart`: `LaneControls.secondary` liefert genau einen
   Nebenknopf nach Zustand (Stoppuhr: Runde, pausiert: Stopp · Timer: neu
   starten, klingelt: +1′ · Intervall: nächste Runde · Zähler: zurücknehmen ·

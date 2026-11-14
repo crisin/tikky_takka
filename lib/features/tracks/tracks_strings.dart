@@ -59,6 +59,13 @@ abstract final class TracksStrings {
   static String labelCount(String label, int count) => '$label  $count';
   static const actionAckEarly = 'Jetzt schon erledigt';
   static const actionStopSession = 'Sitzung beenden';
+  static const actionStopHint = 'Stoppen und sichern';
+
+  /// The undo bar after a lane was stopped.
+  static String trackStopped(String name) => '$name gestoppt';
+  static String ticksKept(int n) =>
+      n == 1 ? '1 Tipp gesichert' : '$n Tipps gesichert';
+  static String timeKept(String time) => '$time gesichert';
   static const actionEditTrack = 'Spur bearbeiten';
   static const sessionRestored = 'Sitzung läuft wieder';
   static const lapRecorded = 'Runde gespeichert';
