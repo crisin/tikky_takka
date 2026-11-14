@@ -19,6 +19,9 @@ abstract final class AlarmStrings {
       'Letzter geplanter Alarm – Tikky Takka öffnen, damit weitere '
       'Alarme kommen.';
 
+  /// Name of the test alarm of the diagnostics page.
+  static const testAlarmName = 'Test-Alarm';
+
   // ----------------------------------------------------- Android channels
   static const channelSoundAndVibration =
       '${Strings.notifChannelName} (Ton und Vibration)';

@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart';
 
 import '../../clock.dart';
 import '../../domain/track.dart';
+import '../../domain/track_config.dart';
+import 'alarm_strings.dart';
 import 'alarm_service.dart';
 import 'notification_backend.dart';
 import 'notification_plan.dart';
@@ -194,6 +196,7 @@ class LocalNotificationsAlarmService implements AlarmService {
 
   @override
   Future<void> cancelAll() => _serial(() async {
+    final test = _plans[AlarmService.testTrackId];
     _plans.clear();
     _truncated.clear();
     if (!await _ensureInit()) return;
@@ -207,7 +210,33 @@ class LocalNotificationsAlarmService implements AlarmService {
         await _cancelIds(trackId);
       }
     }
+    // The diagnostics test alarm outlives the rescheduling until it is due.
+    if (test != null && test.alarms.first.at > _clock.nowMs()) {
+      _plans[AlarmService.testTrackId] = test;
+      await _apply(AlarmService.testTrackId);
+    }
   });
+
+  @override
+  Future<void> scheduleTestAlarm(Duration delay) {
+    final ms = delay.inMilliseconds;
+    return scheduleForTrack(
+      Track(
+        id: AlarmService.testTrackId,
+        setId: '',
+        name: AlarmStrings.testAlarmName,
+        config: CountdownConfig(durationMs: ms),
+      ),
+      [
+        PlannedAlarm(
+          trackId: AlarmService.testTrackId,
+          at: _clock.nowMs() + ms,
+          kind: AlarmKind.countdownDone,
+          index: 0,
+        ),
+      ],
+    );
+  }
 
   @override
   Future<void> setContentHidden(bool hidden) async {
@@ -333,8 +362,7 @@ class LocalNotificationsAlarmService implements AlarmService {
 
   Future<void> _cancelIds(String trackId) async {
     final known = _handedOut.remove(trackId);
-    final ids =
-        known ?? (_cleanSlate ? const <int>[] : AlarmIds.all(trackId));
+    final ids = known ?? (_cleanSlate ? const <int>[] : AlarmIds.all(trackId));
     for (final id in ids) {
       try {
         await _backend.cancel(id);
@@ -350,6 +378,7 @@ class LocalNotificationsAlarmService implements AlarmService {
       actionId: reply.actionId,
     );
     if (action == null || _actions.isClosed) return;
+    if (action.trackId == AlarmService.testTrackId) return;
     if (_actions.hasListener) {
       _actions.add(action);
     } else {

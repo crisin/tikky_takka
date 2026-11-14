@@ -30,9 +30,14 @@ export 'plugin_notification_backend.dart'
 ///
 /// Creating it has no side effects; all plugin work starts in
 /// `AlarmService.init()`, which never throws.
-AlarmService createAlarmService({Clock clock = const SystemClock()}) {
+///
+/// [onError] receives the platform errors the service swallows.
+AlarmService createAlarmService({
+  Clock clock = const SystemClock(),
+  void Function(Object error, StackTrace stack)? onError,
+}) {
   if (!PluginNotificationBackend.isSupported()) {
     return const NoopAlarmService();
   }
-  return LocalNotificationsAlarmService(clock: clock);
+  return LocalNotificationsAlarmService(clock: clock, onError: onError);
 }

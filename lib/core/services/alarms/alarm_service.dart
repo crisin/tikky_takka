@@ -32,7 +32,8 @@ final class AlarmPermissionStatus {
   /// Exact alarm permission (Android 12+). `true` where not applicable.
   final bool exactAlarmsGranted;
 
-  bool get allGranted => supported && notificationsGranted && exactAlarmsGranted;
+  bool get allGranted =>
+      supported && notificationsGranted && exactAlarmsGranted;
 }
 
 /// What the user did with a notification.
@@ -64,6 +65,9 @@ final class AlarmAction {
 /// Implementations must never throw into the caller for platform problems:
 /// swallow and log, timers keep working in-app regardless.
 abstract class AlarmService {
+  /// Track id of the test alarm of the diagnostics page.
+  static const testTrackId = 'diagnostics-test-alarm';
+
   /// One-time setup (plugin init, channels, time zone). Safe to call twice.
   Future<void> init();
 
@@ -92,6 +96,12 @@ abstract class AlarmService {
   /// Notification taps and action buttons, including the one that launched
   /// the app. The app shell routes these to the track commands.
   Stream<AlarmAction> get actions;
+
+  /// Diagnostics: one notification after [delay] that belongs to no track
+  /// ([testTrackId]). It survives [cancelAll] (the app reschedules
+  /// everything on each trip to the background) until it is due, so it
+  /// can be tested with the app closed. Taps on it are not reported.
+  Future<void> scheduleTestAlarm(Duration delay);
 }
 
 /// Does nothing. Used in tests and on platforms without notification
@@ -124,6 +134,9 @@ class NoopAlarmService implements AlarmService {
 
   @override
   Stream<AlarmAction> get actions => const Stream.empty();
+
+  @override
+  Future<void> scheduleTestAlarm(Duration delay) async {}
 }
 
 /// Records every call. Handy for repository and widget tests.
@@ -182,6 +195,10 @@ class RecordingAlarmService implements AlarmService {
   /// Not part of [log]: tests of the scheduling calls stay unaffected.
   @override
   Future<void> setContentHidden(bool hidden) async => contentHidden = hidden;
+
+  @override
+  Future<void> scheduleTestAlarm(Duration delay) async =>
+      log.add('test:${delay.inSeconds}');
 
   @override
   Stream<AlarmAction> get actions => _actions.stream;

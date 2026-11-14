@@ -38,8 +38,7 @@ abstract final class SettingsStrings {
       'stellst du einen Wert wieder auf den App-Standard.';
 
   /// Semantic label of the per-field reset button.
-  static String overrideReset(String field) =>
-      'App-Standard verwenden: $field';
+  static String overrideReset(String field) => 'App-Standard verwenden: $field';
 
   // ----------------------------------------------------------- theme list
   static const themesTitle = 'Designs';
@@ -151,4 +150,33 @@ abstract final class SettingsStrings {
   // ------------------------------------------------------------------ about
   static const licenses = 'Open-Source-Lizenzen';
   static const aboutTagline = 'Mehrere Timer nebeneinander, komplett lokal.';
+
+  // ------------------------------------------------------------ diagnostics
+  static const diagnostics = 'Diagnose';
+  static const diagnosticsHint = 'Für Tests auf dem Gerät: Status und Fehler.';
+  static const diagApp = 'App';
+  static const diagBuild = 'Build';
+  static const diagBuildLocal = 'lokal';
+  static const diagMode = 'Modus';
+  static const diagPlatform = 'Plattform';
+  static const diagNotifications = 'Benachrichtigungen';
+  static const diagSupported = 'Unterstützt';
+  static const diagAllowed = 'Erlaubt';
+  static const diagExact = 'Exakte Alarme';
+  static const diagAppLock = 'App-Sperre möglich';
+  static const diagYes = 'Ja';
+  static const diagNo = 'Nein';
+  static const diagTestAlarm = 'Test-Alarm in 10 Sekunden';
+  static const diagTestAlarmHint =
+      'Danach die App schließen oder das Gerät sperren.';
+  static const diagTestAlarmSet = 'Test-Alarm kommt in 10 Sekunden.';
+  static const diagRequest = 'Erlaubnis anfragen';
+  static const diagErrors = 'Fehler dieser Sitzung';
+  static const diagErrorsFooter =
+      'Nur im Speicher, bis die App beendet wird. Verlässt das Gerät nur, '
+      'wenn du es kopierst.';
+  static const diagNoErrors = 'Keine Fehler.';
+  static const diagCopy = 'Bericht kopieren';
+  static const diagCopied = 'Bericht kopiert';
+  static const diagClear = 'Fehler leeren';
 }
