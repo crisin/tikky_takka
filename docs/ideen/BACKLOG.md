@@ -96,3 +96,22 @@ und Herkunft). Nur gesammelt, nichts entschieden oder gebaut.
 | Laufende Timer auf dem Sperrbildschirm (iOS Live Activities, Android-Dauerbenachrichtigung) | offen | Konzept 11.11. |
 | Abgleich zwischen Geräten | offen | Konzept 11.11. |
 | Dauerhafter Alarmton mit eigenem Audio-Paket | offen | Integration 14.11. |
+
+## Aus der Design-Runde vom 14.11. (Richtung „Pult“)
+
+Quelle: `docs/design/` (Einstieg `README.md`, Entwürfe unter `entwuerfe/`,
+Arbeitspakete in `UMSETZUNG.md`). Entworfen, noch nichts davon gebaut. Wie die
+Ideen Nr. 16–28 darin aufgehen, steht in `UMSETZUNG.md` unter „Abgleich mit dem
+Backlog“.
+
+| Nr. | Idee | Status | Stand in der App |
+|---|---|---|---|
+| 29 | **Spur als Fläche:** die Spurfarbe trägt die ganze Spur, Timer und Intervall füllen sie als Fortschritt, bereite Spuren sind nur ein Umriss. Fünf Farbrollen je Spurfarbe, damit der Kontrast in jedem Design hält. | geplant | Paket P1 und P2. |
+| 30 | **Untere Leiste mit Spuren / Tippfeld / Zeitleiste** als Wörter, Plus daneben; Einstellungen hinter „···“. | geplant | Paket P3. |
+| 31 | **Erfassen in Stufen:** Wer → Was → fertig; „Ändern“ öffnet ein Blatt mit Wann und Wie viel, Wer / Was / Notiz zugeklappt. Ein Eintragsblatt für Tippfeld und Zeitleiste. | geplant | Paket P4. |
+| 32 | **Zeitleiste mit vier Zoomstufen** (Jetzt, Abend, Woche, Monat); der Verlauf geht darin auf. Jetzt mit Karten je Person und Falten für leere Zeit, Abend senkrecht mit einer Spalte je Person. | geplant | Paket P5 und P6; offen sind O1–O3 in `docs/design/README.md`. |
+| 33 | **„Tag beginnt um …“:** Einträge nach Mitternacht zählen zum Abend davor. | offen | Teil von P7; Standard 06:00 nicht bestätigt (O3). |
+| 34 | **Designs als Vorlage plus eigene Änderungen**, mit Form, Schrift und Bewegung; neu Neon, Kassette, Arcade, Lava. Editor als Blatt unter laufenden Spuren. | geplant | Paket P8; Schriften offen (O4). |
+| 35 | **Einstellungen mit festen Reitern** (Design, Bedienung, Alarme, Daten, System), Regler mit Rücksetz-Punkt. | geplant | Paket P7. |
+| 36 | **Fokus:** eine Spur groß mit Ring, die anderen laufenden als Felder darunter. | geplant | Paket P9. |
+| 37 | **Leerer Start mit sechs Vorlagen**, ein Tipp legt die Spur an. | geplant | Paket P9. |
