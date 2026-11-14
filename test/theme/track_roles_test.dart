@@ -22,9 +22,9 @@ const _presets = {
 };
 
 void main() {
-  final tokens =
-      jsonDecode(File('docs/design/tokens.json').readAsStringSync())
-          as Map<String, dynamic>;
+  final tokens = jsonDecode(
+    File('docs/design/tokens.json').readAsStringSync(),
+  ) as Map<String, dynamic>;
   final designs = tokens['designs'] as Map<String, dynamic>;
 
   group('track roles match docs/design/tokens.json', () {

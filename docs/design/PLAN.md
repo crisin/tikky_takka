@@ -100,6 +100,11 @@ genannten Entwurf legen.
   noch nirgends verwenden. Prüfen, dass `0`–`9`, `:` und `+` gleich breit sind
   (Test misst die Breiten mit `TextPainter`).
 
+**Stand Etappe 0: erledigt.** Martian Mono liegt mit Lizenztext (SIL OFL 1.1,
+kein reservierter Schriftname) in `assets/fonts/`; der Test bestätigt gleiche
+Breite für Ziffern, `:`, `+`, `-`, `.`, `,` und `×` bei 400, 500 und 700.
+Verwendet wird sie ab P2.3.
+
 ### P1 · Farbrollen und Tokens
 
 **Stand: erledigt** (Zweig `pult`). Offen geblieben: `surface` von „Schwarz“

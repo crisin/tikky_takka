@@ -15,10 +15,12 @@ import 'core/services/diagnostics_log.dart';
 import 'core/services/lock_service.dart';
 import 'core/services/lock_service_impl.dart';
 import 'core/services/screen_security.dart';
+import 'theme/bundled_fonts.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   _recordErrors(DiagnosticsLog.instance);
+  registerFontLicenses();
   // Draw behind the system bars (Android); a no-op elsewhere.
   unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
 

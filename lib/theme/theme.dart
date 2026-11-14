@@ -1,6 +1,7 @@
 /// Barrel file for the theme system.
 library;
 
+export 'bundled_fonts.dart';
 export 'set_theme_scope.dart';
 export 'theme_builder.dart';
 export 'theme_controllers.dart';

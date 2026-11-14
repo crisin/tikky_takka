@@ -214,8 +214,8 @@ final class DigitStyle {
   int get hashCode => Object.hash(tabular, monospace, weight);
 }
 
-/// Font choices. Only fonts that ship with the operating systems are used;
-/// nothing is bundled or downloaded.
+/// Font choices for text: fonts that ship with the operating systems.
+/// The fonts the app bundles are in bundled_fonts.dart.
 abstract final class TikkyFonts {
   /// The platform's default UI font.
   static const system = 'system';
