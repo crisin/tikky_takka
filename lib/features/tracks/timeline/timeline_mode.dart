@@ -27,12 +27,15 @@ enum TimelineMode {
 }
 
 /// The level of the timeline (Pult 3.1 - 3.4): "Jetzt" the strip of the
-/// open sessions, "Abend" one logical day. ("Woche" and "Monat" follow.)
+/// open sessions, "Abend" one logical day, "Woche" and "Monat" the days
+/// around it.
 ///
 /// The [name] of each value is the persisted identifier - never rename.
 enum TimelineLevel {
   now,
-  evening;
+  evening,
+  week,
+  month;
 
   static TimelineLevel? fromName(String? name) {
     for (final v in values) {

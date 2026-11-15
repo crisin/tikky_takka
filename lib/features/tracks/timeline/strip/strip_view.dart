@@ -668,23 +668,28 @@ class StripViewState extends ConsumerState<StripView> {
       key: StripKeys.controls,
       mainAxisSize: MainAxisSize.min,
       children: [
-        PillButton(
-          key: StripKeys.fit,
-          label: TracksStrings.stripAll,
-          semanticLabel: TracksStrings.stripFit,
-          outlined: true,
-          onPressed: _fit,
+        // Very large text on a narrow phone: the words give way.
+        Flexible(
+          child: PillButton(
+            key: StripKeys.fit,
+            label: TracksStrings.stripAll,
+            semanticLabel: TracksStrings.stripFit,
+            outlined: true,
+            onPressed: _fit,
+          ),
         ),
         SizedBox(width: t.space.sm),
         // Following already: nothing to jump to.
-        ValueListenableBuilder<bool>(
-          valueListenable: _following,
-          builder: (context, following, _) => PillButton(
-            key: StripKeys.now,
-            label: TracksStrings.stripNow,
-            semanticLabel: TracksStrings.stripToNow,
-            outlined: true,
-            onPressed: following ? null : _jumpToNow,
+        Flexible(
+          child: ValueListenableBuilder<bool>(
+            valueListenable: _following,
+            builder: (context, following, _) => PillButton(
+              key: StripKeys.now,
+              label: TracksStrings.stripNow,
+              semanticLabel: TracksStrings.stripToNow,
+              outlined: true,
+              onPressed: following ? null : _jumpToNow,
+            ),
           ),
         ),
       ],

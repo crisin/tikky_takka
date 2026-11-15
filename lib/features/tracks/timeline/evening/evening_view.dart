@@ -133,7 +133,12 @@ class _EveningViewState extends ConsumerState<EveningView> {
       builder: (context, minute) {
         final now = ref.read(nowTickerProvider).value;
         return LayoutBuilder(
-          builder: (context, constraints) {
+          builder: (context, outer) {
+            // Low (a phone held sideways): the whole evening scrolls.
+            final low = outer.maxHeight < t.strip.eveningMinHeight;
+            final constraints = low
+                ? outer.copyWith(maxHeight: t.strip.eveningMinHeight)
+                : outer;
             final chainHeight = _chain == null ? 0.0 : t.strip.eveningChain;
             final layout = layoutEvening(
               sessions: widget.sessions,
@@ -204,14 +209,22 @@ class _EveningViewState extends ConsumerState<EveningView> {
                 ),
               ],
             );
+            final wide = layout.width > constraints.maxWidth
+                ? SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: SizedBox(width: layout.width, child: content),
+                  )
+                : content;
             return KeyedSubtree(
               key: EveningKeys.view,
-              child: layout.width > constraints.maxWidth
+              child: low
                   ? SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: SizedBox(width: layout.width, child: content),
+                      child: SizedBox(
+                        height: constraints.maxHeight,
+                        child: wide,
+                      ),
                     )
-                  : content,
+                  : wide,
             );
           },
         );

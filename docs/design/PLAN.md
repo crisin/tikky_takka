@@ -397,12 +397,25 @@ Abweichungen in Teil 1:
 
 Entwürfe `3-2` bis `3-5`. Vorher O1, O2, O3, E4.
 
-**Stand: Teil 1 erledigt** (P6.1, P6.2, P6.4 und der Bereichszugriff aus
-P6.3; Zweig `pult`). Offen: Teil 2 Woche und Monat (P6.5, P6.6, Zahlen aus
-P6.3), Teil 3 Eintragsblatt, Export, Verlauf (P6.7–P6.9). Abweichungen:
+**Stand: Teil 1 und 2 erledigt** (P6.1–P6.6; Zweig `pult`). Offen: Teil 3
+Eintragsblatt, Export, Verlauf (P6.7–P6.9). Abweichungen in Teil 2:
 
-- Der Umschalter zeigt vorerst nur „Jetzt“ und „Abend“; Woche und Monat
-  kommen mit ihren Ansichten dazu.
+- Woche und Monat zählen nur Protokoll-Einträge (Sachen), keine Tipps von
+  Zählern und keine Sitzungen anderer Spuren.
+- Alle Stufen hängen an einem Tag: Pfeile springen einen Tag, eine Woche
+  oder einen Monat; ein Tipp auf einen Tag in Woche oder Monat öffnet seinen
+  Abend.
+- Woche: Striche nur im 12-Stunden-Fenster vor dem Tagesbeginn; die Zahl
+  rechts zählt den ganzen logischen Tag. Kommende Tage sind blass und ohne
+  Zahl. Die Summenzeile heißt immer „Diese Woche“.
+- Monat: Stufe 3 hat immer der stärkste Tag; darunter `1 + (n−1)·3 / max`.
+  Die Stufen nutzen die Rollen tint, strong, solid der Sachfarbe („Alles“:
+  Primärfarbe). „Längste Pause“ zählt bis heute, Tage vor dem ersten
+  Eintrag eingeschlossen. Die Auswahl „Was zählen“ wird nicht gemerkt.
+- Ist der Abend niedriger als 320, rollt er als Ganzes (Telefon quer).
+- „Alles“ und „Jetzt“ im Streifen dürfen bei sehr großer Schrift schrumpfen.
+
+Abweichungen in Teil 1:
 - „Kompakt“ ist die bisherige Liste, beschränkt auf den Abend (O2). Die
   Zusammenfassung ist entfallen (`timeline_summary.dart`).
 - „Jetzt“ zeigt nur noch die offenen Sitzungen; die Zeiträume „Heute“ und

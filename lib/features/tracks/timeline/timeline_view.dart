@@ -14,6 +14,9 @@ import '../../protocol/protocol_widgets.dart';
 import '../now_selector.dart';
 import '../tracks_strings.dart';
 import 'evening/evening_view.dart';
+import 'period/month_view.dart';
+import 'period/period_things.dart';
+import 'period/week_view.dart';
 import 'person_cards.dart';
 import 'strip/strip_view.dart';
 import 'timeline_event_sheet.dart';
@@ -82,8 +85,12 @@ class TimelineView extends ConsumerStatefulWidget {
 }
 
 class _TimelineViewState extends ConsumerState<TimelineView> {
-  /// The evening shown; `null` = the one going on now.
+  /// The day the levels are around (the evening, its week, its month);
+  /// `null` = the one going on now.
   LocalDay? _day;
+
+  /// What the month counts; `null` = everything.
+  String? _monthThing;
   bool _newestFirst = true;
   bool _showLifecycle = false;
   final Set<String> _hiddenTracks = {};
@@ -122,10 +129,10 @@ class _TimelineViewState extends ConsumerState<TimelineView> {
     final dayStart = t.prefs.dayStartMinutes;
     final choices = ref.read(timelineChoicesProvider.notifier);
     final day = _day ?? today;
-    final evening = choice.level == TimelineLevel.evening;
+    final level = choice.level;
+    final evening = level == TimelineLevel.evening;
     final compact = evening && choice.compact;
 
-    // "Jetzt" / "Abend" ("Woche" and "Monat" follow).
     final levelRow = Padding(
       padding: EdgeInsets.symmetric(horizontal: t.space.page),
       child: Semantics(
@@ -137,8 +144,11 @@ class _TimelineViewState extends ConsumerState<TimelineView> {
             segments: const {
               TimelineLevel.now: TracksStrings.levelNow,
               TimelineLevel.evening: TracksStrings.levelEvening,
+              TimelineLevel.week: TracksStrings.levelWeek,
+              TimelineLevel.month: TracksStrings.levelMonth,
             },
-            selected: choice.level,
+            fitLabels: true,
+            selected: level,
             onChanged: (next) {
               ref.read(hapticsProvider).selection();
               choices.show(widget.setId, next);
@@ -153,12 +163,14 @@ class _TimelineViewState extends ConsumerState<TimelineView> {
       padding: EdgeInsets.symmetric(horizontal: t.space.page),
       child: Row(
         children: [
-          FilterChip(
-            key: TimelineKeys.lifecycle,
-            label: const Text(TracksStrings.timelineShowLifecycle),
-            selected: _showLifecycle,
-            onSelected: (on) => _set(() => _showLifecycle = on),
-          ),
+          // Start and stop are only drawn in "Jetzt" and in the list.
+          if (level == TimelineLevel.now || compact)
+            FilterChip(
+              key: TimelineKeys.lifecycle,
+              label: const Text(TracksStrings.timelineShowLifecycle),
+              selected: _showLifecycle,
+              onSelected: (on) => _set(() => _showLifecycle = on),
+            ),
           if (tracks.length > 1)
             for (final track in tracks) ...[
               SizedBox(width: t.space.sm),
@@ -180,8 +192,114 @@ class _TimelineViewState extends ConsumerState<TimelineView> {
       ),
     );
 
-    final from = evening ? logicalDayStartMs(day, dayStart) : null;
-    final to = evening ? logicalDayEndMs(day, dayStart) : null;
+    // The range of the level around the chosen day.
+    final monday = day.weekStart;
+    final month = LocalDay(day.year, day.month, 1);
+    final nextMonth = DateTime(day.year, day.month + 1);
+    final lastOfMonth = logicalDayShift(
+      LocalDay(nextMonth.year, nextMonth.month, 1),
+      -1,
+    );
+    final (LocalDay first, LocalDay last) = switch (level) {
+      TimelineLevel.now || TimelineLevel.evening => (day, day),
+      TimelineLevel.week => (monday, logicalDayShift(monday, 6)),
+      TimelineLevel.month => (month, lastOfMonth),
+    };
+    final from = level == TimelineLevel.now
+        ? null
+        : logicalDayStartMs(first, dayStart);
+    final to = level == TimelineLevel.now
+        ? null
+        : logicalDayEndMs(last, dayStart);
+    final hasToday = first.compareTo(today) <= 0 && last.compareTo(today) >= 0;
+
+    void go(LocalDay next) => _set(() => _day = next == today ? null : next);
+    void openEvening(LocalDay next) {
+      go(next);
+      choices.show(widget.setId, TimelineLevel.evening);
+    }
+
+    Widget? head;
+    switch (level) {
+      case TimelineLevel.now:
+        head = null;
+      case TimelineLevel.evening:
+        head = _PeriodRow(
+          title: Fmt.dayShort(from!),
+          caption: _EveningCaption(
+            setId: widget.setId,
+            fromMs: from,
+            toMs: to!,
+          ),
+          previousLabel: TracksStrings.eveningPrevious,
+          nextLabel: TracksStrings.eveningNext,
+          onPrevious: () => go(logicalDayShift(day, -1)),
+          onNext: hasToday ? null : () => go(logicalDayShift(day, 1)),
+          trailing: [
+            SizedBox(width: t.space.sm),
+            SheetChip(
+              key: TimelineKeys.compact,
+              label: TracksStrings.eveningCompact,
+              semanticLabel: TracksStrings.eveningCompactSemantics,
+              selected: compact,
+              onTap: () {
+                ref.read(hapticsProvider).selection();
+                choices.setCompact(widget.setId, compact: !compact);
+              },
+            ),
+            if (compact)
+              AdaptiveIconButton(
+                key: TimelineKeys.order,
+                icon: _newestFirst
+                    ? Icons.arrow_downward_rounded
+                    : Icons.arrow_upward_rounded,
+                semanticLabel: _newestFirst
+                    ? TracksStrings.timelineNewestFirst
+                    : TracksStrings.timelineOldestFirst,
+                onPressed: () => _set(() => _newestFirst = !_newestFirst),
+              ),
+          ],
+        );
+      case TimelineLevel.week:
+        head = _PeriodRow(
+          title: Fmt.weekRange(monday),
+          caption: Text(
+            TracksStrings.weekNumber(isoWeekNumber(monday)),
+            style: t.text.caption,
+          ),
+          previousLabel: TracksStrings.weekPrevious,
+          nextLabel: TracksStrings.weekNext,
+          onPrevious: () => go(logicalDayShift(day, -7)),
+          onNext: hasToday ? null : () => go(logicalDayShift(day, 7)),
+        );
+      case TimelineLevel.month:
+        final substances = ref.watch(substancesByIdProvider);
+        final thing = _monthThing;
+        head = _PeriodRow(
+          title: Fmt.monthYear(month),
+          caption: Text(
+            TracksStrings.monthCaption(
+              thing == null
+                  ? TracksStrings.monthAll
+                  : thingLabel(thing, substances),
+              current: hasToday,
+            ),
+            style: t.text.caption,
+          ),
+          previousLabel: TracksStrings.monthPrevious,
+          nextLabel: TracksStrings.monthNext,
+          onPrevious: () {
+            final d = DateTime(day.year, day.month - 1);
+            go(LocalDay(d.year, d.month, 1));
+          },
+          onNext: hasToday
+              ? null
+              : () {
+                  final d = DateTime(day.year, day.month + 1);
+                  go(LocalDay(d.year, d.month, 1));
+                },
+        );
+    }
 
     return Column(
       key: TimelineKeys.view,
@@ -189,22 +307,7 @@ class _TimelineViewState extends ConsumerState<TimelineView> {
       children: [
         levelRow,
         SizedBox(height: t.space.xs),
-        if (evening)
-          _DayRow(
-            setId: widget.setId,
-            day: day,
-            fromMs: from!,
-            toMs: to!,
-            isToday: day == today,
-            compact: compact,
-            newestFirst: _newestFirst,
-            onDay: (next) => _set(() => _day = next == today ? null : next),
-            onCompact: () {
-              ref.read(hapticsProvider).selection();
-              choices.setCompact(widget.setId, compact: !compact);
-            },
-            onOrder: () => _set(() => _newestFirst = !_newestFirst),
-          ),
+        ?head,
         filterRow,
         Divider(height: t.space.sm, color: t.colors.border),
         Expanded(
@@ -214,10 +317,15 @@ class _TimelineViewState extends ConsumerState<TimelineView> {
             child: _TimelineBody(
               setId: widget.setId,
               tracks: tracks,
-              level: choice.level,
+              level: level,
               compact: compact,
               fromMs: from,
               toMs: to,
+              monday: monday,
+              month: month,
+              monthThing: _monthThing,
+              onMonthThing: (thing) => setState(() => _monthThing = thing),
+              onDay: openEvening,
               newestFirst: _newestFirst,
               showLifecycle: _showLifecycle,
               hiddenTracks: _hiddenTracks,
@@ -229,32 +337,95 @@ class _TimelineViewState extends ConsumerState<TimelineView> {
   }
 }
 
-/// The evening shown: back, the day with since when, forward,
-/// "Kompakt" (and in it the order of the list).
-class _DayRow extends ConsumerWidget {
-  const _DayRow({
+/// The period shown: back, its name with a line below, forward, and what
+/// belongs to it ("Kompakt").
+class _PeriodRow extends StatelessWidget {
+  const _PeriodRow({
+    required this.title,
+    required this.caption,
+    required this.previousLabel,
+    required this.nextLabel,
+    required this.onPrevious,
+    required this.onNext,
+    this.trailing = const [],
+  });
+
+  final String title;
+  final Widget caption;
+  final String previousLabel;
+  final String nextLabel;
+  final VoidCallback onPrevious;
+
+  /// `null` while the period going on is shown.
+  final VoidCallback? onNext;
+  final List<Widget> trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tikky;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        t.space.pageLanes,
+        0,
+        t.space.pageLanes,
+        t.space.xs,
+      ),
+      child: Row(
+        children: [
+          HeaderRoundButton(
+            key: TimelineKeys.previous,
+            icon: AdaptiveIcons.chevronLeft(context),
+            label: previousLabel,
+            onPressed: onPrevious,
+          ),
+          Expanded(
+            child: Semantics(
+              container: true,
+              liveRegion: true,
+              child: Column(
+                key: TimelineKeys.day,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title,
+                    style: t.text.headline,
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  DefaultTextStyle.merge(
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    child: caption,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          HeaderRoundButton(
+            key: TimelineKeys.next,
+            icon: AdaptiveIcons.chevronRight(context),
+            label: nextLabel,
+            onPressed: onNext,
+          ),
+          ...trailing,
+        ],
+      ),
+    );
+  }
+}
+
+/// "Abend · seit 20:50": since the first entry (or start) of the evening.
+class _EveningCaption extends ConsumerWidget {
+  const _EveningCaption({
     required this.setId,
-    required this.day,
     required this.fromMs,
     required this.toMs,
-    required this.isToday,
-    required this.compact,
-    required this.newestFirst,
-    required this.onDay,
-    required this.onCompact,
-    required this.onOrder,
   });
 
   final String setId;
-  final LocalDay day;
   final int fromMs;
   final int toMs;
-  final bool isToday;
-  final bool compact;
-  final bool newestFirst;
-  final ValueChanged<LocalDay> onDay;
-  final VoidCallback onCompact;
-  final VoidCallback onOrder;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -274,76 +445,11 @@ class _DayRow extends ConsumerWidget {
         if (first == null || e.at < first) first = e.at;
       }
     }
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        t.space.pageLanes,
-        0,
-        t.space.pageLanes,
-        t.space.xs,
-      ),
-      child: Row(
-        children: [
-          HeaderRoundButton(
-            key: TimelineKeys.previous,
-            icon: AdaptiveIcons.chevronLeft(context),
-            label: TracksStrings.eveningPrevious,
-            onPressed: () => onDay(logicalDayShift(day, -1)),
-          ),
-          Expanded(
-            child: Semantics(
-              container: true,
-              liveRegion: true,
-              child: Column(
-                key: TimelineKeys.day,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    Fmt.dayShort(fromMs),
-                    style: t.text.headline,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  Text(
-                    first == null
-                        ? TracksStrings.eveningPlain
-                        : TracksStrings.eveningSince(
-                            Fmt.time(first, use24h: t.prefs.use24h),
-                          ),
-                    style: t.text.caption,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          HeaderRoundButton(
-            key: TimelineKeys.next,
-            icon: AdaptiveIcons.chevronRight(context),
-            label: TracksStrings.eveningNext,
-            onPressed: isToday ? null : () => onDay(logicalDayShift(day, 1)),
-          ),
-          SizedBox(width: t.space.sm),
-          SheetChip(
-            key: TimelineKeys.compact,
-            label: TracksStrings.eveningCompact,
-            semanticLabel: TracksStrings.eveningCompactSemantics,
-            selected: compact,
-            onTap: onCompact,
-          ),
-          if (compact)
-            AdaptiveIconButton(
-              key: TimelineKeys.order,
-              icon: newestFirst
-                  ? Icons.arrow_downward_rounded
-                  : Icons.arrow_upward_rounded,
-              semanticLabel: newestFirst
-                  ? TracksStrings.timelineNewestFirst
-                  : TracksStrings.timelineOldestFirst,
-              onPressed: onOrder,
-            ),
-        ],
-      ),
+    return Text(
+      first == null
+          ? TracksStrings.eveningPlain
+          : TracksStrings.eveningSince(Fmt.time(first, use24h: t.prefs.use24h)),
+      style: t.text.caption,
     );
   }
 }
@@ -356,11 +462,21 @@ class _TimelineBody extends ConsumerWidget {
     required this.compact,
     required this.fromMs,
     required this.toMs,
+    required this.monday,
+    required this.month,
+    required this.monthThing,
+    required this.onMonthThing,
+    required this.onDay,
     required this.newestFirst,
     required this.showLifecycle,
     required this.hiddenTracks,
   });
 
+  final LocalDay monday;
+  final LocalDay month;
+  final String? monthThing;
+  final ValueChanged<String?> onMonthThing;
+  final ValueChanged<LocalDay> onDay;
   final String setId;
   final List<Track> tracks;
   final TimelineLevel level;
@@ -411,6 +527,22 @@ class _TimelineBody extends ConsumerWidget {
                 ],
               ),
       );
+    }
+
+    if (level == TimelineLevel.week || level == TimelineLevel.month) {
+      final shown = [
+        for (final s in sessions)
+          if (!hiddenTracks.contains(s.track?.id)) s,
+      ];
+      return level == TimelineLevel.week
+          ? WeekView(sessions: shown, monday: monday, onDay: onDay)
+          : MonthView(
+              sessions: shown,
+              month: month,
+              thing: monthThing,
+              onThing: onMonthThing,
+              onDay: onDay,
+            );
     }
 
     if (!compact) {

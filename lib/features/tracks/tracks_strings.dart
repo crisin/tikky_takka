@@ -280,6 +280,43 @@ abstract final class TracksStrings {
   static const levelSwitch = 'Zeitraum';
   static const levelNow = 'Jetzt';
   static const levelEvening = 'Abend';
+  static const levelWeek = 'Woche';
+  static const levelMonth = 'Monat';
+  static const weekPrevious = 'Woche davor';
+  static const weekNext = 'Nächste Woche';
+  static const monthPrevious = 'Monat davor';
+  static const monthNext = 'Nächster Monat';
+
+  /// "KW 46"
+  static String weekNumber(int n) => 'KW $n';
+
+  /// "Diese Woche · 39 Einträge"
+  static String weekTotal(int n) => 'Diese Woche · ${stripCluster(n)}';
+
+  /// A day without an entry.
+  static const noCount = '–';
+
+  /// Read for a row of the week or a day of the month: "Di 10.11.: 4
+  /// Einträge".
+  static String daySemantics(String day, String date, int n) =>
+      '$day $date: ${stripCluster(n)}';
+
+  /// What the month counts.
+  static const monthAll = 'Alles';
+  static const monthWhat = 'Was zählen';
+
+  /// "Bier · bis heute"
+  static String monthCaption(String thing, {required bool current}) =>
+      current ? '$thing · bis heute' : thing;
+
+  /// Below the figures of the month: "Mal Bier", "Einträge".
+  static String monthCountLabel(String? thing) =>
+      thing == null ? 'Einträge' : 'Mal $thing';
+  static const monthDays = 'Tage mit Eintrag';
+  static const monthPause = 'längste Pause';
+
+  /// "4 Tage", "1 Tag"
+  static String days(int n) => n == 1 ? '1 Tag' : '$n Tage';
   static const eveningPrevious = 'Abend davor';
   static const eveningNext = 'Nächster Abend';
   static const eveningCompact = 'Kompakt';

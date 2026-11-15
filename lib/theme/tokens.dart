@@ -436,6 +436,27 @@ final class TikkyStripTokens {
   double get eveningChainDot => 8;
   double get eveningAvatar => 24;
 
+  /// Below this height the evening scrolls as a whole.
+  double get eveningMinHeight => 320;
+
+  // "Woche" and "Monat" (Pult 3.3, 3.4).
+
+  /// A row of the week (a full tap target), the column with the day and
+  /// the one with the count, the gap between rows.
+  double get weekRow => 48;
+  double get weekLabel => 44;
+  double get weekCount => 40;
+  double get weekGap => 6;
+
+  /// An entry in a row of the week; the bar of a thing in the totals.
+  double get weekTick => 2;
+  double get weekTickHeight => 22;
+  double get weekSumBar => 14;
+
+  /// A day of the month (a full tap target) and the gap between days.
+  double get monthCell => 48;
+  double get monthGap => 6;
+
   /// Width of the "now" line and of a lap tick.
   double get nowLine => 1.5;
 

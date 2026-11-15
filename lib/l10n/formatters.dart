@@ -115,6 +115,50 @@ abstract final class Fmt {
     'Dez.',
   ];
 
+  static const _monthsLong = [
+    'Januar',
+    'Februar',
+    'März',
+    'April',
+    'Mai',
+    'Juni',
+    'Juli',
+    'August',
+    'September',
+    'Oktober',
+    'November',
+    'Dezember',
+  ];
+  static const _weekdaysPlain = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+
+  /// `November 2026`
+  static String monthYear(LocalDay day) =>
+      '${_monthsLong[day.month - 1]} ${day.year}';
+
+  /// `9. – 15. November`, `26. Oktober – 1. November`,
+  /// `29. Dezember 2025 – 4. Januar 2026`
+  static String weekRange(LocalDay monday) {
+    final a = monday.start;
+    final b = DateTime(a.year, a.month, a.day + 6);
+    if (a.year != b.year) {
+      return '${a.day}. ${_monthsLong[a.month - 1]} ${a.year} – '
+          '${b.day}. ${_monthsLong[b.month - 1]} ${b.year}';
+    }
+    if (a.month != b.month) {
+      return '${a.day}. ${_monthsLong[a.month - 1]} – '
+          '${b.day}. ${_monthsLong[b.month - 1]}';
+    }
+    return '${a.day}. – ${b.day}. ${_monthsLong[b.month - 1]}';
+  }
+
+  /// `Mo` (a week row, the head of a calendar column).
+  static String weekdayPlain(LocalDay day) =>
+      _weekdaysPlain[day.start.weekday - 1];
+  static List<String> get weekdaysPlain => _weekdaysPlain;
+
+  /// `9.11.`
+  static String dayMonth(LocalDay day) => '${day.day}.${day.month}.';
+
   /// `11.11.2026`
   static String date(int ms) {
     final d = DateTime.fromMillisecondsSinceEpoch(ms);

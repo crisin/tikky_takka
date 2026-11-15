@@ -5,6 +5,7 @@ export 'alarm_plan.dart';
 export 'derive.dart';
 export 'history_math.dart';
 export 'logical_day.dart';
+export 'period_counts.dart';
 export 'snapshots.dart';
 export 'summary.dart';
 export 'timeline.dart';
