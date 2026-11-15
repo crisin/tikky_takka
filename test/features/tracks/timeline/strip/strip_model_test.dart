@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:tikky_takka/core/domain/domain.dart';
 import 'package:tikky_takka/core/engine/engine.dart';
 import 'package:tikky_takka/features/tracks/timeline/strip/strip_model.dart';
+import 'package:tikky_takka/features/tracks/timeline/strip/strip_viewport.dart';
 import 'package:tikky_takka/l10n/strings.dart';
 
 import '../../../../support/events.dart';
@@ -58,8 +59,7 @@ StripLayout _layout(
   required int nowMs,
 }) => layoutStrip(
   data: data,
-  startMs: startMs,
-  msPerPx: msPerPx,
+  scale: TimeScale.linear(startMs: startMs, msPerPx: msPerPx),
   width: width,
   nowMs: nowMs,
   metrics: _metrics,

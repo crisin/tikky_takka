@@ -8,6 +8,7 @@ import '../../../../core/engine/engine.dart';
 import '../../../../l10n/strings.dart';
 import '../../tracks_strings.dart';
 import '../timeline_logic.dart';
+import 'strip_viewport.dart';
 
 // Pure layout model of the strip ("Streifen"): time runs left to right,
 // one lane per track. Unit tested.
@@ -158,6 +159,9 @@ final class StripSession {
   /// Time of the last event (at least [startAt]).
   final int lastAt;
   final List<TimeSpan> _closed;
+
+  /// The stretches that counted and are over (not the running one).
+  List<TimeSpan> get closedSpans => _closed;
 
   /// Start of the stretch that is still counting; `null` when the session
   /// is paused or has ended.
@@ -907,17 +911,16 @@ int _lowerBound<T>(List<T> list, num value, int Function(T item) key) {
   return lo;
 }
 
-/// The primitives for the stretch that starts at [startMs] and is [width]
-/// pixels wide at [msPerPx], as seen at [nowMs].
+/// The primitives for the stretch of [scale] that is [width] pixels
+/// wide, as seen at [nowMs].
 ///
 /// Only what touches the viewport (plus [StripMetrics.cullMargin]) is
 /// produced. Markers of a lane that are closer than
-/// [StripMetrics.markerGap] become a [StripCluster]; zooming in takes
-/// them apart again.
+/// [StripMetrics.markerGap] pixels become a [StripCluster]; zooming in
+/// takes them apart again. Bars run through the folds of [scale].
 StripLayout layoutStrip({
   required StripData data,
-  required double startMs,
-  required double msPerPx,
+  required TimeScale scale,
   required double width,
   required int nowMs,
   required StripMetrics metrics,
@@ -931,7 +934,8 @@ StripLayout layoutStrip({
     heights.add(h);
     y += h;
   }
-  double xOf(num ms) => (ms - startMs) / msPerPx;
+  final msPerPx = scale.msPerPx;
+  double xOf(num ms) => scale.xOf(ms);
   final nowX = msPerPx <= 0 ? 0.0 : xOf(nowMs);
   if (width <= 0 || msPerPx <= 0) {
     return StripLayout(
@@ -947,9 +951,12 @@ StripLayout layoutStrip({
 
   final minX = -metrics.cullMargin;
   final maxX = width + metrics.cullMargin;
-  final lo = startMs + minX * msPerPx;
-  final hi = startMs + maxX * msPerPx;
+  final lo = scale.timeAt(minX);
+  final hi = scale.timeAt(maxX);
   final gapMs = metrics.markerGap * msPerPx;
+  // Closer than this on screen: one cluster.
+  bool close(StripEvent a, StripEvent b) =>
+      xOf(b.at) - xOf(a.at) < metrics.markerGap;
 
   final bands = <StripBand>[];
   final bars = <StripBar>[];
@@ -1122,16 +1129,13 @@ StripLayout layoutStrip({
       var i = _lowerBound(events, lo, (e) => e.at);
       // A cluster that starts outside the viewport still counts all of
       // its events.
-      while (i > 0 &&
-          i < events.length &&
-          events[i].at - events[i - 1].at < gapMs) {
+      while (i > 0 && i < events.length && close(events[i - 1], events[i])) {
         i--;
       }
       while (i < events.length) {
         if (events[i].at > hi) break;
         var j = i;
-        while (j + 1 < events.length &&
-            events[j + 1].at - events[j].at < gapMs) {
+        while (j + 1 < events.length && close(events[j], events[j + 1])) {
           j++;
         }
         if (j == i) {
@@ -1252,6 +1256,28 @@ StripLayout layoutStrip({
 
 /// The start and the end of the range the strip can show; `null` when
 /// there is nothing.
+/// The moments of [data] that must stay visible - every event, and the
+/// starts, ends and pauses of the sessions - for [computeFolds]. A bar
+/// that simply keeps running adds nothing between its ends.
+Iterable<int> stripKeepTimes(StripData data) sync* {
+  for (final row in data.rows) {
+    for (final e in row.events) {
+      yield e.at;
+    }
+    for (final s in row.sessions) {
+      yield s.startAt;
+      final end = s.endAt;
+      if (end != null) yield end;
+      for (final span in s.closedSpans) {
+        yield span.from;
+        yield span.to;
+      }
+      final since = s.runningSince;
+      if (since != null) yield since;
+    }
+  }
+}
+
 ({int start, int end})? stripExtent(StripData data) {
   final first = data.firstAt;
   final last = data.lastAt;

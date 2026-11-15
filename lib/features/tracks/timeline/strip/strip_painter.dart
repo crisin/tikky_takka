@@ -164,8 +164,7 @@ class StripLanesPainter extends CustomPainter {
 
   StripLayout layoutFor(Size size) => layoutStrip(
     data: data,
-    startMs: viewport.startMs,
-    msPerPx: viewport.msPerPx,
+    scale: viewport.scale,
     width: size.width,
     nowMs: now.value,
     metrics: style.metrics,
@@ -200,8 +199,7 @@ class StripLanesPainter extends CustomPainter {
 
     // Gridlines at the ticks of the axis; day separators stronger.
     final axis = computeAxis(
-      startMs: viewport.startMs,
-      msPerPx: viewport.msPerPx,
+      scale: viewport.scale,
       width: size.width,
       minSpacingPx: style.tickSpacing,
       use24h: t.prefs.use24h,
@@ -218,6 +216,11 @@ class StripLanesPainter extends CustomPainter {
         Offset(tick.x, size.height),
         tick.isDay && axis.stepMs < stripDayMs ? day : grid,
       );
+    }
+
+    // Folds behind everything else: the bars run through them.
+    for (final fold in axis.folds) {
+      _paintFold(canvas, fold, 0, size.height, t);
     }
 
     for (final band in layout.bands) {
@@ -451,7 +454,9 @@ class StripLanesPainter extends CustomPainter {
       ..save()
       ..clipRRect(rrect);
     // Anchored to the time, not to the screen: the lines move with the bar.
-    final phase = (viewport.startMs / viewport.msPerPx) % s.hatchSpacing;
+    final phase =
+        (viewport.scale.drawnMs(viewport.startMs) / viewport.msPerPx) %
+        s.hatchSpacing;
     for (
       var x = rect.left - rect.height - phase;
       x < rect.right;
@@ -572,8 +577,7 @@ class StripAxisPainter extends CustomPainter {
       ..save()
       ..clipRect(Offset.zero & size);
     final axis = computeAxis(
-      startMs: viewport.startMs,
-      msPerPx: viewport.msPerPx,
+      scale: viewport.scale,
       width: size.width,
       minSpacingPx: style.tickSpacing,
       use24h: t.prefs.use24h,
@@ -588,6 +592,25 @@ class StripAxisPainter extends CustomPainter {
     );
     final tickLength = t.space.xs;
     final taken = <Rect>[];
+
+    // A fold continues through the axis and carries its length.
+    final foldLabels = <(TextPainter, Rect)>[];
+    for (final fold in axis.folds) {
+      _paintFold(canvas, fold, 0, size.height, t);
+      final text = _texts.get(Fmt.coarse(fold.ms), t.text.caption);
+      final width = text.width + 2 * s.labelGap;
+      // Inside the width, like the current time.
+      final left = (fold.center - width / 2)
+          .clamp(0.0, math.max(0.0, size.width - width))
+          .toDouble();
+      final rect = Rect.fromLTWH(
+        left,
+        (size.height - tickLength - text.height) / 2,
+        width,
+        text.height,
+      );
+      foldLabels.add((text, rect));
+    }
 
     // The current time at the "now" line wins over the tick labels.
     final nowMs = now.value;
@@ -644,6 +667,17 @@ class StripAxisPainter extends CustomPainter {
       if (taken.any((r) => r.overlaps(rect))) return;
       taken.add(rect.inflate(s.labelGap));
       text.paint(canvas, rect.topLeft);
+    }
+
+    // Fold lengths before the ticks, after the current time.
+    for (final (text, rect) in foldLabels) {
+      if (taken.any((r) => r.overlaps(rect))) continue;
+      taken.add(rect.inflate(s.labelGap));
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(rect, Radius.circular(t.radii.sm)),
+        Paint()..color = t.colors.background,
+      );
+      text.paint(canvas, rect.topLeft.translate(s.labelGap, 0));
     }
 
     final dayLines = axis.stepMs < stripDayMs;
@@ -721,4 +755,45 @@ class StripCornerPainter extends CustomPainter {
   @override
   bool shouldRepaint(StripCornerPainter oldDelegate) =>
       oldDelegate.style != style || !identical(oldDelegate.viewport, viewport);
+}
+
+/// A fold from [top] to [bottom]: a narrow column on the surface colour,
+/// hatched, with dashed edges (Pult 3.1).
+void _paintFold(
+  Canvas canvas,
+  StripFoldMark fold,
+  double top,
+  double bottom,
+  TikkyTokens t,
+) {
+  final rect = Rect.fromLTRB(fold.left, top, fold.right, bottom);
+  if (rect.width <= 0 || rect.height <= 0) return;
+  final line = Paint()
+    ..color = t.colors.border
+    ..strokeWidth = 1;
+  canvas
+    ..drawRect(rect, Paint()..color = t.colors.surface)
+    ..save()
+    ..clipRect(rect);
+  // Anchored to the top of the column: the lines do not crawl.
+  final step = t.strip.foldHatchSpacing;
+  for (var x = rect.left - rect.height; x < rect.right; x += step) {
+    canvas.drawLine(
+      Offset(x, rect.bottom),
+      Offset(x + rect.height, rect.top),
+      line,
+    );
+  }
+  canvas.restore();
+  // Dashed edges.
+  final dash = t.strip.foldHatchSpacing / 2;
+  for (final x in [rect.left, rect.right]) {
+    for (var y = rect.top; y < rect.bottom; y += 2 * dash) {
+      canvas.drawLine(
+        Offset(x, y),
+        Offset(x, math.min(rect.bottom, y + dash)),
+        line,
+      );
+    }
+  }
 }

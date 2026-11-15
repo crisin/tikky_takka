@@ -1,6 +1,9 @@
+import 'dart:math' as math;
+
 import 'package:flutter/foundation.dart';
 
 import '../../../../l10n/formatters.dart';
+import 'strip_viewport.dart';
 
 // Pure logic of the time axis of the strip: which ticks, where, with
 // which text. Unit tested. All times are UTC milliseconds; ticks sit on
@@ -78,15 +81,42 @@ final class StripTick {
   String toString() => 'StripTick($label @${x.toStringAsFixed(1)})';
 }
 
+/// A fold where it is drawn: [left] to [right], standing for [ms].
+@immutable
+final class StripFoldMark {
+  const StripFoldMark({
+    required this.left,
+    required this.right,
+    required this.ms,
+  });
+
+  final double left;
+  final double right;
+  final int ms;
+
+  double get center => (left + right) / 2;
+
+  @override
+  String toString() => 'StripFoldMark($ms ms @${left.toStringAsFixed(1)})';
+}
+
 /// The ticks of the visible stretch.
 @immutable
 final class StripAxis {
-  const StripAxis({required this.stepMs, required this.ticks});
+  const StripAxis({
+    required this.stepMs,
+    required this.ticks,
+    this.folds = const [],
+  });
 
   final int stepMs;
 
-  /// Left to right. Only ticks inside the width.
+  /// Left to right. Only ticks inside the width, none in or right next
+  /// to a fold.
   final List<StripTick> ticks;
+
+  /// The folds that touch the width, left to right.
+  final List<StripFoldMark> folds;
 
   /// The day separators among the ticks.
   Iterable<StripTick> get days => ticks.where((t) => t.isDay);
@@ -103,8 +133,7 @@ String stripDayLabel(int ms) {
 int _midnight(int year, int month, int day) =>
     DateTime(year, month, day).millisecondsSinceEpoch;
 
-/// The axis for the stretch that starts at [startMs] and is [width]
-/// pixels wide at [msPerPx].
+/// The axis for the stretch of [scale] that is [width] pixels wide.
 ///
 /// * Below one day the ticks count from local midnight of each day, so
 ///   they sit on round times; the tick at midnight is the day separator
@@ -112,27 +141,46 @@ int _midnight(int year, int month, int day) =>
 /// * From one day on every tick is a local midnight.
 /// * Labels show seconds only when the step is below one minute and
 ///   honour [use24h].
+/// * The step follows the scale outside the folds. A tick inside a fold,
+///   or closer to it than half of [minSpacingPx], is left out: the fold
+///   carries its length instead ([StripAxis.folds]).
 StripAxis computeAxis({
-  required double startMs,
-  required double msPerPx,
+  required TimeScale scale,
   required double width,
   required double minSpacingPx,
   bool use24h = true,
 }) {
+  final msPerPx = scale.msPerPx;
   if (width <= 0 || msPerPx <= 0) {
     return const StripAxis(stepMs: _secondMs, ticks: []);
   }
   final step = pickAxisStep(msPerPx, minSpacingPx);
-  final endMs = startMs + width * msPerPx;
+  final startMs = scale.timeAt(0);
+  final endMs = scale.timeAt(width);
   final ticks = <StripTick>[];
   final first = DateTime.fromMillisecondsSinceEpoch(startMs.floor());
 
+  final marks = <StripFoldMark>[
+    for (final f in scale.folds)
+      if (f.to >= startMs && f.from <= endMs)
+        StripFoldMark(
+          left: scale.xOf(f.from),
+          right: scale.xOf(f.to),
+          ms: f.lengthMs,
+        ),
+  ];
+  bool nearFold(double x) => marks.any(
+    (m) => x > m.left - minSpacingPx / 2 && x < m.right + minSpacingPx / 2,
+  );
+
   void add(int ms, {required bool isDay}) {
     if (ms < startMs || ms > endMs) return;
+    final x = scale.xOf(ms);
+    if (nearFold(x)) return;
     ticks.add(
       StripTick(
         ms: ms,
-        x: (ms - startMs) / msPerPx,
+        x: x,
         isDay: isDay,
         label: isDay
             ? stripDayLabel(ms)
@@ -157,7 +205,7 @@ StripAxis computeAxis({
       add(ms, isDay: true);
       offset += days;
     }
-    return StripAxis(stepMs: step, ticks: ticks);
+    return StripAxis(stepMs: step, ticks: ticks, folds: marks);
   }
 
   var dayOffset = 0;
@@ -173,10 +221,16 @@ StripAxis computeAxis({
     while (true) {
       final ms = dayStart + k * step;
       if (ms >= nextDay || ms > endMs) break;
+      // Across a fold in one jump.
+      final fold = scale.foldAt(ms);
+      if (fold != null) {
+        k = math.max(k + 1, ((fold.to - dayStart) / step).ceil());
+        continue;
+      }
       add(ms, isDay: k == 0);
       k++;
     }
     dayOffset++;
   }
-  return StripAxis(stepMs: step, ticks: ticks);
+  return StripAxis(stepMs: step, ticks: ticks, folds: marks);
 }

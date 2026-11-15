@@ -154,6 +154,10 @@ class StripViewState extends ConsumerState<StripView> {
 
   NowTicker? _ticker;
   StripData _data = StripData.empty;
+
+  /// The data and the minute the folds were computed for.
+  StripData? _foldedData;
+  int _foldedMinute = -1;
   StripStyle? _style;
   bool _needsFit = true;
   bool _lanesOverflow = false;
@@ -213,6 +217,7 @@ class StripViewState extends ConsumerState<StripView> {
     final ticker = _ticker;
     if (ticker == null || !mounted) return;
     final now = ticker.value;
+    _updateFolds(now);
     // While following this moves the view (and repaints through it).
     _viewport.setNow(now);
     _pulse.tick(now, _viewport.msPerPx);
@@ -242,12 +247,31 @@ class StripViewState extends ConsumerState<StripView> {
 
   int get _now => ref.read(nowTickerProvider).value;
 
+  /// The stretches without events are drawn narrow. Only the fold up to
+  /// "now" grows with time: once a minute is enough.
+  void _updateFolds(int nowMs, {bool notify = true}) {
+    final minute = nowMs ~/ Duration.millisecondsPerMinute;
+    if (identical(_foldedData, _data) && minute == _foldedMinute) return;
+    _foldedData = _data;
+    _foldedMinute = minute;
+    final s = context.tikky.strip;
+    _viewport.setFolds(
+      computeFolds(
+        stripKeepTimes(_data),
+        nowMs: minute * Duration.millisecondsPerMinute,
+        minGapMs: s.foldMinGapMs,
+        keepRecentMs: s.foldKeepRecentMs,
+        padMs: s.foldPadMs,
+      ),
+      notify: notify,
+    );
+  }
+
   StripLayout _layout() {
     final style = _style ?? StripStyle.of(context);
     return layoutStrip(
       data: _data,
-      startMs: _viewport.startMs,
-      msPerPx: _viewport.msPerPx,
+      scale: _viewport.scale,
       width: _viewport.width,
       nowMs: _now,
       metrics: style.metrics,
@@ -667,7 +691,8 @@ class StripViewState extends ConsumerState<StripView> {
       ..fitMinSpanMs = s.fitMinSpanMs
       ..maxSpanFloorMs = s.maxSpanFloorMs
       ..followAnchor = s.followAnchor
-      ..fitPadding = s.fitPadding;
+      ..fitPadding = s.fitPadding
+      ..foldPx = s.fold;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -695,6 +720,7 @@ class StripViewState extends ConsumerState<StripView> {
         final gutter = narrow ? s.gutterNarrow : s.gutter;
         final width = math.max(0.0, constraints.maxWidth - gutter);
         final extent = stripExtent(data)!;
+        _updateFolds(ticker.value, notify: false);
         _viewport
           ..setNow(ticker.value, notify: false)
           ..setExtent(extent.start, extent.end, live: data.live, notify: false)
@@ -716,8 +742,7 @@ class StripViewState extends ConsumerState<StripView> {
         final paintHeight = math.max(lanesHeight, content + reserve);
         final layout = layoutStrip(
           data: data,
-          startMs: _viewport.startMs,
-          msPerPx: _viewport.msPerPx,
+          scale: _viewport.scale,
           width: width,
           nowMs: ticker.value,
           metrics: style.metrics,

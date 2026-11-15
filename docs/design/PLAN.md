@@ -329,6 +329,24 @@ P4.6, P4.8). Abweichungen:
 
 Entwurf `3-1-jetzt`.
 
+**Stand: Teil 1 erledigt** (P5.1–P5.3; Zweig `pult`). Offen: P5.4–P5.6
+(Zeilen je Person, Abstände, Karten). Abweichungen:
+
+- **O7, Faltschwelle entschieden: 20 min** wie vorgeschlagen.
+- Neben den Ereignissen bleiben je 2 min offen (`foldPadMs`), damit Punkte
+  nicht an der Falte kleben. Eine Falte von 25 min steht also für 21 min.
+- `TimeScale` liegt in `strip_viewport.dart` und rechnet mit „gezeichneter
+  Zeit“ (Falten auf 24 px gestaucht). Eine Falte, die ohnehin schmaler als
+  24 px wäre, bleibt ungefaltet. Schieben und Zoomen rechnen ebenfalls in
+  gezeichneter Zeit.
+- Punkte werden nach Pixelabstand gebündelt statt nach Zeitabstand, damit
+  zwei Punkte zu beiden Seiten einer Falte nicht zusammenfallen.
+- Ticks in einer Falte und näher als ein halber Tickabstand fallen weg. Das
+  Schild mit der Dauer bleibt innerhalb der Breite; überdeckt es ein
+  anderes, wird es ausgelassen.
+- Die Falten gelten in jedem Zeitraum des Streifens, nicht nur bei
+  „Laufende Sitzungen“. Ob „Abend“, „Woche“ und „Monat“ falten, klärt P6.
+
 - **P5.1** Umbau ohne sichtbare Änderung: neue Klasse `TimeScale` (Zeit ↔ x)
   in `strip_viewport.dart`, zunächst linear. `layoutStrip` und `computeAxis`
   nehmen die Skala statt `(startMs, msPerPx)`; Bündelung und Ausblenden rechnen

@@ -386,7 +386,18 @@ final class TikkyStripTokens {
   double get gridOpacity => 0.6;
 
   /// Where the "now" line sits while it is followed (share of the width).
-  double get followAnchor => 0.82;
+  double get followAnchor => 0.85;
+
+  /// A stretch without any event of at least [foldMinGapMs] is drawn
+  /// [fold] pixels wide; never the last [foldKeepRecentMs] before "now";
+  /// [foldPadMs] stay open next to the events on both sides.
+  double get fold => 24;
+  int get foldMinGapMs => 20 * 60 * 1000;
+  int get foldKeepRecentMs => 10 * 60 * 1000;
+  int get foldPadMs => 2 * 60 * 1000;
+
+  /// Distance of the hatch lines of a fold.
+  double get foldHatchSpacing => 6;
 
   /// Free room on both sides of "Alles zeigen" (share of the range).
   double get fitPadding => 0.06;
