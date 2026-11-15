@@ -20,6 +20,7 @@ import '../../protocol/protocol_widgets.dart';
 import '../lane_view.dart';
 import '../now_selector.dart';
 import '../tracks_strings.dart';
+import '../tracks_view.dart';
 import 'pad_actions.dart';
 import 'pad_model.dart';
 
@@ -154,6 +155,22 @@ class _TapPadState extends ConsumerState<TapPad>
           setState(() => _last = null);
         }
       });
+    _take(ref.read(padPageRequestProvider));
+  }
+
+  /// Opens the page that was asked for elsewhere ([PadPageRequest]).
+  void _take(PadPageRequest? request) {
+    if (request == null) return;
+    // Cleared after this frame: providers must not change while building.
+    Future.microtask(() {
+      if (mounted) ref.read(padPageRequestProvider.notifier).clear();
+    });
+    final known = widget.tracks.any(
+      (t) => t.id == request.trackId && t.mode == TrackMode.protocol,
+    );
+    if (!known) return;
+    _closePage();
+    _page = _Page(request.trackId, request.personId);
   }
 
   @override
@@ -356,6 +373,9 @@ class _TapPadState extends ConsumerState<TapPad>
       context,
       track: track,
       existing: added.event,
+      justAdded: true,
+      // The bar above shows the changed entry with its undo.
+      quiet: true,
     );
     if (!mounted) return;
     final open = ref.read(openSessionProvider(track.id));
@@ -447,6 +467,9 @@ class _TapPadState extends ConsumerState<TapPad>
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(padPageRequestProvider, (_, request) {
+      if (request != null) setState(() => _take(request));
+    });
     final t = context.tikky;
     final tracks = widget.tracks;
     final sessions = ref.watch(openSessionsProvider);

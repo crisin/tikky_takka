@@ -8,114 +8,76 @@ import '../../core/repo/providers.dart';
 import '../../l10n/formatters.dart';
 import '../../l10n/strings.dart';
 import '../../theme/theme.dart';
+import 'entry_edit_sheet.dart';
 import 'protocol_logic.dart';
 import 'protocol_people_screen.dart';
 import 'protocol_strings.dart';
 import 'protocol_widgets.dart';
 
-/// Opens the quick entry sheet of a protocol track: who (person), what
-/// (substance), amount (free text), optional note, optional time.
+/// Opens the entry sheet of a protocol track.
 ///
-/// * [existing] `null`: a new entry is created with
-///   `trackCommandsProvider.addEntry(track.id, ...)`.
-/// * [existing] set: that entry is edited (including its time) and saved
-///   with `historyRepositoryProvider.updateEvent(...)`; the sheet also
-///   offers to delete it.
-/// * [initialPersonId] preselects a person for a new entry. Nothing else
-///   is filled in: substance and amount are picked by the user each time
-///   (repeat entries are one tap on the lane's substance buttons).
+/// * [existing] set: the sheet "Ändern" of that entry
+///   ([showEntryEditSheet]; [justAdded]: it was just written and the sheet
+///   is opened from an undo bar).
+/// * otherwise the form for a new entry: who (person), what (substance),
+///   amount (free text), optional note, optional time, saved with
+///   `protocolActions.addEntry`. [initialPersonId] preselects a person.
+///   Nothing else is filled in: substance and amount are picked by the
+///   user each time (repeat entries are one tap on the tap pad).
 ///
 /// Returns the saved entry, or `null` when the sheet was dismissed or the
 /// entry was deleted.
 ///
-/// There are no confirmation dialogs: after saving, editing or deleting a
-/// "Rückgängig" snackbar is shown on the scaffold of [context]. The app
-/// never fills in or suggests amounts or intervals of its own; the amount
-/// shortcuts are the user's own earlier inputs.
+/// There are no confirmation dialogs: afterwards a "Rückgängig" snackbar
+/// is shown on the scaffold of [context] (not for a new entry or an edit
+/// when [quiet]: the caller shows it itself). The app never fills in or
+/// suggests amounts or intervals of its own; the amount shortcuts are the
+/// user's own earlier inputs.
 Future<TrackEvent?> showProtocolEntrySheet(
   BuildContext context, {
   required Track track,
   TrackEvent? existing,
   String? initialPersonId,
+  bool justAdded = false,
   bool quiet = false,
 }) async {
+  if (existing != null) {
+    return showEntryEditSheet(
+      context,
+      track: track,
+      entry: existing,
+      fresh: justAdded,
+      quiet: quiet,
+    );
+  }
   // Fetched up front: undo may run long after the calling widget is gone.
   final actions = ProviderScope.containerOf(
     context,
     listen: false,
   ).read(protocolActionsProvider);
 
-  final result = await showAdaptiveSheet<_SheetResult>(
+  final added = await showAdaptiveSheet<AddedEntry>(
     context,
-    builder: (context) => _EntrySheet(
-      track: track,
-      existing: existing,
-      initialPersonId: initialPersonId,
-    ),
+    builder: (context) =>
+        _EntrySheet(track: track, initialPersonId: initialPersonId),
   );
-  if (result == null) return null;
-
-  switch (result) {
-    case _Added(:final added):
-      // [quiet]: the caller shows the new entry (and its undo) itself.
-      if (!quiet && context.mounted) {
-        showUndoSnackBar(
-          context,
-          message: Strings.protocolSaved,
-          onUndo: () => actions.undoAdd(added),
-        );
-      }
-      return added.event;
-    case _Updated(:final before, :final after):
-      if (context.mounted) {
-        showUndoSnackBar(
-          context,
-          message: ProtocolStrings.entryUpdated,
-          onUndo: () => actions.updateEntry(before),
-        );
-      }
-      return after;
-    case _Deleted(:final entry):
-      if (context.mounted) {
-        showUndoSnackBar(
-          context,
-          message: Strings.protocolDeleted,
-          onUndo: () => actions.restoreEntry(entry),
-        );
-      }
-      return null;
+  if (added == null) return null;
+  // [quiet]: the caller shows the new entry (and its undo) itself.
+  if (!quiet && context.mounted) {
+    showUndoSnackBar(
+      context,
+      message: Strings.protocolSaved,
+      onUndo: () => actions.undoAdd(added),
+    );
   }
+  return added.event;
 }
 
-sealed class _SheetResult {
-  const _SheetResult();
-}
-
-final class _Added extends _SheetResult {
-  const _Added(this.added);
-  final AddedEntry added;
-}
-
-final class _Updated extends _SheetResult {
-  const _Updated({required this.before, required this.after});
-  final TrackEvent before;
-  final TrackEvent after;
-}
-
-final class _Deleted extends _SheetResult {
-  const _Deleted(this.entry);
-  final TrackEvent entry;
-}
-
+/// The form for a new entry.
 class _EntrySheet extends ConsumerStatefulWidget {
-  const _EntrySheet({
-    required this.track,
-    required this.existing,
-    required this.initialPersonId,
-  });
+  const _EntrySheet({required this.track, required this.initialPersonId});
 
   final Track track;
-  final TrackEvent? existing;
   final String? initialPersonId;
 
   @override
@@ -138,8 +100,6 @@ class _EntrySheetState extends ConsumerState<_EntrySheet> {
   bool _addingSubstance = false;
   bool _saving = false;
 
-  bool get _isEdit => widget.existing != null;
-
   @override
   void initState() {
     super.initState();
@@ -149,15 +109,6 @@ class _EntrySheetState extends ConsumerState<_EntrySheet> {
   }
 
   void _prefill() {
-    final existing = widget.existing;
-    if (existing != null) {
-      _personId = existing.personId;
-      _substanceId = existing.substanceId;
-      _amount.text = existing.amount ?? '';
-      _note.text = existing.note ?? '';
-      _at = existing.at;
-      return;
-    }
     // Only the person is preselected. Substance and amount are never
     // carried over from an earlier entry: the user picks them each time.
     _personId = widget.initialPersonId;
@@ -271,30 +222,14 @@ class _EntrySheetState extends ConsumerState<_EntrySheet> {
       final amount = _amount.text.trim();
       final note = _note.text.trim();
 
-      _SheetResult? result;
-      final existing = widget.existing;
-      if (existing == null) {
-        final added = await actions.addEntry(
-          widget.track.id,
-          personId: _personId,
-          substanceId: _substanceId,
-          amount: amount,
-          note: note,
-          at: at,
-        );
-        if (added != null) result = _Added(added);
-      } else {
-        final updated = existing.copyWith(
-          personId: () => _personId,
-          substanceId: () => _substanceId,
-          amount: () => amount.isEmpty ? null : amount,
-          note: () => note.isEmpty ? null : note,
-          at: at ?? now,
-        );
-        if (await actions.updateEntry(updated)) {
-          result = _Updated(before: existing, after: updated);
-        }
-      }
+      final result = await actions.addEntry(
+        widget.track.id,
+        personId: _personId,
+        substanceId: _substanceId,
+        amount: amount,
+        note: note,
+        at: at,
+      );
       if (result != null) await actions.haptics.tick();
       if (navigator.mounted) navigator.pop(result);
     } catch (_) {
@@ -305,42 +240,21 @@ class _EntrySheetState extends ConsumerState<_EntrySheet> {
     }
   }
 
-  Future<void> _delete() async {
-    final existing = widget.existing;
-    if (existing == null || _saving) return;
-    setState(() => _saving = true);
-    final actions = ref.read(protocolActionsProvider);
-    final navigator = Navigator.of(context);
-    final deleted = await actions.deleteEntry(existing.id);
-    await actions.haptics.heavy();
-    if (navigator.mounted) {
-      navigator.pop(deleted == null ? null : _Deleted(deleted));
-    }
-  }
-
   // ----------------------------------------------------------------- build
 
   @override
   Widget build(BuildContext context) {
     final t = context.tikky;
     final byPerson = ref.watch(personsByIdProvider);
-    final bySubstance = ref.watch(substancesByIdProvider);
-    final persons = [
-      ...ref.watch(personsProvider).value ?? const <Person>[],
-    ];
+    final persons = [...ref.watch(personsProvider).value ?? const <Person>[]];
     final substances = [
       ...ref.watch(substancesProvider).value ?? const <Substance>[],
     ];
-    // An edited entry may refer to someone who was removed from the list.
+    // A preselected person may have been removed from the list.
     if (_personId != null &&
         persons.every((p) => p.id != _personId) &&
         byPerson[_personId] != null) {
       persons.add(byPerson[_personId]!);
-    }
-    if (_substanceId != null &&
-        substances.every((s) => s.id != _substanceId) &&
-        bySubstance[_substanceId] != null) {
-      substances.add(bySubstance[_substanceId]!);
     }
 
     final history =
@@ -366,9 +280,7 @@ class _EntrySheetState extends ConsumerState<_EntrySheet> {
                     Semantics(
                       header: true,
                       child: Text(
-                        _isEdit
-                            ? Strings.protocolEditEntry
-                            : Strings.protocolNewEntry,
+                        Strings.protocolNewEntry,
                         style: t.text.title,
                       ),
                     ),
@@ -387,8 +299,7 @@ class _EntrySheetState extends ConsumerState<_EntrySheet> {
                             color: Color(p.color),
                             selected: p.id == _personId,
                             onTap: () => setState(
-                              () =>
-                                  _personId = p.id == _personId ? null : p.id,
+                              () => _personId = p.id == _personId ? null : p.id,
                             ),
                           ),
                         if (!_addingPerson)
@@ -453,12 +364,11 @@ class _EntrySheetState extends ConsumerState<_EntrySheet> {
                           _addingSubstance = false;
                         }),
                       ),
-                    if (!_isEdit)
-                      _LockoutLine(
-                        track: widget.track,
-                        personId: _personId,
-                        substanceId: _substanceId,
-                      ),
+                    _LockoutLine(
+                      track: widget.track,
+                      personId: _personId,
+                      substanceId: _substanceId,
+                    ),
 
                     // ------------------------------------------- amount
                     const ProtocolSectionLabel(Strings.protocolAmount),
@@ -525,20 +435,12 @@ class _EntrySheetState extends ConsumerState<_EntrySheet> {
                       ),
                     ),
                     SizedBox(height: t.space.sm),
-                    Wrap(
-                      alignment: WrapAlignment.spaceBetween,
-                      children: [
-                        if (_isEdit)
-                          AdaptiveTextButton(
-                            label: ProtocolStrings.deleteEntry,
-                            destructive: true,
-                            onPressed: _saving ? null : _delete,
-                          ),
-                        AdaptiveTextButton(
-                          label: ProtocolStrings.manage,
-                          onPressed: () => openProtocolPeople(context),
-                        ),
-                      ],
+                    Align(
+                      alignment: AlignmentDirectional.centerEnd,
+                      child: AdaptiveTextButton(
+                        label: ProtocolStrings.manage,
+                        onPressed: () => openProtocolPeople(context),
+                      ),
                     ),
                   ],
                 ),

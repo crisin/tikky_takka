@@ -242,9 +242,8 @@ Entwürfe `1-2-spuren`, `2-7-sets-und-szene`.
 
 Entwürfe `2-1` bis `2-6`. Vorher O5.
 
-**Stand: Teil 1 erledigt** (P4.1–P4.4, P4.7; Zweig `pult`). Offen: P4.5,
-P4.6 (neues Blatt „Ändern“) und P4.8 (Protokoll-Spur ohne eigene
-Erfassung). Abweichungen:
+**Stand: erledigt** (Zweig `pult`; Teil 1: P4.1–P4.4, P4.7; Teil 2: P4.5,
+P4.6, P4.8). Abweichungen:
 
 - **O5 entschieden: mit Schalter.** „Anzahl auf den Erfassen-Feldern zeigen“
   unter Anzeige der Spuren (`UiPrefsKeys.showEntryCounts`, Standard aus,
@@ -256,7 +255,24 @@ Erfassung). Abweichungen:
   (`padCount`, `padLastEntry`, `padLockout`).
 - Das Raster hat mindestens zwei Spalten, auf breiten Fenstern mehr.
   „Was?“ hat immer das Raster für fünf Sachen und „Anderes“ (2 × 3).
-- „Ändern“ öffnet bis P4.5 das bisherige Eintragsblatt im Bearbeiten-Modus.
+- Das Blatt „Ändern“ (`entry_edit_sheet.dart`) gilt für jeden bestehenden
+  Eintrag. Aus einer Rückgängig-Leiste: „Wann?“ mit Jetzt / −5 / −10 /
+  −30 min, gezählt ab der Zeit des Eintrags. Aus Zeitleiste, Verlauf und
+  Eintragsliste der Sitzung: schon jetzt die Variante aus P4.6. „Nach dem
+  vorherigen“ meint den vorherigen Eintrag derselben Person und Sache.
+  Eine Uhrzeit liegt nie in der Zukunft.
+- Text (Menge, Notiz) wird bei jeder Eingabe gespeichert. Nach dem Schließen
+  bietet eine Snackbar „Rückgängig“ für die ganze Änderung; im Tippfeld
+  nicht, dort zeigt die Leiste den geänderten Eintrag.
+- **Neuer Eintrag** („+“ der Protokoll-Spur, „+ Eintrag“ im Tippfeld,
+  Zifferntasten, Eintragsliste) nutzt weiter das bisherige Formular, jetzt
+  nur noch zum Anlegen. Es gibt also vorerst zwei Blätter; das Formular
+  folgt in einem späteren Paket der Form von „Ändern“.
+- Protokoll-Spur: Ein Personen-Feld schaltet auf das Tippfeld und öffnet
+  dort „Was?“ (`padPageRequestProvider`). Auch eine Szene mit genau einer
+  Person zeigt ihr Feld. Die Rückgängig-Leiste der Spur entfällt. Das Feld
+  „Ohne Person“ und das „+“ öffnen das Formular, das „+“ ohne
+  vorgewählte Person.
 - Auf der Hauptseite bleibt das „+“-Feld einer Protokoll-Spur (volles
   Formular, z. B. ohne Person). Es ist wie „Anderes“ gestrichelt und heißt
   „Eintrag“.

@@ -11,6 +11,7 @@ import '../../core/services/haptics.dart';
 import '../../l10n/formatters.dart';
 import '../../l10n/strings.dart';
 import '../../theme/theme.dart';
+import '../tracks/tracks_view.dart';
 import 'protocol_entry_sheet.dart';
 import 'protocol_logic.dart';
 import 'protocol_scene_sheet.dart';
@@ -21,35 +22,26 @@ import 'protocol_widgets.dart';
 /// The lane of a protocol-mode track. The tracks screen uses this instead
 /// of its regular lane whenever `track.mode == TrackMode.protocol`.
 ///
-/// One-tap capture in two steps:
+/// "Wer bist du?": one card per person (name, colour, last entry, time
+/// since and, while one of the user's own lockouts is still running,
+/// "frühestens wieder in ..."). With a scene on the track's set only the
+/// scene's persons are shown, the rest waits behind "Andere"; without a
+/// scene everybody is listed.
 ///
-/// 1. "Wer bist du?": one card per person (name, colour, last entry, time
-///    since and, while one of the user's own lockouts is still running,
-///    "frühestens wieder in ..."). With a scene on the track's set only
-///    the scene's persons are shown, the rest waits behind "Andere";
-///    without a scene everybody is listed. A scene with exactly one
-///    person skips this step.
-/// 2. Up to five large substance buttons for that person (the scene's
-///    substances, then what the person logged most often). ONE TAP WRITES
-///    THE ENTRY: person, substance, now - no amount, no note, no dialog,
-///    also while a lockout is running. A bar INSIDE the lane (never a
-///    snackbar: that would cover buttons and get hit by accident) then
-///    offers "Rückgängig" and "Details" (the entry sheet, to add amount,
-///    note or another time) for `TikkyMotion.inlineUndoWindow`.
+/// A card opens the page "Was?" of that person on the tap pad, where one
+/// tap writes the entry (Pult 2.2). The lane itself captures nothing any
+/// more. The card of entries without a person, and the round "+", open
+/// the full entry sheet. Secondary buttons: the entry list of the session,
+/// and "Sitzung beenden" (undoable, no confirmation).
 ///
-/// The round "+" opens the full entry sheet (with the chosen person) for
-/// anything else. Secondary buttons: the entry list of the session, and
-/// "Sitzung beenden" (undoable, no confirmation).
-///
-/// Narrow lanes (phones, tiles) stack the capture part above the buttons;
-/// wide ones put them side by side. Works in a list row (height follows
-/// the content) and in a box of fixed height (the capture part scrolls).
-/// Long-press is left to the surrounding screen (track editor /
-/// reordering).
+/// Narrow lanes (phones, tiles) stack the cards above the buttons; wide
+/// ones put them side by side. Works in a list row (height follows the
+/// content) and in a box of fixed height (the cards scroll). Long-press is
+/// left to the surrounding screen (track editor / reordering).
 ///
 /// The app never shows or suggests dosing or interval values of its own:
-/// a button shows a count, and a remaining time only for a substance the
-/// user gave a lockout.
+/// a card shows a remaining time only for a substance the user gave a
+/// lockout.
 class ProtocolLane extends ConsumerStatefulWidget {
   const ProtocolLane({required this.track, super.key});
 
@@ -59,123 +51,23 @@ class ProtocolLane extends ConsumerStatefulWidget {
   ConsumerState<ProtocolLane> createState() => _ProtocolLaneState();
 }
 
-/// The one-tap entry that can still be taken back.
-final class _Captured {
-  const _Captured(this.message, this.entry);
-
-  /// "Jacke · GBL eingetragen"
-  final String message;
-  final AddedEntry entry;
-}
-
-/// The person chosen in step 1 (`personId` `null` = "Ohne Person").
-final class _Pick {
-  const _Pick(this.personId);
-
-  final String? personId;
-}
-
 class _ProtocolLaneState extends ConsumerState<ProtocolLane> {
-  /// The explicit choice of step 1; `null` = nobody chosen.
-  _Pick? _pick;
-
-  /// Step 1 was asked for although the scene has a single person.
-  bool _forceWho = false;
-
   /// "Andere" was tapped: persons outside the scene are listed too.
   bool _showOthers = false;
 
-  /// A one-tap entry is being written or was just written: further taps
-  /// are ignored until the lane has shown it.
-  bool _busy = false;
-
-  /// The substance of the entry that was just written.
-  String? _justLogged;
-
-  Timer? _confirmTimer;
-
-  /// What the inline undo bar shows; `null` = no bar.
-  _Captured? _captured;
-  Timer? _capturedTimer;
-  final GlobalKey _undoBarKey = GlobalKey();
-
   Track get _track => widget.track;
 
-  @override
-  void dispose() {
-    _confirmTimer?.cancel();
-    _capturedTimer?.cancel();
-    super.dispose();
-  }
-
-  void _hideCaptured() {
-    _capturedTimer?.cancel();
-    _capturedTimer = null;
-    _captured = null;
-  }
-
-  /// Shows the inline undo bar for [captured] and brings it into view
-  /// (a lane of fixed height scrolls its capture part).
-  void _showCaptured(_Captured captured) {
-    _capturedTimer?.cancel();
-    _captured = captured;
-    _capturedTimer = Timer(context.tikky.motion.inlineUndoWindow, () {
-      if (mounted) setState(_hideCaptured);
-    });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final bar = _undoBarKey.currentContext;
-      if (bar == null || !mounted) return;
-      Scrollable.ensureVisible(
-        bar,
-        alignment: 1,
-        alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
-      );
-    });
-  }
-
-  /// "Rückgängig" of the bar. Ignored while the entry is still being
-  /// confirmed on its button ([_busy]): the bar has just appeared - and
-  /// may have been scrolled into view - so a second, hasty tap must not
-  /// land on it and take the entry back by accident.
-  Future<void> _undoCaptured() async {
-    final captured = _captured;
-    if (captured == null || _busy) return;
-    final actions = ref.read(protocolActionsProvider);
-    setState(_hideCaptured);
-    unawaited(actions.haptics.selection());
-    await actions.undoAdd(captured.entry);
-  }
-
-  void _detailsOfCaptured() {
-    final captured = _captured;
-    if (captured == null || _busy) return;
-    setState(_hideCaptured);
-    showProtocolEntrySheet(
-      context,
-      track: _track,
-      existing: captured.entry.event,
-    );
-  }
-
-  void _backToWho() {
-    setState(() {
-      _pick = null;
-      _forceWho = true;
-    });
-  }
-
+  /// A person card: "Was?" of that person on the tap pad; entries without
+  /// a person go through the full sheet.
   void _choose(String? personId) {
+    if (personId == null) {
+      unawaited(_openSheet(null));
+      return;
+    }
     ref.read(hapticsProvider).selection();
-    setState(() {
-      _pick = _Pick(personId);
-      _forceWho = false;
-    });
-  }
-
-  void _resetSteps() {
-    _pick = null;
-    _forceWho = false;
-    _showOthers = false;
+    ref
+        .read(padPageRequestProvider.notifier)
+        .open(_track.setId, trackId: _track.id, personId: personId);
   }
 
   Future<void> _finish() async {
@@ -190,7 +82,7 @@ class _ProtocolLaneState extends ConsumerState<ProtocolLane> {
     );
   }
 
-  /// The full entry sheet, for anything the buttons do not cover.
+  /// The full entry sheet, for anything the tap pad does not cover.
   Future<void> _openSheet(String? personId) async {
     ref.read(hapticsProvider).primary();
     final saved = await showProtocolEntrySheet(
@@ -198,56 +90,7 @@ class _ProtocolLaneState extends ConsumerState<ProtocolLane> {
       track: _track,
       initialPersonId: personId,
     );
-    if (saved != null && mounted) setState(_resetSteps);
-  }
-
-  /// One tap: writes the entry right away. Never asks, never blocks.
-  Future<void> _capture(String? personId, Substance substance) async {
-    if (_busy) return;
-    final actions = ref.read(protocolActionsProvider);
-    final person = personLabel(personId, ref.read(personsByIdProvider));
-    final track = _track;
-    setState(() {
-      _busy = true;
-      _justLogged = substance.id;
-    });
-    AddedEntry? added;
-    try {
-      added = await actions.addEntry(
-        track.id,
-        personId: personId,
-        substanceId: substance.id,
-      );
-    } catch (_) {
-      added = null;
-    }
-    if (!mounted) return;
-    if (added == null) {
-      setState(() {
-        _busy = false;
-        _justLogged = null;
-      });
-      showInfoSnackBar(context, Strings.errorGeneric);
-      return;
-    }
-    final entry = added;
-    unawaited(actions.haptics.tick());
-    setState(() {
-      _showCaptured(
-        _Captured(ProtocolStrings.captured(person, substance.name), entry),
-      );
-    });
-    _confirmTimer?.cancel();
-    _confirmTimer = Timer(context.tikky.motion.captureConfirm, () {
-      if (!mounted) return;
-      setState(() {
-        _busy = false;
-        _justLogged = null;
-        // Back to "Wer bist du?" (a single-person scene stays on its
-        // buttons, see build).
-        _resetSteps();
-      });
-    });
+    if (saved != null && mounted) setState(() => _showOthers = false);
   }
 
   @override
@@ -257,7 +100,6 @@ class _ProtocolLaneState extends ConsumerState<ProtocolLane> {
     final open = ref.watch(openSessionProvider(track.id));
     final set = ref.watch(setProvider(track.setId));
     final active = ref.watch(personsProvider).value ?? const <Person>[];
-    final known = ref.watch(personsByIdProvider);
     final entryCount =
         open?.events.where((e) => e.type == EventType.entry).length ?? 0;
 
@@ -266,20 +108,11 @@ class _ProtocolLaneState extends ConsumerState<ProtocolLane> {
       for (final id in set?.scenePersonIds ?? const <String>[])
         if (active.any((p) => p.id == id)) id,
     ];
-    var pick = _pick;
-    if (pick?.personId case final id? when !known.containsKey(id)) {
-      // Deleted in the meantime.
-      pick = null;
-    }
-    // Exactly one person in the scene: no need to ask who it is.
-    if (pick == null && scenePersonIds.length == 1 && !_forceWho) {
-      pick = _Pick(scenePersonIds.single);
-    }
 
     final roles = t.trackRoles(track);
-    final chosen = pick;
-    // Step 1 asks in the head line; otherwise it names the mode.
-    final asks = chosen == null && active.isNotEmpty;
+    // With persons to choose from the head line asks; otherwise it names
+    // the mode.
+    final asks = active.isNotEmpty;
     final title = Row(
       children: [
         ExcludeSemantics(
@@ -334,32 +167,19 @@ class _ProtocolLaneState extends ConsumerState<ProtocolLane> {
       ],
     );
 
-    final Widget step = chosen == null
-        ? _PersonCards(
-            track: track,
-            open: open,
-            scenePersonIds: scenePersonIds,
-            showOthers: _showOthers,
-            onChoose: _choose,
-            onShowOthers: () => setState(() => _showOthers = true),
-            onEditScene: () => showSceneEditor(context, setId: track.setId),
-          )
-        : _CapturePanel(
-            // A fresh panel (and button order) per person.
-            key: ValueKey('capture-panel-${chosen.personId}'),
-            track: track,
-            open: open,
-            personId: chosen.personId,
-            sceneSubstanceIds: set?.sceneSubstanceIds ?? const [],
-            busy: _busy,
-            justLogged: _justLogged,
-            onBack: _backToWho,
-            onCapture: (substance) => _capture(chosen.personId, substance),
-          );
+    final cards = _PersonCards(
+      track: track,
+      open: open,
+      scenePersonIds: scenePersonIds,
+      showOthers: _showOthers,
+      onChoose: _choose,
+      onShowOthers: () => setState(() => _showOthers = true),
+      onEditScene: () => showSceneEditor(context, setId: track.setId),
+    );
 
     final primary = _PrimaryButton(
       roles: roles,
-      onPressed: () => _openSheet(chosen?.personId),
+      onPressed: () => _openSheet(null),
     );
 
     final secondary = open == null
@@ -381,28 +201,13 @@ class _ProtocolLaneState extends ConsumerState<ProtocolLane> {
             ),
           ];
 
-    final captured = _captured;
     final info = Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         title,
         SizedBox(height: t.space.xs),
-        step,
-        // Below everything else of the capture part: nothing that is
-        // being tapped moves when the bar comes or goes.
-        if (captured != null)
-          Padding(
-            key: _undoBarKey,
-            padding: EdgeInsets.only(top: t.space.sm),
-            child: InlineUndoBar(
-              key: const ValueKey('capture-undo-bar'),
-              message: captured.message,
-              onUndo: _undoCaptured,
-              secondaryLabel: ProtocolStrings.details,
-              onSecondary: _detailsOfCaptured,
-            ),
-          ),
+        cards,
       ],
     );
     final direction = t.prefs.leftHanded
@@ -990,286 +795,6 @@ class _PersonCard extends StatelessWidget {
                           ),
                       ],
                     ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ------------------------------------------------------------------ step 2
-
-/// Step 2: the chosen person and up to five one-tap substance buttons.
-class _CapturePanel extends ConsumerStatefulWidget {
-  const _CapturePanel({
-    required this.track,
-    required this.open,
-    required this.personId,
-    required this.sceneSubstanceIds,
-    required this.busy,
-    required this.justLogged,
-    required this.onBack,
-    required this.onCapture,
-    super.key,
-  });
-
-  final Track track;
-  final OpenSession? open;
-  final String? personId;
-  final List<String> sceneSubstanceIds;
-  final bool busy;
-  final String? justLogged;
-  final VoidCallback onBack;
-  final ValueChanged<Substance> onCapture;
-
-  @override
-  ConsumerState<_CapturePanel> createState() => _CapturePanelState();
-}
-
-class _CapturePanelState extends ConsumerState<_CapturePanel> {
-  /// The buttons as last shown; they keep their places while the panel is
-  /// in use (see [keepButtonOrder]).
-  List<String> _shown = const [];
-  List<String> _sceneOfShown = const [];
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.tikky;
-    final track = widget.track;
-    final personId = widget.personId;
-    final persons = ref.watch(personsByIdProvider);
-    final substances =
-        ref.watch(substancesProvider).value ?? const <Substance>[];
-    final byId = {for (final s in substances) s.id: s};
-    final use =
-        ref.watch(protocolSubstanceUseProvider(track.id)).value ??
-        const <SubstanceUse>[];
-    final lockouts = ref.watch(lockoutsProvider);
-    // Until the track-wide facts have loaded, the open session's entries.
-    final facts = lockouts.isEmpty
-        ? const <LastEntryFact>[]
-        : ref.watch(protocolLastEntriesProvider(track.id)).value ??
-              lastEntriesOfSession(widget.open);
-
-    final available = byId.keys.toSet();
-    final fresh = topSubstanceIds(
-      sceneSubstanceIds: widget.sceneSubstanceIds,
-      use: use,
-      personId: personId,
-      available: available,
-    );
-    // An edited scene starts over: its order comes first again.
-    final sameScene = jsonListEquals(_sceneOfShown, widget.sceneSubstanceIds);
-    _shown = sameScene
-        ? keepButtonOrder(_shown, fresh, available: available)
-        : fresh;
-    _sceneOfShown = widget.sceneSubstanceIds;
-    final ids = _shown;
-    final counts = sessionCounts(widget.open, personId);
-
-    final person = personId == null ? null : persons[personId];
-    final name = personLabel(personId, persons);
-    final header = Semantics(
-      button: true,
-      label: name,
-      hint: ProtocolStrings.backToPersons,
-      excludeSemantics: true,
-      child: Material(
-        color: t.colors.surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: t.radii.mdAll,
-          side: t.hairline,
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          key: const ValueKey('capture-back'),
-          onTap: widget.busy ? null : widget.onBack,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minHeight: t.sizes.primaryButton),
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: t.space.md),
-              child: Row(
-                children: [
-                  ColorDot(
-                    color: person == null
-                        ? t.colors.textMuted
-                        : Color(person.color),
-                    size: t.sizes.iconSm,
-                  ),
-                  SizedBox(width: t.space.md),
-                  Expanded(
-                    child: Text(
-                      name,
-                      style: t.text.headline,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  Icon(
-                    AdaptiveIcons.close(context),
-                    size: t.sizes.iconMd,
-                    color: t.colors.textMuted,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        header,
-        if (ids.isNotEmpty) SizedBox(height: t.space.sm),
-        if (ids.isNotEmpty)
-          CoarseNowBuilder(
-            builder: (context, nowMs) => Wrap(
-              spacing: t.space.sm,
-              runSpacing: t.space.sm,
-              children: [
-                for (final id in ids)
-                  _SubstanceButton(
-                    key: ValueKey('capture-$id'),
-                    substance: byId[id]!,
-                    count: counts[id] ?? 0,
-                    // Only for a lockout the user set, and only while it
-                    // is running. Shown, never enforced.
-                    remainingMs: lockouts.containsKey(id)
-                        ? lockoutRemainingFor(
-                            facts,
-                            personId: personId,
-                            substanceId: id,
-                            nowMs: nowMs,
-                            lockouts: lockouts,
-                          )
-                        : null,
-                    justLogged: widget.justLogged == id,
-                    onTap: widget.busy
-                        ? null
-                        : () => widget.onCapture(byId[id]!),
-                  ),
-              ],
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-/// A one-tap substance button: name, the person's count in this session
-/// and - only for a running lockout the user set - the remaining time.
-class _SubstanceButton extends StatelessWidget {
-  const _SubstanceButton({
-    required this.substance,
-    required this.count,
-    required this.remainingMs,
-    required this.justLogged,
-    required this.onTap,
-    super.key,
-  });
-
-  final Substance substance;
-  final int count;
-  final int? remainingMs;
-  final bool justLogged;
-
-  /// `null` while taps are ignored (an entry was just written).
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.tikky;
-    final remaining = remainingMs == null
-        ? null
-        : formatRemaining(remainingMs!);
-    final background = justLogged ? t.colors.primary : t.colors.surfaceAlt;
-    final foreground = justLogged ? t.colors.onPrimary : t.colors.text;
-    final minHeight = t.sizes.bigTapTarget;
-
-    return Semantics(
-      button: true,
-      enabled: onTap != null,
-      label: ProtocolStrings.captureLabel(substance.name, count, remaining),
-      excludeSemantics: true,
-      child: Material(
-        color: background,
-        shape: RoundedRectangleBorder(
-          borderRadius: t.radii.mdAll,
-          side: t.hairline,
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              minHeight: minHeight,
-              minWidth: minHeight * 1.5,
-            ),
-            child: Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: t.space.lg,
-                vertical: t.space.xs,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (justLogged)
-                        Icon(
-                          AdaptiveIcons.check(context),
-                          size: t.sizes.iconSm,
-                          color: foreground,
-                        )
-                      else
-                        ColorDot(color: Color(substance.color)),
-                      SizedBox(width: t.space.sm),
-                      Flexible(
-                        child: Text(
-                          substance.name,
-                          style: t.text.headline.copyWith(color: foreground),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        ProtocolStrings.timesCount(count),
-                        style: t.text.label.copyWith(color: foreground),
-                      ),
-                      if (remaining != null) ...[
-                        SizedBox(width: t.space.sm),
-                        Icon(
-                          ProtocolIcons.time(context),
-                          size: t.sizes.iconSm,
-                          color: justLogged ? foreground : t.colors.warning,
-                        ),
-                        SizedBox(width: t.space.xxs),
-                        Flexible(
-                          child: Text(
-                            remaining,
-                            style: t.text.label.copyWith(
-                              color: justLogged ? foreground : t.colors.warning,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ],
                   ),
                 ],
               ),

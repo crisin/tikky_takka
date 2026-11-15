@@ -377,7 +377,8 @@ void main() {
     );
 
     await h.tap(h.row(entry));
-    expect(find.text(Strings.protocolEditEntry), findsOneWidget);
+    // The sheet "Ändern" of the entry.
+    expect(find.text('GBL · Jacke'), findsOneWidget);
     expect(find.text(TracksStrings.eventEditTitle), findsNothing);
     expect(
       tester

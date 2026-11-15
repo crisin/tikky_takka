@@ -465,7 +465,8 @@ void main() {
     expect(find.text('Jacke · GBL · 1 ml'), findsOneWidget);
     expect(find.text(Strings.lockoutRemaining('1 h 30 min')), findsOneWidget);
     await h.tap(find.byKey(StripDetailKeys.edit));
-    expect(find.text(Strings.protocolEditEntry), findsOneWidget);
+    // The sheet "Ändern" of the entry.
+    expect(find.text('GBL · Jacke'), findsOneWidget);
     expect(find.text(TracksStrings.eventEditTitle), findsNothing);
     expect(
       tester

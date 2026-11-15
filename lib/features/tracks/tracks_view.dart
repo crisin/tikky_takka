@@ -66,3 +66,30 @@ String tracksViewLabel(TracksView view) => switch (view) {
   TracksView.pad => TracksStrings.viewPad,
   TracksView.timeline => TracksStrings.viewTimeline,
 };
+
+/// A page of the tap pad that was asked for elsewhere: a person tile of a
+/// protocol lane opens "Was?" for that person.
+final class PadPageRequest {
+  const PadPageRequest({required this.trackId, required this.personId});
+
+  final String trackId;
+  final String personId;
+}
+
+/// Holds a [PadPageRequest] until the tap pad has taken it.
+class PadPageRequests extends Notifier<PadPageRequest?> {
+  @override
+  PadPageRequest? build() => null;
+
+  /// Shows the tap pad of [setId] on the page "Was?" of [personId].
+  void open(String setId, {required String trackId, required String personId}) {
+    state = PadPageRequest(trackId: trackId, personId: personId);
+    ref.read(tracksViewsProvider.notifier).show(setId, TracksView.pad);
+  }
+
+  /// The tap pad has taken the request.
+  void clear() => state = null;
+}
+
+final padPageRequestProvider =
+    NotifierProvider<PadPageRequests, PadPageRequest?>(PadPageRequests.new);

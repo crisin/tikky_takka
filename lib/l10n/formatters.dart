@@ -121,6 +121,12 @@ abstract final class Fmt {
     return '${_two(d.day)}.${_two(d.month)}.${d.year}';
   }
 
+  /// `Sa. 14.11.`
+  static String dayShort(int ms) {
+    final d = DateTime.fromMillisecondsSinceEpoch(ms);
+    return '${_weekdays[d.weekday - 1]} ${_two(d.day)}.${_two(d.month)}.';
+  }
+
   /// `11.11.2026, 21:05`
   static String dateTime(int ms, {bool use24h = true}) =>
       '${date(ms)}, ${time(ms, use24h: use24h)}';

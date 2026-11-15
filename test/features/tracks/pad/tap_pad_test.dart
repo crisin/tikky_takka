@@ -5,6 +5,8 @@ import 'package:tikky_takka/adaptive/adaptive.dart';
 import 'package:tikky_takka/core/domain/domain.dart';
 import 'package:tikky_takka/core/engine/engine.dart';
 import 'package:tikky_takka/core/repo/repo.dart';
+import 'package:tikky_takka/features/protocol/entry_edit_sheet.dart';
+import 'package:tikky_takka/features/protocol/protocol_strings.dart';
 import 'package:tikky_takka/features/tracks/pad/pad_model.dart';
 import 'package:tikky_takka/features/tracks/pad/tap_pad.dart';
 import 'package:tikky_takka/features/tracks/tracks_screen.dart';
@@ -795,15 +797,27 @@ void main() {
         TracksStrings.padEdit,
       );
 
+      final writtenAt = (await p.entries(h)).single.at;
       await h.press(find.byKey(InlineUndoBar.secondaryKey));
-      expect(find.text(Strings.protocolEditEntry), findsOneWidget);
-      await tester.enterText(find.byKey(const ValueKey('amount')), '0,5 l');
-      await tester.ensureVisible(find.byKey(const ValueKey('save-entry')));
-      await h.press(find.byKey(const ValueKey('save-entry')));
+      // The sheet "Ändern" of an entry that was just written.
+      expect(find.text('Wasser · Jacke'), findsOneWidget);
+      expect(
+        tester.widget<SheetChip>(find.byKey(EntrySheetKeys.timeNow)).selected,
+        isTrue,
+      );
+      expect(find.byKey(EntrySheetKeys.again), findsNothing);
+      await h.press(find.byKey(EntrySheetKeys.timeBack(5)));
+      await h.press(find.byKey(EntrySheetKeys.amountOther));
+      await tester.enterText(find.byKey(EntrySheetKeys.amountField), '0,5 l');
+      await tester.ensureVisible(find.byKey(EntrySheetKeys.done));
+      await h.press(find.byKey(EntrySheetKeys.done));
       await h.settle();
       final entry = (await p.entries(h)).single;
       expect(entry.substanceId, p.water.id);
       expect(entry.amount, '0,5 l');
+      expect(entry.at, writtenAt - 5 * 60 * 1000);
+      // No snackbar over the pad: the bar shows the changed entry.
+      expect(find.text(ProtocolStrings.entryUpdated), findsNothing);
       expect(h.barMessage, 'Jacke · Wasser · 0,5 l');
       // Undo still takes the (changed) entry back.
       await h.tapUndo();

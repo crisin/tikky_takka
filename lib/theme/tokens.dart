@@ -146,6 +146,12 @@ final class TikkySizes {
   /// Dash and gap of the outline of "Anderes".
   double get padDash => 6;
 
+  /// Height of a folded row of the entry sheet (Wer, Was, Notiz).
+  double get sheetRow => 56;
+
+  /// Width of a step button of the time in the entry sheet (-5, +1, ...).
+  double get timeStep => 52;
+
   double get iconSm => 20;
   double get iconMd => 24;
   double get iconLg => 28;
@@ -207,6 +213,9 @@ final class TikkyTextStyles {
     required this.padHint,
     required this.padDigits,
     required this.padInitial,
+    required this.sheetTitle,
+    required this.chip,
+    required this.rowValue,
     required this.navLabel,
     required this.pageTitle,
     required this.pageTitleCompact,
@@ -265,6 +274,15 @@ final class TikkyTextStyles {
 
   /// The initial of a person on the tap pad.
   final TextStyle padInitial;
+
+  /// The title of the entry sheet ("Wasser · Krille").
+  final TextStyle sheetTitle;
+
+  /// A choice chip of a sheet ("Jetzt", "0,5 l").
+  final TextStyle chip;
+
+  /// The value of a folded row of a sheet ("Wer  Krille").
+  final TextStyle rowValue;
 
   /// An entry of the navigation pill.
   final TextStyle navLabel;
@@ -659,6 +677,15 @@ class TikkyTokens extends ThemeExtension<TikkyTokens> {
       padHint: base(14, FontWeight.w400, colors.text, height: 1.25),
       padDigits: laneDigits(sizes.digitsMedium, 26 / 22, colors.text),
       padInitial: base(18, FontWeight.w700, colors.text, height: 1),
+      sheetTitle: base(
+        20,
+        FontWeight.w700,
+        colors.text,
+        height: 1.2,
+        letterSpacing: 20 * -0.01,
+      ),
+      chip: base(14, FontWeight.w600, colors.text, height: 1.2),
+      rowValue: base(16, FontWeight.w600, colors.text, height: 1.25),
       navLabel: base(15, FontWeight.w600, colors.text, height: 1.2),
       pageTitle: base(
         30,

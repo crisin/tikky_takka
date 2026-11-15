@@ -284,7 +284,6 @@ abstract final class Strings {
   // ------------------------------------------------------------- protocol
   static const protocolEmpty = 'Noch kein Eintrag';
   static const protocolNewEntry = 'Neuer Eintrag';
-  static const protocolEditEntry = 'Eintrag bearbeiten';
   static const protocolWho = 'Wer';
   static const protocolWhat = 'Was';
   static const protocolAmount = 'Menge';

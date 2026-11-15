@@ -197,9 +197,9 @@ void main() {
     await f.run(() => f.commands.stopTrack(f.track.id));
     await f.settle();
 
-    // The locked-out person's card, then "+": the sheet for that person.
-    await f.tap(find.text('Alex · vor 30 min'));
+    // "+", then the locked-out person and the substance.
     await f.tap(find.byKey(const ValueKey('protocol-add')));
+    await f.tap(find.byKey(ValueKey('person-${alex.id}')));
     await f.tap(find.byKey(ValueKey('substance-${water.id}')));
     expect(
       find.text('Alex · ${Strings.lockoutRemaining('1 h 30 min')}'),

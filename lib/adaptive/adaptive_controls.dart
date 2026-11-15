@@ -452,12 +452,16 @@ class HeaderRoundButton extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.onPressed,
+    this.color,
     super.key,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback onPressed;
+
+  /// The fill; the surface by default (on a sheet: the background).
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
@@ -471,7 +475,7 @@ class HeaderRoundButton extends StatelessWidget {
         message: label,
         excludeFromSemantics: true,
         child: Material(
-          color: t.colors.surface,
+          color: color ?? t.colors.surface,
           shape: RoundedRectangleBorder(
             borderRadius: t.radii.pillAll,
             side: t.hairline,
