@@ -200,44 +200,6 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('running timers stay pinned at the top with their live '
-      'time', (tester) async {
-    final h = await TracksHarness.start(tester);
-    final (_, ticks) = await _birds(h);
-    await h.showTimeline();
-    Finder chip(Track track) => find.byKey(TimelineKeys.stripChip(track.id));
-
-    expect(find.text(TracksStrings.stripNothingRunning), findsOneWidget);
-    final strip = tester.getRect(find.byKey(TimelineKeys.strip));
-
-    await h.run(() => h.commands.startTrack(h.stopwatch.id));
-    await h.advance(const Duration(seconds: 7));
-    expect(find.text(TracksStrings.stripNothingRunning), findsNothing);
-    expect(chip(h.stopwatch), findsOneWidget);
-    expect(
-      find.descendant(of: chip(h.stopwatch), matching: find.text('00:07')),
-      findsOneWidget,
-    );
-    await h.advance(const Duration(seconds: 3));
-    expect(
-      find.descendant(of: chip(h.stopwatch), matching: find.text('00:10')),
-      findsOneWidget,
-    );
-    // Above the list, and it does not push anything around.
-    expect(tester.getRect(find.byKey(TimelineKeys.strip)), strip);
-    expect(strip.bottom, lessThanOrEqualTo(h.top(h.row(ticks[2]))));
-    // Counters are not timers.
-    expect(find.byKey(TimelineKeys.strip), findsOneWidget);
-    expect(chip(h.counter), findsNothing);
-
-    // Paused: no longer running.
-    await h.run(() => h.commands.pauseTrack(h.stopwatch.id));
-    await h.settle();
-    expect(chip(h.stopwatch), findsNothing);
-    expect(find.text(TracksStrings.stripNothingRunning), findsOneWidget);
-    expect(tester.takeException(), isNull);
-  });
-
   testWidgets('tapping a row edits time, label and note', (tester) async {
     final h = await TracksHarness.start(tester);
     final (_, ticks) = await _birds(h);
@@ -512,9 +474,6 @@ void main() {
       await h.tapChip(TimelineKeys.sort);
       expect(sortShows(TracksStrings.sortByLast), findsOneWidget);
       expect(h.top(inGroup('Ente')), lessThan(h.top(inGroup('Reiher'))));
-
-      // The running timers stay in view here too.
-      expect(find.byKey(TimelineKeys.strip), findsOneWidget);
 
       // Back to the timeline.
       await h.mode(TracksStrings.modeTimeline);

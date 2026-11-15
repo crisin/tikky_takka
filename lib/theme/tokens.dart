@@ -217,6 +217,12 @@ final class TikkyTextStyles {
     required this.chip,
     required this.rowValue,
     required this.laneButton,
+    required this.stripName,
+    required this.stripThing,
+    required this.stripDigits,
+    required this.stripWord,
+    required this.cardDigits,
+    required this.cardNote,
     required this.navLabel,
     required this.pageTitle,
     required this.pageTitleCompact,
@@ -288,6 +294,17 @@ final class TikkyTextStyles {
   /// Text on a round button of a lane ("+1′", "+10′").
   final TextStyle laneButton;
 
+  /// The strip: the name of a lane, the name of a thing, a live value
+  /// next to a name, and the word below a marker.
+  final TextStyle stripName;
+  final TextStyle stripThing;
+  final TextStyle stripDigits;
+  final TextStyle stripWord;
+
+  /// A person card above the strip: the time since, and the line below.
+  final TextStyle cardDigits;
+  final TextStyle cardNote;
+
   /// An entry of the navigation pill.
   final TextStyle navLabel;
 
@@ -320,24 +337,38 @@ final class TikkyStripTokens {
 
   final double _density;
 
-  /// Height of the lane of a track.
-  double get lane => 52 * _density;
+  /// The line above every lane with its name (and its live value).
+  double get label => 16 * _density;
 
-  /// Height of a sub-lane (a person of a protocol, a label of a counter).
-  double get subLane => 44 * _density;
+  /// Height of the lane of a track: its name, then a compact bar.
+  double get lane => 32 * _density;
+
+  /// Height of the lane of a thing (a substance of a person, a label of a
+  /// counter): its name, then the line with the markers.
+  double get subLane => 40 * _density;
+
+  /// The name line of an open person, and of a folded one with all its
+  /// things on one line and the word below every marker.
+  double get personHead => 20 * _density;
+  double get personFolded => 68 * _density;
+
+  /// The word below a marker of a folded person.
+  double get word => 16;
 
   /// Height of the time axis above the lanes.
   double get axis => 30;
 
-  /// Thickness of a session bar in a lane / in a sub-lane.
-  double get bar => 22 * _density;
-  double get subBar => 14 * _density;
+  /// Thickness of a session bar in a lane / the line of a thing.
+  double get bar => 12 * _density;
+  double get subBar => 2;
 
-  /// Diameter of an event marker.
-  double get marker => 13;
+  /// Diameter of the marker of an entry, and of an event of a track.
+  double get marker => 16;
+  double get trackMarker => 10;
 
-  /// How far around a marker a tap or the pointer still counts.
-  double get hitSlop => 14;
+  /// How far around a marker a tap or the pointer still counts: a tap
+  /// area of 48 x 48.
+  double get hitSlop => 24;
 
   /// Markers closer than this (centre to centre) become a cluster.
   double get markerGap => 18;
@@ -352,18 +383,28 @@ final class TikkyStripTokens {
   double get labelMinWidth => 24;
   double get labelMaxWidth => 140;
 
+  /// The time between two markers is written from this much room on.
+  double get gapText => 56;
+
+  /// Height of the band in the warning colour while a lockout runs.
+  double get warnBand => 22;
+
   /// Padding around an axis label when choosing the tick spacing.
   double get tickPadding => 28;
 
-  /// Width of the fixed track names: wide, and on a phone.
-  double get gutter => 184;
-  double get gutterNarrow => 124;
+  /// Space at the left of a name; a thing's name is indented further.
+  double get nameInset => 12;
+  double get subIndent => 16;
 
-  /// Below this width of the whole strip the narrow gutter is used.
-  double get narrowBreakpoint => 560;
+  /// The colour dot before the name of a track or a person, and the
+  /// space after it.
+  double get nameDot => 8;
+  double get nameGap => 6;
 
-  /// Indent of the name of a sub-lane.
-  double get subIndent => 14;
+  /// The initial of a person on a card above the strip; below this
+  /// height of the timeline the cards are left out.
+  double get cardAvatar => 28;
+  double get cardsMinHeight => 320;
 
   /// Width of the "now" line and of a lap tick.
   double get nowLine => 1.5;
@@ -379,7 +420,7 @@ final class TikkyStripTokens {
   double get barOpacity => 0.42;
   double get pauseOpacity => 0.14;
   double get phaseAltOpacity => 0.24;
-  double get subBarOpacity => 0.22;
+  double get subBarOpacity => 0.5;
   double get bandOpacity => 0.18;
 
   /// Opacity of the vertical gridlines.
@@ -702,6 +743,12 @@ class TikkyTokens extends ThemeExtension<TikkyTokens> {
       chip: base(14, FontWeight.w600, colors.text, height: 1.2),
       rowValue: base(16, FontWeight.w600, colors.text, height: 1.25),
       laneButton: base(14, FontWeight.w700, colors.text, height: 1),
+      stripName: base(13, FontWeight.w600, colors.text, height: 16 / 13),
+      stripThing: base(12, FontWeight.w500, colors.textMuted, height: 16 / 12),
+      stripDigits: laneDigits(11, 16 / 11, colors.text),
+      stripWord: base(11, FontWeight.w400, colors.textMuted, height: 15 / 11),
+      cardDigits: laneDigits(20 * prefs.digitScale, 24 / 20, colors.text),
+      cardNote: base(12, FontWeight.w400, colors.textMuted, height: 15 / 12),
       navLabel: base(15, FontWeight.w600, colors.text, height: 1.2),
       pageTitle: base(
         30,

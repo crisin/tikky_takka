@@ -238,7 +238,21 @@ final class StripBandData {
   final int colorArgb;
 }
 
-/// One lane: a track, or below it a person or a substance of a protocol,
+/// What a lane stands for; decides its height and how it is drawn.
+enum StripRowKind {
+  /// A track: its name, then a compact bar.
+  track,
+
+  /// A person of a protocol: only the name while open (its things
+  /// follow); folded, all its entries on one line with a word below each.
+  person,
+
+  /// A substance of a person, or a label of a counter: its name, then a
+  /// line with the markers.
+  thing,
+}
+
+/// One lane: a track, a person of a protocol, a substance of that person,
 /// or a label of a counter.
 final class StripRowData {
   StripRowData({
@@ -247,11 +261,13 @@ final class StripRowData {
     required this.title,
     required this.sessions,
     required this.events,
-    this.isSub = false,
+    this.kind = StripRowKind.track,
+    this.folded = false,
     this.indent = 0,
     this.dotArgb,
     this.bands = const [],
     this.timerFrom,
+    this.barFrom,
     this.showGaps = false,
   }) : maxBandMs = bands.fold(0, (m, b) => math.max(m, b.to - b.from)),
        gapEvents = showGaps
@@ -261,27 +277,37 @@ final class StripRowData {
              ]
            : const [];
 
-  /// Stable id (for keys): the track id, or for a sub-lane
+  /// Stable id (for keys): the track id, or for a lane below it
   /// `<track id>/p/<person id>` (a person of a protocol),
   /// `<track id>/p/<person id>/s/<substance id>` (a substance of that
   /// person) or `<track id>/l/<label>` (a label of a counter).
   final String id;
   final Track track;
 
-  /// What the fixed gutter shows: the track name, the person, the
+  /// What the line above the lane names: the track, the person, the
   /// substance, the label.
   final String title;
+  final StripRowKind kind;
 
-  /// A sub-lane: indented, lower, with a thin bar.
-  final bool isSub;
+  /// A person whose things are folded onto one line.
+  final bool folded;
 
-  /// How far the name is indented in the gutter (0 = a track, 1 = below a
-  /// track, 2 = below a person of a protocol).
+  /// A lane below a track: lower, with a thin line instead of a bar.
+  bool get isSub => kind != StripRowKind.track;
+
+  /// A lane of a person (open or folded).
+  bool get isPerson => kind == StripRowKind.person;
+
+  /// How far the name is indented (0 = a track or a person, 1 = a thing).
   final int indent;
 
   /// The time the timer of the lane counts from: the last entry of a
   /// substance while its protocol has an open session. `null` = no timer.
   final int? timerFrom;
+
+  /// The line of the lane starts here (the first entry of a substance);
+  /// `null` = with the session.
+  final int? barFrom;
 
   /// The time between two neighbouring markers is written between them,
   /// and - with [timerFrom] - the time from the last one up to "now".
@@ -294,8 +320,8 @@ final class StripRowData {
   /// the lane; `null` when there is none.
   int? get lockoutUntil => bands.isEmpty ? null : bands.last.to;
 
-  /// Colour of the dot in the gutter (the person's colour); `null` = the
-  /// colour of the track.
+  /// Colour of the dot next to the name (the person's, the substance's);
+  /// `null` = the colour of the track.
   final int? dotArgb;
 
   /// Oldest start first.
@@ -354,7 +380,7 @@ final class StripData {
   double contentHeight(StripMetrics metrics) {
     var height = 0.0;
     for (final row in rows) {
-      height += row.isSub ? metrics.subLaneHeight : metrics.laneHeight;
+      height += metrics.heightOf(row);
     }
     return height;
   }
@@ -363,12 +389,13 @@ final class StripData {
 /// The lanes of the strip for [sessions] (what
 /// `HistoryRepository.watchSetActivity` delivers).
 ///
-/// * One lane per track of [tracks] (in that order) that has a session,
-///   except those in [hiddenTrackIds].
-/// * A protocol track gets one sub-lane per person below it (in the order
-///   of their first entry). A counter whose taps carry labels gets one
-///   sub-lane per label with [expandCounterLabels]; otherwise everything
-///   sits on the one lane.
+/// * The persons of the protocol tracks come first (see [_protocolRows]),
+///   then one lane per other track of [tracks] (in that order) that has a
+///   session, except those in [hiddenTrackIds].
+/// * A person is open when [openPersons] holds the id of its lane, or
+///   when [openPersons] is `null` (nothing remembered yet).
+/// * A counter whose taps carry labels gets one lane per label with
+///   [expandCounterLabels]; otherwise everything sits on the one lane.
 /// * Events before [sinceMs] are left out, like in the list; running
 ///   numbers still count them. Start, pause, resume and stop become
 ///   markers only with [showLifecycle] - the bars show them anyway.
@@ -384,6 +411,7 @@ StripData buildStripData({
   bool showLifecycle = false,
   Set<String> hiddenTrackIds = const {},
   bool expandCounterLabels = true,
+  Set<String>? openPersons,
 }) {
   final sessionsByTrack = <String, List<StripSession>>{};
   for (final item in sessions) {
@@ -455,6 +483,7 @@ StripData buildStripData({
     eventsByTrack.putIfAbsent(row.track.id, () => []).add(event);
   }
 
+  final personRows = <StripRowData>[];
   final result = <StripRowData>[];
   var eventCount = 0;
   int? firstAt;
@@ -476,15 +505,16 @@ StripData buildStripData({
     }
 
     if (track.mode == TrackMode.protocol) {
-      result.addAll(
-        _protocolRows(
-          track: track,
-          sessions: own,
-          events: events,
-          persons: persons,
-          substances: substances,
-        ),
+      final (own: trackRow, :people) = _protocolRows(
+        track: track,
+        sessions: own,
+        events: events,
+        persons: persons,
+        substances: substances,
+        openPersons: openPersons,
       );
+      personRows.addAll(people);
+      if (trackRow != null) result.add(trackRow);
       continue;
     }
 
@@ -525,7 +555,8 @@ StripData buildStripData({
             id: '${track.id}/l/${entry.key}',
             track: track,
             title: entry.key,
-            isSub: true,
+            kind: StripRowKind.thing,
+            indent: 1,
             sessions: own,
             events: entry.value,
           ),
@@ -550,7 +581,7 @@ StripData buildStripData({
   }
 
   return StripData(
-    rows: result,
+    rows: [...personRows, ...result],
     firstAt: firstAt,
     lastAt: lastAt,
     live: live,
@@ -559,69 +590,73 @@ StripData buildStripData({
   );
 }
 
-/// The lanes of a protocol track: the track itself (its sessions and, if
-/// shown, start and stop), then one lane per substance with its own timer.
+/// The lanes of a protocol track: one per person (in the order of their
+/// first entry; entries without a person under "Ohne Person"), and below
+/// an open person one lane per substance with its own timer.
 ///
-/// * With entries of one person (or none) the substance lanes follow the
-///   track directly.
-/// * With several persons every person gets a lane (in the order of their
-///   first entry, holding their entries without a substance), and their
-///   substances are listed below it.
 /// * Substances are in the order of their first entry; entries without a
-///   substance of a single person go to a lane "Ohne Angabe".
+///   substance go to a lane "Ohne Angabe".
+/// * A folded person carries all its entries on its own lane, each
+///   marker named by its substance.
 /// * The timer of a substance lane counts from its last entry, only while
-///   the track has an open session.
-List<StripRowData> _protocolRows({
+///   the track has an open session; its line starts with its first entry.
+/// * The track's own lane (its bar) only stays while it has no entry yet,
+///   or carries start and stop.
+({StripRowData? own, List<StripRowData> people}) _protocolRows({
   required Track track,
   required List<StripSession> sessions,
   required List<StripEvent> events,
   required Map<String, Person> persons,
   required Map<String, Substance> substances,
+  required Set<String>? openPersons,
 }) {
-  final rows = [
-    StripRowData(
-      id: track.id,
-      track: track,
-      title: track.name,
-      sessions: sessions,
-      events: [
-        for (final e in events)
-          if (e.kind == StripMarkerKind.lifecycle) e,
-      ],
-    ),
+  final lifecycle = [
+    for (final e in events)
+      if (e.kind == StripMarkerKind.lifecycle) e,
   ];
   final live = sessions.any((s) => s.isOpen);
   final byPerson = <String?, Map<String?, List<StripEvent>>>{};
+  final allOf = <String?, List<StripEvent>>{};
   for (final e in events) {
     if (e.kind != StripMarkerKind.entry) continue;
+    final personId = e.row.event.personId;
     byPerson
-        .putIfAbsent(e.row.event.personId, () => {})
+        .putIfAbsent(personId, () => {})
         .putIfAbsent(e.row.event.substanceId, () => [])
         .add(e);
+    allOf.putIfAbsent(personId, () => []).add(e);
   }
-  final several = byPerson.length > 1;
+  final own = byPerson.isEmpty || lifecycle.isNotEmpty
+      ? StripRowData(
+          id: track.id,
+          track: track,
+          title: track.name,
+          sessions: sessions,
+          events: lifecycle,
+        )
+      : null;
 
+  final rows = <StripRowData>[];
   for (final MapEntry(key: personId, value: bySubstance) in byPerson.entries) {
     final personKey = '${track.id}/p/${personId ?? ''}';
-    if (several) {
-      final person = personId == null ? null : persons[personId];
-      rows.add(
-        StripRowData(
-          id: personKey,
-          track: track,
-          title: personId == null
-              ? Strings.protocolNoPerson
-              : person?.name ?? Strings.unknown,
-          isSub: true,
-          indent: 1,
-          dotArgb: person?.color,
-          sessions: sessions,
-          events: bySubstance[null] ?? const [],
-        ),
-      );
-    }
+    final person = personId == null ? null : persons[personId];
+    final open = openPersons == null || openPersons.contains(personKey);
+    rows.add(
+      StripRowData(
+        id: personKey,
+        track: track,
+        title: personId == null
+            ? Strings.protocolNoPerson
+            : person?.name ?? Strings.unknown,
+        kind: StripRowKind.person,
+        folded: !open,
+        dotArgb: person?.color,
+        sessions: sessions,
+        events: open ? const [] : allOf[personId]!,
+      ),
+    );
+    if (!open) continue;
     for (final MapEntry(key: substanceId, value: list) in bySubstance.entries) {
-      if (substanceId == null && several) continue;
       final substance = substanceId == null ? null : substances[substanceId];
       rows.add(
         StripRowData(
@@ -630,8 +665,8 @@ List<StripRowData> _protocolRows({
           title: substanceId == null
               ? Strings.protocolNoSubstance
               : substance?.name ?? Strings.unknown,
-          isSub: true,
-          indent: several ? 2 : 1,
+          kind: StripRowKind.thing,
+          indent: 1,
           dotArgb: substance?.color,
           sessions: sessions,
           // The lane names the substance; an amount stays as the text.
@@ -650,12 +685,13 @@ List<StripRowData> _protocolRows({
                 ),
           ],
           timerFrom: live ? list.last.at : null,
+          barFrom: list.first.at,
           showGaps: true,
         ),
       );
     }
   }
-  return rows;
+  return (own: own, people: rows);
 }
 
 /// The measures the layout needs, in logical pixels (from the theme
@@ -672,14 +708,46 @@ final class StripMetrics {
     required this.clusterHeight,
     required this.clusterMinWidth,
     required this.labelGap,
+    this.labelHeight = 0,
+    double? personHeight,
+    double? foldedHeight,
+    this.wordHeight = 0,
+    double? trackMarkerRadius,
+    this.bandHeight,
+    double? gapMinWidth,
     this.cullMargin = 48,
-  });
+  }) : personHeight = personHeight ?? subLaneHeight,
+       foldedHeight = foldedHeight ?? subLaneHeight,
+       trackMarkerRadius = trackMarkerRadius ?? markerRadius,
+       gapMinWidth = gapMinWidth ?? markerGap * 2;
 
+  /// Whole heights of a track lane and of a thing lane (name line
+  /// included).
   final double laneHeight;
   final double subLaneHeight;
+
+  /// The line with the name at the top of every lane.
+  final double labelHeight;
+
+  /// An open person (only its name line) and a folded one.
+  final double personHeight;
+  final double foldedHeight;
+
+  /// The word below a marker of a folded person.
+  final double wordHeight;
   final double barHeight;
   final double subBarHeight;
+
+  /// The marker of an entry (and of every lane below a track), and of an
+  /// event of a track.
   final double markerRadius;
+  final double trackMarkerRadius;
+
+  /// Height of the band of a running lockout; `null` = the whole lane.
+  final double? bandHeight;
+
+  /// Stretches narrower than this get no text with their time.
+  final double gapMinWidth;
 
   /// Markers closer than this (centre to centre) become a cluster.
   final double markerGap;
@@ -692,6 +760,22 @@ final class StripMetrics {
   /// How far outside the viewport something may start and still be
   /// produced (so nothing pops in at the edges).
   final double cullMargin;
+
+  double heightOf(StripRowData row) => switch (row.kind) {
+    StripRowKind.track => laneHeight,
+    StripRowKind.thing => subLaneHeight,
+    StripRowKind.person => row.folded ? foldedHeight : personHeight,
+  };
+
+  /// The middle of the bar or the line of a lane that starts at [top]:
+  /// below its name line (and above the words of a folded person).
+  double centerOf(StripRowData row, double top) {
+    final below = row.isPerson ? wordHeight : 0.0;
+    return top + labelHeight + (heightOf(row) - labelHeight - below) / 2;
+  }
+
+  double radiusOf(StripRowData row) =>
+      row.isSub ? markerRadius : trackMarkerRadius;
 }
 
 /// How a piece of a session bar is drawn.
@@ -929,7 +1013,7 @@ StripLayout layoutStrip({
   final heights = <double>[];
   var y = 0.0;
   for (final row in data.rows) {
-    final h = row.isSub ? metrics.subLaneHeight : metrics.laneHeight;
+    final h = metrics.heightOf(row);
     tops.add(y);
     heights.add(h);
     y += h;
@@ -963,31 +1047,37 @@ StripLayout layoutStrip({
   final markers = <StripMarker>[];
   final clusters = <StripCluster>[];
   final gaps = <StripGap>[];
-  // Shorter stretches have no room for a text anyway; the painter leaves
-  // out what does not fit.
-  final minGapPx = metrics.markerGap * 2;
+  // Shorter stretches get no text; the painter leaves out what still
+  // does not fit.
+  final minGapPx = metrics.gapMinWidth;
 
   for (var r = 0; r < data.rows.length; r++) {
     final row = data.rows[r];
-    final centerY = tops[r] + heights[r] / 2;
+    final centerY = metrics.centerOf(row, tops[r]);
     final barH = row.isSub ? metrics.subBarHeight : metrics.barHeight;
     final barTop = centerY - barH / 2;
+    final bandH = metrics.bandHeight;
+    final bandTop = bandH == null ? tops[r] : centerY - bandH / 2;
+    final bandBottom = bandH == null
+        ? tops[r] + heights[r]
+        : centerY + bandH / 2;
 
-    // ---- lockout bands (only where the user set a lockout)
+    // ---- lockout bands: only where the user set a lockout, and only
+    // while it still runs
     if (row.bands.isNotEmpty) {
       var i = _lowerBound(row.bands, lo - row.maxBandMs, (b) => b.from);
       for (; i < row.bands.length; i++) {
         final band = row.bands[i];
         if (band.from > hi) break;
-        if (band.to < lo) continue;
+        if (band.to < lo || band.to <= nowMs) continue;
         bands.add(
           StripBand(
             rowIndex: r,
             rect: Rect.fromLTRB(
               math.max(minX, xOf(band.from)),
-              tops[r],
+              bandTop,
               math.min(maxX, xOf(band.to)),
-              tops[r] + heights[r],
+              bandBottom,
             ),
             colorArgb: band.colorArgb,
           ),
@@ -997,13 +1087,16 @@ StripLayout layoutStrip({
 
     // ---- session bars
     final finishes = <StripMarker>[];
-    for (final s in row.sessions) {
+    // A person has no line of its own.
+    for (final s in row.isPerson ? const <StripSession>[] : row.sessions) {
       if (s.startAt > hi) break;
       final end = s.endOr(nowMs);
       if (end < lo) continue;
       final growing = s.isRunning;
 
+      final barFrom = row.barFrom;
       void bar(int from, int to, StripBarKind kind) {
+        if (barFrom != null && from < barFrom) from = barFrom;
         if (to < lo || from > hi || to < from) return;
         bars.add(
           StripBar(
@@ -1120,6 +1213,7 @@ StripLayout layoutStrip({
 
     // ---- events: markers, or clusters where they would overlap
     final events = row.events;
+    final radius = metrics.radiusOf(row);
     final rowMarkers = <StripMarker>[];
     final rowClusters = <StripCluster>[];
     // (left edge, index into rowMarkers or -1): to measure the label room.
@@ -1140,7 +1234,7 @@ StripLayout layoutStrip({
         }
         if (j == i) {
           final x = xOf(events[i].at);
-          lefts.add(x - metrics.markerRadius);
+          lefts.add(x - radius);
           owners.add(rowMarkers.length);
           rowMarkers.add(
             StripMarker(
@@ -1156,7 +1250,7 @@ StripLayout layoutStrip({
           final right = math.min(maxX, xOf(events[j].at));
           final middle = (left + right) / 2;
           final half = math.max(
-            (right - left) / 2 + metrics.markerRadius,
+            (right - left) / 2 + radius,
             metrics.clusterMinWidth / 2,
           );
           final rect = Rect.fromLTRB(
@@ -1190,9 +1284,7 @@ StripLayout layoutStrip({
         event: m.event,
         labelRoom: math.max(
           0,
-          nextLeft -
-              (m.center.dx + metrics.markerRadius) -
-              2 * metrics.labelGap,
+          nextLeft - (m.center.dx + radius) - 2 * metrics.labelGap,
         ),
       );
     }
@@ -1254,8 +1346,6 @@ StripLayout layoutStrip({
   );
 }
 
-/// The start and the end of the range the strip can show; `null` when
-/// there is nothing.
 /// The moments of [data] that must stay visible - every event, and the
 /// starts, ends and pauses of the sessions - for [computeFolds]. A bar
 /// that simply keeps running adds nothing between its ends.
@@ -1278,6 +1368,8 @@ Iterable<int> stripKeepTimes(StripData data) sync* {
   }
 }
 
+/// The start and the end of the range the strip can show; `null` when
+/// there is nothing.
 ({int start, int end})? stripExtent(StripData data) {
   final first = data.firstAt;
   final last = data.lastAt;

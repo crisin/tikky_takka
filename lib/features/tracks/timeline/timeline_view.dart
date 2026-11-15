@@ -12,9 +12,8 @@ import '../../../l10n/strings.dart';
 import '../../../theme/theme.dart';
 import '../../protocol/protocol_logic.dart';
 import '../../protocol/protocol_widgets.dart';
-import '../lane_view.dart';
-import '../now_selector.dart';
 import '../tracks_strings.dart';
+import 'person_cards.dart';
 import 'strip/strip_view.dart';
 import 'timeline_event_sheet.dart';
 import 'timeline_logic.dart';
@@ -24,7 +23,6 @@ import 'timeline_summary.dart';
 /// Keys of the timeline view (for tests).
 abstract final class TimelineKeys {
   static const view = ValueKey('timeline-view');
-  static const strip = ValueKey('timeline-strip');
   static const list = ValueKey('timeline-list');
   static const summary = ValueKey('timeline-summary');
   static const order = ValueKey('timeline-order');
@@ -34,7 +32,6 @@ abstract final class TimelineKeys {
   static const sort = ValueKey('timeline-sort');
   static Key trackChip(String trackId) => ValueKey('timeline-track-$trackId');
   static Key row(String eventId) => ValueKey('timeline-row-$eventId');
-  static Key stripChip(String trackId) => ValueKey('timeline-strip-$trackId');
   static Key group(String title) => ValueKey('timeline-group-$title');
 }
 
@@ -64,8 +61,7 @@ final timelineActivityProvider = StreamProvider.autoDispose
 /// "Zusammenfassung", what came together overall. The mode is remembered
 /// per set ([timelineModeProvider]).
 ///
-/// * Pinned at the top: the running timers of the set ([RunningStrip]),
-///   so they stay in view while reading.
+/// * With the strip: a card per person above it ([PersonCards]).
 /// * Scope (a chip that opens the choices): the open sessions (default),
 ///   today, or the last 24 hours.
 /// * Strip: see [StripView]. The scope and the filters apply to it too.
@@ -257,7 +253,6 @@ class _TimelineViewState extends ConsumerState<TimelineView> {
       key: TimelineKeys.view,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        RunningStrip(tracks: tracks),
         modeRow,
         SizedBox(height: t.space.xs),
         filterRow,
@@ -339,7 +334,7 @@ class _TimelineBody extends ConsumerWidget {
         : TracksStrings.timelineEmptyRange;
 
     if (mode == TimelineMode.strip) {
-      return StripView(
+      final strip = StripView(
         setId: setId,
         scope: scope,
         tracks: tracks,
@@ -348,6 +343,19 @@ class _TimelineBody extends ConsumerWidget {
         showLifecycle: showLifecycle,
         hiddenTracks: hiddenTracks,
         emptyMessage: emptyMessage,
+      );
+      // Low (a phone held sideways): the strip keeps all the room.
+      return LayoutBuilder(
+        builder: (context, constraints) =>
+            constraints.maxHeight < t.strip.cardsMinHeight
+            ? strip
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  PersonCards(setId: setId, sessions: sessions),
+                  Expanded(child: strip),
+                ],
+              ),
       );
     }
 
@@ -707,123 +715,6 @@ class _SummaryCard extends StatelessWidget {
             SizedBox(height: t.space.xs),
             ...body,
           ],
-        ),
-      ),
-    );
-  }
-}
-
-/// The running timers of a set in one compact line: name, colour, live
-/// time. Stopwatches, countdowns, intervals and reminders that are
-/// running or ringing; paused ones are not listed.
-class RunningStrip extends ConsumerWidget {
-  const RunningStrip({required this.tracks, super.key});
-
-  final List<Track> tracks;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final t = context.tikky;
-    final sessions =
-        ref.watch(openSessionsProvider).value ?? const <String, OpenSession>{};
-    final candidates = [
-      for (final track in tracks)
-        if (track.mode.supportsStartPause &&
-            laneSession(track, sessions[track.id]) != null)
-          track,
-    ];
-    return Semantics(
-      container: true,
-      label: TracksStrings.stripLabel,
-      child: SizedBox(
-        key: TimelineKeys.strip,
-        height: t.sizes.minTapTarget,
-        // Which timers run can change by itself (a countdown ends), so
-        // the list follows the ticker - but only rebuilds when it changes.
-        child: NowSelector<String>(
-          enabled: candidates.isNotEmpty,
-          selector: (now) => [
-            for (final track in candidates)
-              if (laneSnapshot(track, sessions[track.id], now).isTicking)
-                track.id,
-          ].join('\n'),
-          builder: (context, ids) {
-            final running = ids.isEmpty
-                ? const <String>{}
-                : ids.split('\n').toSet();
-            final shown = [
-              for (final track in candidates)
-                if (running.contains(track.id)) track,
-            ];
-            if (shown.isEmpty) {
-              return Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: t.space.page),
-                  child: Text(
-                    TracksStrings.stripNothingRunning,
-                    style: t.text.caption,
-                  ),
-                ),
-              );
-            }
-            return ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: EdgeInsets.symmetric(
-                horizontal: t.space.page,
-                vertical: t.space.xs,
-              ),
-              itemCount: shown.length,
-              separatorBuilder: (_, _) => SizedBox(width: t.space.sm),
-              itemBuilder: (context, index) => _StripChip(
-                key: TimelineKeys.stripChip(shown[index].id),
-                track: shown[index],
-                open: sessions[shown[index].id],
-              ),
-            );
-          },
-        ),
-      ),
-    );
-  }
-}
-
-class _StripChip extends StatelessWidget {
-  const _StripChip({required this.track, required this.open, super.key});
-
-  final Track track;
-  final OpenSession? open;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.tikky;
-    final prefs = t.prefs;
-    return DecoratedBox(
-      decoration: t.surfaceDecoration(color: t.colors.surfaceAlt),
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: t.space.md),
-        child: MergeSemantics(
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ColorDot(color: t.trackColor(track)),
-              SizedBox(width: t.space.sm),
-              Text(track.name, style: t.text.label),
-              SizedBox(width: t.space.sm),
-              NowSelector<String>(
-                selector: (now) => buildLaneView(
-                  track: track,
-                  open: open,
-                  nowMs: now,
-                  prefs: prefs,
-                ).time.digits,
-                builder: (context, digits) => Text(
-                  digits,
-                  style: t.text.digitsSmall.copyWith(color: t.colors.text),
-                ),
-              ),
-            ],
-          ),
         ),
       ),
     );

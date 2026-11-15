@@ -27,20 +27,17 @@ class StripStyle {
     final t = context.tikky;
     final scaler = MediaQuery.textScalerOf(context);
     final s = t.strip;
-    // Lanes grow with the text so a label never leaves its lane.
-    final textHeight = scaler.scale(t.text.caption.fontSize ?? 12) * 1.5;
-    final laneHeight = math.max(s.lane, textHeight + t.space.sm);
-    // A substance lane shows its name and its timer in the gutter.
     double lineHeight(TextStyle style) =>
         scaler.scale(style.fontSize ?? 12) * (style.height ?? 1.2);
-    final twoLines =
-        lineHeight(t.text.caption) +
-        lineHeight(t.text.digitsSmall) +
-        t.space.xs;
-    final subLaneHeight = math.max(
-      s.subLane,
-      math.max(textHeight + t.space.xs, twoLines),
+    // Every lane grows with the text of its name line, so a name never
+    // runs into the line below it.
+    final label = math.max(
+      s.label,
+      math.max(lineHeight(t.text.stripName), lineHeight(t.text.stripDigits)),
     );
+    final grow = label - s.label;
+    final word = math.max(s.word, lineHeight(t.text.stripWord));
+    final textHeight = scaler.scale(t.text.caption.fontSize ?? 12) * 1.5;
     final sample = TextPainter(
       text: TextSpan(
         text: Fmt.time(
@@ -61,15 +58,22 @@ class StripStyle {
       textScaler: scaler,
       tickSpacing: tickSpacing,
       metrics: StripMetrics(
-        laneHeight: laneHeight,
-        subLaneHeight: subLaneHeight,
+        labelHeight: label,
+        laneHeight: s.lane + grow,
+        subLaneHeight: s.subLane + grow,
+        personHeight: s.personHead + grow,
+        foldedHeight: s.personFolded + grow + word - s.word,
+        wordHeight: word,
         barHeight: s.bar,
         subBarHeight: s.subBar,
         markerRadius: s.marker / 2,
+        trackMarkerRadius: s.trackMarker / 2,
         markerGap: s.markerGap,
         clusterHeight: math.max(s.clusterHeight, textHeight),
         clusterMinWidth: s.clusterMinWidth,
         labelGap: s.labelGap,
+        bandHeight: s.warnBand,
+        gapMinWidth: s.gapText,
       ),
     );
   }
@@ -187,12 +191,13 @@ class StripLanesPainter extends CustomPainter {
       ..save()
       ..clipRect(Offset.zero & size);
 
-    // Lane separators: a hairline above every track.
+    // A hairline between the persons and the other tracks.
     final separator = Paint()
       ..color = t.colors.border
       ..strokeWidth = math.max(t.sizes.hairline, 0.5);
-    for (var r = 0; r < data.rows.length; r++) {
-      if (data.rows[r].isSub || r == 0) continue;
+    for (var r = 1; r < data.rows.length; r++) {
+      if (data.rows[r].kind != StripRowKind.track) continue;
+      if (data.rows[r - 1].kind == StripRowKind.track) continue;
       final y = layout.rowTops[r];
       canvas.drawLine(Offset(0, y), Offset(size.width, y), separator);
     }
@@ -223,16 +228,16 @@ class StripLanesPainter extends CustomPainter {
       _paintFold(canvas, fold, 0, size.height, t);
     }
 
+    // A lockout that still runs: a band in the warning colour.
+    final bandPaint = Paint()
+      ..color = t.colors.warning.withValues(alpha: s.bandOpacity);
     for (final band in layout.bands) {
-      canvas.drawRect(
-        band.rect,
-        Paint()..color = Color(band.colorArgb).withValues(alpha: s.bandOpacity),
-      );
+      canvas.drawRect(band.rect, bandPaint);
     }
 
     final radius = Radius.circular(t.radii.sm);
     for (final bar in layout.bars) {
-      final color = _rowColor(data.rows[bar.rowIndex]);
+      final color = _laneColor(data.rows[bar.rowIndex]);
       // Even the shortest session stays visible.
       final rect = bar.rect.width >= 2
           ? bar.rect
@@ -273,11 +278,14 @@ class StripLanesPainter extends CustomPainter {
       ..strokeWidth = s.nowLine
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
-    final r = m.markerRadius;
+    final wordStyle = t.text.stripWord;
+    // Right edge of the last word below a marker, per lane.
+    final wordEnds = <int, double>{};
     for (final marker in layout.markers) {
       final c = marker.center;
       final row = data.rows[marker.rowIndex];
       final color = _rowColor(row);
+      final r = m.radiusOf(row);
       switch (marker.kind) {
         case StripMarkerKind.tick || StripMarkerKind.entry:
           final argb = marker.event?.colorArgb;
@@ -335,6 +343,20 @@ class StripLanesPainter extends CustomPainter {
       }
       final label = marker.event?.label;
       if (label == null || label.isEmpty) continue;
+      if (row.isPerson) {
+        // Folded person: the word below its marker, where it fits.
+        final text = _texts.get(
+          label,
+          wordStyle,
+          maxWidth: style.textScaler.scale(s.labelMaxWidth),
+        );
+        final left = c.dx - text.width / 2;
+        final end = wordEnds[marker.rowIndex] ?? double.negativeInfinity;
+        if (left < end + s.labelGap) continue;
+        wordEnds[marker.rowIndex] = left + text.width;
+        text.paint(canvas, Offset(left, c.dy + r + s.labelGap / 2));
+        continue;
+      }
       final room = math.min(
         marker.labelRoom,
         style.textScaler.scale(s.labelMaxWidth),
@@ -349,7 +371,7 @@ class StripLanesPainter extends CustomPainter {
       fontWeight: FontWeight.w600,
     );
     for (final cluster in layout.clusters) {
-      final color = _rowColor(data.rows[cluster.rowIndex]);
+      final color = _laneColor(data.rows[cluster.rowIndex]);
       final text = _texts.get('${cluster.count}', countStyle);
       final width = math.max(cluster.rect.width, text.width + 2 * s.labelGap);
       final rect = Rect.fromCenter(
@@ -389,7 +411,7 @@ class StripLanesPainter extends CustomPainter {
         Offset(layout.nowX, 0),
         Offset(layout.nowX, size.height),
         Paint()
-          ..color = t.colors.primary
+          ..color = t.colors.text
           ..strokeWidth = s.nowLine,
       );
     }
@@ -412,13 +434,22 @@ class StripLanesPainter extends CustomPainter {
       color: t.colors.text,
       fontWeight: FontWeight.w600,
     );
-    final pillPaint = Paint()..color = t.colors.surface;
+    final warn = loud.copyWith(color: t.colors.warningText);
+    final pillPaint = Paint()..color = t.colors.background;
     final inset = m.markerRadius + s.labelGap;
+    final nowMs = now.value;
     for (final gap in layout.gaps) {
       final from = math.max(gap.fromX, 0.0) + inset;
       final to = math.min(gap.toX, size.width) - inset;
       if (to <= from) continue;
-      final text = _texts.get(Fmt.compact(gap.ms), gap.live ? loud : quiet);
+      final row = data.rows[gap.rowIndex];
+      // The running time while the lockout the user set still runs.
+      final until = row.lockoutUntil;
+      final locked = gap.live && until != null && until > nowMs;
+      final text = _texts.get(
+        Fmt.compact(gap.ms),
+        locked ? warn : (gap.live ? loud : quiet),
+      );
       final pillWidth = text.width + 2 * s.labelGap;
       if (pillWidth > to - from) continue;
       final rect = Rect.fromCenter(
@@ -435,7 +466,7 @@ class StripLanesPainter extends CustomPainter {
         canvas.drawRRect(
           pill,
           Paint()
-            ..color = _laneColor(data.rows[gap.rowIndex])
+            ..color = locked ? t.colors.warning : _laneColor(row)
             ..style = PaintingStyle.stroke
             ..strokeWidth = s.nowLine,
         );
@@ -621,7 +652,7 @@ class StripAxisPainter extends CustomPainter {
       nowText = _texts.get(
         Fmt.time(nowMs, use24h: t.prefs.use24h, seconds: true),
         t.text.caption.copyWith(
-          color: t.colors.onPrimary,
+          color: t.colors.background,
           fontWeight: FontWeight.w600,
         ),
       );
@@ -694,12 +725,12 @@ class StripAxisPainter extends CustomPainter {
           Offset(nowX, 0),
           Offset(nowX, size.height),
           Paint()
-            ..color = t.colors.primary
+            ..color = t.colors.text
             ..strokeWidth = s.nowLine,
         )
         ..drawRRect(
-          RRect.fromRectAndRadius(nowRect, Radius.circular(t.radii.sm)),
-          Paint()..color = t.colors.primary,
+          RRect.fromRectAndRadius(nowRect, Radius.circular(nowRect.height / 2)),
+          Paint()..color = t.colors.text,
         );
       nowText.paint(canvas, nowRect.topLeft.translate(s.labelGap, 0));
     }
@@ -714,47 +745,6 @@ class StripAxisPainter extends CustomPainter {
     if (changed || !identical(oldDelegate, this)) oldDelegate._texts.dispose();
     return changed;
   }
-}
-
-/// The corner above the track names: the date at the left edge of the
-/// strip (the axis itself only shows times of day).
-class StripCornerPainter extends CustomPainter {
-  StripCornerPainter({required this.viewport, required this.style})
-    : super(repaint: viewport);
-
-  final StripViewport viewport;
-  final StripStyle style;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final t = style.tokens;
-    final line = Paint()
-      ..color = t.colors.border
-      ..strokeWidth = math.max(t.sizes.hairline, 0.5);
-    canvas.drawLine(
-      Offset(0, size.height - line.strokeWidth / 2),
-      Offset(size.width, size.height - line.strokeWidth / 2),
-      line,
-    );
-    if (viewport.width <= 0) return;
-    final text = TextPainter(
-      text: TextSpan(
-        text: stripDayLabel(viewport.startMs.floor()),
-        style: t.text.caption,
-      ),
-      textDirection: TextDirection.ltr,
-      textScaler: style.textScaler,
-      maxLines: 1,
-      ellipsis: '…',
-    )..layout(maxWidth: math.max(0, size.width - 2 * t.space.sm));
-    text
-      ..paint(canvas, Offset(t.space.sm, (size.height - text.height) / 2))
-      ..dispose();
-  }
-
-  @override
-  bool shouldRepaint(StripCornerPainter oldDelegate) =>
-      oldDelegate.style != style || !identical(oldDelegate.viewport, viewport);
 }
 
 /// A fold from [top] to [bottom]: a narrow column on the surface colour,

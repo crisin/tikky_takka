@@ -248,7 +248,7 @@ void main() {
 
     // ... and in the timeline.
     await h.tap(_segment(TracksStrings.viewTimeline));
-    final timeline = tester.element(find.byKey(TimelineKeys.strip));
+    final timeline = tester.element(find.byKey(TimelineKeys.view));
     expect(timeline.tikky.theme.id, ThemePresets.blackId);
     // The strip is the default mode; the times as text are in the list.
     await h.tap(_timelineMode(TracksStrings.modeTimeline));

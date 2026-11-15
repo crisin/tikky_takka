@@ -244,8 +244,6 @@ abstract final class TracksStrings {
       'In diesem Zeitraum gibt es keine Einträge.';
   static const timelineAllHidden =
       'Alle Einträge sind ausgeblendet. Ändere die Filter oben.';
-  static const stripNothingRunning = 'Gerade läuft kein Timer.';
-  static const stripLabel = 'Laufende Timer';
 
   /// "12 min später" (oldest first) / "12 min früher" (newest first).
   static String gapLater(String duration) => '$duration später';
@@ -278,11 +276,33 @@ abstract final class TracksStrings {
       '$time, $track, $text';
 
   // --------------------------------------------------------------- strip
-  static const stripZoomIn = 'Vergrößern';
-  static const stripZoomOut = 'Verkleinern';
+  static const stripAll = 'Alles';
   static const stripFit = 'Alles zeigen';
   static const stripNow = 'Jetzt';
+  static const stripToNow = 'Zu jetzt springen';
   static const stripControls = 'Ausschnitt der Streifenansicht';
+
+  /// Next to the name of a person in the strip.
+  static const stripPersonOpen = 'aufgeklappt';
+  static String stripPersonFolded(int n) =>
+      '${stripCluster(n)} · antippen klappt auf';
+
+  /// Read for the name of a person in the strip.
+  static String stripPersonSemantics(String name, {required bool open}) =>
+      open ? '$name, aufgeklappt' : '$name, zugeklappt';
+  static const stripPersonFold = 'zuklappen';
+  static const stripPersonUnfold = 'aufklappen';
+
+  /// A person card above the strip: "26:14 seit Bier", "Abstand: noch
+  /// 34 min", "Mate vor 21 min".
+  static String cardSince(String thing) => 'seit $thing';
+  static String cardLockout(String rest) => 'Abstand: noch $rest';
+  static String cardOther(String thing, String ago) => '$thing vor $ago';
+
+  /// Read for a person card: "Krille: 26:14 seit Bier. Abstand: noch
+  /// 34 min".
+  static String cardSemantics(String name, String since, String? note) =>
+      note == null ? '$name: $since' : '$name: $since. $note';
   static const stripSessionTitle = 'Sitzung';
   static const stripRunning = 'läuft';
 

@@ -329,8 +329,28 @@ P4.6, P4.8). Abweichungen:
 
 Entwurf `3-1-jetzt`.
 
-**Stand: Teil 1 erledigt** (P5.1–P5.3; Zweig `pult`). Offen: P5.4–P5.6
-(Zeilen je Person, Abstände, Karten). Abweichungen:
+**Stand: erledigt** (Zweig `pult`; Teil 1 P5.1–P5.3, Teil 2 P5.4–P5.6).
+Abweichungen in Teil 2:
+
+- Die Protokoll-Spur hat keine eigene Zeile mehr, sobald sie Einträge hat;
+  mit „Start und Stopp“ bleibt sie für Start und Stopp stehen.
+- Jede Person hat eine Zeile, auch wenn es nur eine gibt. Einträge ohne
+  Sache stehen unter „Ohne Angabe“ bei der Person.
+- Aufgeklappt sind ohne gemerkten Zustand alle Personen. Gemerkt werden die
+  offenen; eine neue Person kommt danach zugeklappt dazu.
+- Das Band in Warnfarbe gibt es nur, solange die Sperre noch läuft;
+  vergangene Sperren zeigt der Streifen nicht mehr.
+- Die Linie einer Sache beginnt mit ihrem ersten Eintrag und hat die Farbe
+  der Sache.
+- Karten nur für Personen mit Einträgen in einer offenen Sitzung. Untere
+  Zeile: „Abstand: noch …“, sonst die letzte andere Sache („Mate vor
+  21 min“), sonst leer. Bei weniger als 320 Höhe (Telefon quer) entfallen
+  die Karten.
+- Gezoomt wird ohne Knöpfe: Spreizen, Strg + Rad, Tasten + und −.
+- Die Jetzt-Linie ist in Textfarbe, die Uhrzeit darauf invers (wie im
+  Entwurf). Das Datum links über den Namen entfällt mit der Namensspalte.
+
+Abweichungen in Teil 1:
 
 - **O7, Faltschwelle entschieden: 20 min** wie vorgeschlagen.
 - Neben den Ereignissen bleiben je 2 min offen (`foldPadMs`), damit Punkte
