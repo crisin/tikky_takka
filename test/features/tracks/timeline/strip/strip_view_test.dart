@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:tikky_takka/adaptive/adaptive.dart';
 import 'package:tikky_takka/core/domain/domain.dart';
 import 'package:tikky_takka/core/repo/repo.dart';
+import 'package:tikky_takka/features/tracks/timeline/evening/evening_view.dart';
 import 'package:tikky_takka/features/tracks/timeline/person_cards.dart';
 import 'package:tikky_takka/features/tracks/timeline/strip/strip_detail.dart';
 import 'package:tikky_takka/features/tracks/timeline/strip/strip_model.dart';
@@ -61,7 +62,7 @@ extension on TracksHarness {
 
   Future<void> mode(String label) => tap(
     find.descendant(
-      of: find.byKey(TimelineKeys.mode),
+      of: find.byKey(TimelineKeys.level),
       matching: find.text(label),
     ),
   );
@@ -101,8 +102,8 @@ Future<(Track, List<TrackEvent>)> _birds(TracksHarness h) async {
 }
 
 void main() {
-  testWidgets('the strip is the default mode; the order of the modes is '
-      'Streifen, Liste, Zusammenfassung', (tester) async {
+  testWidgets('"Jetzt" is the default level; "Abend" shows the evening, '
+      '"Kompakt" its list', (tester) async {
     final h = await TracksHarness.start(tester);
     await _birds(h);
     await h.showTimeline();
@@ -110,39 +111,33 @@ void main() {
     expect(find.byKey(StripKeys.view), findsOneWidget);
     expect(find.byKey(StripKeys.lanes), findsOneWidget);
     expect(find.byKey(TimelineKeys.list), findsNothing);
-    // The order toggle belongs to the list.
-    expect(find.byKey(TimelineKeys.order), findsNothing);
+    // The day and "Kompakt" belong to the evening.
+    expect(find.byKey(TimelineKeys.compact), findsNothing);
     // Without a protocol there are no person cards above.
     expect(find.byKey(PersonCardKeys.row), findsNothing);
 
     Finder segment(String label) => find.descendant(
-      of: find.byKey(TimelineKeys.mode),
+      of: find.byKey(TimelineKeys.level),
       matching: find.text(label),
     );
-    expect(TracksStrings.modeTimeline, 'Liste');
-    final xs = [
-      for (final label in [
-        TracksStrings.modeStrip,
-        TracksStrings.modeTimeline,
-        TracksStrings.modeSummary,
-      ])
-        tester.getCenter(segment(label)).dx,
-    ];
-    expect(xs[0], lessThan(xs[1]));
-    expect(xs[1], lessThan(xs[2]));
+    expect(
+      tester.getCenter(segment(TracksStrings.levelNow)).dx,
+      lessThan(tester.getCenter(segment(TracksStrings.levelEvening)).dx),
+    );
 
-    await h.mode(TracksStrings.modeTimeline);
+    await h.mode(TracksStrings.levelEvening);
+    expect(find.byKey(EveningKeys.view), findsOneWidget);
+    expect(find.byKey(StripKeys.view), findsNothing);
+    await h.tap(find.byKey(TimelineKeys.compact));
     expect(find.byKey(TimelineKeys.list), findsOneWidget);
     expect(find.byKey(TimelineKeys.order), findsOneWidget);
-    expect(find.byKey(StripKeys.view), findsNothing);
-    await h.mode(TracksStrings.modeSummary);
-    expect(find.byKey(TimelineKeys.summary), findsOneWidget);
-    await h.mode(TracksStrings.modeStrip);
+    await h.mode(TracksStrings.levelNow);
     expect(find.byKey(StripKeys.view), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('the mode is remembered per set', (tester) async {
+  testWidgets('the level is remembered per set; a stored mode of before is '
+      'taken over', (tester) async {
     final h = await TracksHarness.start(tester);
     final first = h.activeSet;
     await _birds(h);
@@ -160,18 +155,14 @@ void main() {
     );
     await h.showTimeline();
     expect(find.byKey(StripKeys.view), findsOneWidget);
-    expect(
-      h.app.settings.getString('${SettingsKeys.timelineModePrefix}${first.id}'),
-      isNull,
-    );
+    String? level(String setId) =>
+        h.app.settings.getString('${SettingsKeys.timelineLevelPrefix}$setId');
+    expect(level(first.id), isNull);
 
-    await h.mode(TracksStrings.modeSummary);
-    expect(
-      h.app.settings.getString('${SettingsKeys.timelineModePrefix}${first.id}'),
-      'summary',
-    );
+    await h.mode(TracksStrings.levelEvening);
+    expect(level(first.id), 'evening');
 
-    // Another set starts with the strip ...
+    // Another set starts with "Jetzt" ...
     await h.run(
       () => h.container.read(activeSetIdProvider.notifier).select(kitchen.id),
     );
@@ -183,33 +174,36 @@ void main() {
     await h.tick(noodles);
     await h.settle();
     expect(find.byKey(StripKeys.view), findsOneWidget);
-    // ... and remembers its own choice.
-    await h.mode(TracksStrings.modeTimeline);
-    expect(find.byKey(TimelineKeys.list), findsOneWidget);
-    expect(
-      h.app.settings.getString(
-        '${SettingsKeys.timelineModePrefix}${kitchen.id}',
-      ),
-      'list',
-    );
-
     await h.run(
       () => h.container.read(activeSetIdProvider.notifier).select(first.id),
     );
     await h.settle();
-    expect(find.byKey(TimelineKeys.summary), findsOneWidget);
-    expect(find.byKey(TimelineKeys.list), findsNothing);
+    expect(find.byKey(EveningKeys.view), findsOneWidget);
 
-    // A fresh start of the app reads the same choices from the store.
+    // The mode of before: the list is the evening as a list, the summary
+    // the evening, the strip "Jetzt".
+    await h.run(() async {
+      final store = h.app.settings;
+      await store.setString('${SettingsKeys.timelineModePrefix}a', 'list');
+      await store.setString('${SettingsKeys.timelineModePrefix}b', 'summary');
+      await store.setString('${SettingsKeys.timelineModePrefix}c', 'strip');
+      // Once there is a level, it wins.
+      await store.setString('${SettingsKeys.timelineModePrefix}d', 'list');
+      await store.setString('${SettingsKeys.timelineLevelPrefix}d', 'now');
+    });
     final restarted = ProviderContainer(overrides: h.app.overrides);
     addTearDown(restarted.dispose);
+    TimelineChoice choice(String setId) =>
+        restarted.read(timelineChoiceProvider(setId));
     expect(
-      restarted.read(timelineModeProvider(first.id)),
-      TimelineMode.summary,
+      choice('a'),
+      const TimelineChoice(TimelineLevel.evening, compact: true),
     );
-    expect(restarted.read(timelineModeProvider(kitchen.id)), TimelineMode.list);
-    expect(restarted.read(timelineModeProvider('unknown')), TimelineMode.strip);
-    expect(TimelineMode.fromName('nonsense'), TimelineMode.strip);
+    expect(choice('b'), const TimelineChoice(TimelineLevel.evening));
+    expect(choice('c'), TimelineChoice.initial);
+    expect(choice('d').level, TimelineLevel.now);
+    expect(choice(first.id).level, TimelineLevel.evening);
+    expect(choice('unknown'), TimelineChoice.initial);
     expect(tester.takeException(), isNull);
   });
 
@@ -327,7 +321,13 @@ void main() {
     expect(find.byKey(StripKeys.value(birds.id)), findsOneWidget);
     // "Alles" and "Jetzt".
     expect(find.text(TracksStrings.stripAll), findsOneWidget);
-    expect(find.text(TracksStrings.stripNow), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(StripKeys.now),
+        matching: find.text(TracksStrings.stripNow),
+      ),
+      findsOneWidget,
+    );
     // The lanes use the whole width and the height that is left.
     final lanes = tester.getRect(find.byKey(StripKeys.lanes));
     final view = tester.getRect(find.byKey(StripKeys.view));
@@ -721,7 +721,13 @@ void main() {
     bool canJump() =>
         tester.widget<PillButton>(find.byKey(StripKeys.now)).onPressed != null;
     expect(find.text(TracksStrings.stripAll), findsOneWidget);
-    expect(find.text(TracksStrings.stripNow), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(StripKeys.now),
+        matching: find.text(TracksStrings.stripNow),
+      ),
+      findsOneWidget,
+    );
     Future<void> zoom(double factor) async {
       v.zoomBy(factor);
       await tester.pump();
@@ -963,7 +969,8 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('the scope and the filters apply to the strip', (tester) async {
+  testWidgets('"Jetzt" shows the open sessions; the filters apply to the '
+      'strip', (tester) async {
     final h = await TracksHarness.start(tester);
     // A closed session ...
     final old = await h.tick(h.counter);
@@ -979,21 +986,6 @@ void main() {
     expect(h.stripLane(h.stopwatch.id), findsOneWidget);
     expect(h.stripLane(h.counter.id), findsNothing);
     expect(h.markerOf(old), isNull);
-    final openStart = h.viewport.extentStart;
-
-    // "Letzte 24 h" also shows what has ended - and fits the view again.
-    await h.tap(find.byKey(TimelineKeys.scope));
-    await h.tap(find.text(TracksStrings.scopeLast24h).last);
-    expect(h.stripLane(h.counter.id), findsOneWidget);
-    expect(h.viewport.extentStart, lessThan(openStart));
-    expect(h.viewport.xOf(old.at), inInclusiveRange(0, h.viewport.width));
-    expect(
-      h.strip.layout.markers.any((m) => m.event?.row.event.id == old.id) ||
-          h.strip.layout.clusters.any(
-            (c) => c.events.any((e) => e.row.event.id == old.id),
-          ),
-      isTrue,
-    );
 
     // Start and stop become markers only with the chip.
     bool lifecycle() =>
@@ -1031,11 +1023,8 @@ void main() {
     expect(find.byKey(StripKeys.lanes), findsNothing);
     expect(find.text(TracksStrings.timelineEmptyTitle), findsOneWidget);
     expect(find.text(TracksStrings.timelineEmptyOpen), findsOneWidget);
-    // The mode switch and the scope are still there.
-    expect(find.byKey(TimelineKeys.mode), findsOneWidget);
-    await h.tap(find.byKey(TimelineKeys.scope));
-    await h.tap(find.text(TracksStrings.scopeToday).last);
-    expect(find.text(TracksStrings.timelineEmptyRange), findsOneWidget);
+    // The level switch is still there.
+    expect(find.byKey(TimelineKeys.level), findsOneWidget);
 
     // The first event brings the strip, fitted to it.
     final tick = await h.tick(h.counter);

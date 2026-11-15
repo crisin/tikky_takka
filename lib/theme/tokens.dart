@@ -221,6 +221,7 @@ final class TikkyTextStyles {
     required this.stripThing,
     required this.stripDigits,
     required this.stripWord,
+    required this.eveningChip,
     required this.cardDigits,
     required this.cardNote,
     required this.navLabel,
@@ -300,6 +301,9 @@ final class TikkyTextStyles {
   final TextStyle stripThing;
   final TextStyle stripDigits;
   final TextStyle stripWord;
+
+  /// An entry chip of the evening.
+  final TextStyle eveningChip;
 
   /// A person card above the strip: the time since, and the line below.
   final TextStyle cardDigits;
@@ -405,6 +409,32 @@ final class TikkyStripTokens {
   /// height of the timeline the cards are left out.
   double get cardAvatar => 28;
   double get cardsMinHeight => 320;
+
+  // "Abend" (Pult 3.2): the time runs downwards.
+
+  /// The column with the hours, a bar of a track, the space between two
+  /// and the least width of the column of the tracks.
+  double get eveningAxis => 42;
+  double get eveningTrackBar => 8;
+  double get eveningTrackGap => 4;
+  double get eveningTracks => 46;
+
+  /// An entry chip: its height, its distance from the edge of the column,
+  /// and how close two may come before the second takes the other place.
+  double get eveningChip => 20;
+  double get eveningChipInset => 18;
+  double get eveningSlotGap => 22;
+
+  /// The closest scale (then the evening scrolls), the least width of a
+  /// person's column, the height of the line with a chain.
+  double get eveningMinPxPerHour => 60;
+  double get eveningMinColumn => 120;
+  double get eveningChain => 36;
+
+  /// The line of a chain and its dots; the initial in a column head.
+  double get eveningChainLine => 2;
+  double get eveningChainDot => 8;
+  double get eveningAvatar => 24;
 
   /// Width of the "now" line and of a lap tick.
   double get nowLine => 1.5;
@@ -747,6 +777,7 @@ class TikkyTokens extends ThemeExtension<TikkyTokens> {
       stripThing: base(12, FontWeight.w500, colors.textMuted, height: 16 / 12),
       stripDigits: laneDigits(11, 16 / 11, colors.text),
       stripWord: base(11, FontWeight.w400, colors.textMuted, height: 15 / 11),
+      eveningChip: base(12, FontWeight.w600, colors.text, height: 20 / 12),
       cardDigits: laneDigits(20 * prefs.digitScale, 24 / 20, colors.text),
       cardNote: base(12, FontWeight.w400, colors.textMuted, height: 15 / 12),
       navLabel: base(15, FontWeight.w600, colors.text, height: 1.2),

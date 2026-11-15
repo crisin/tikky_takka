@@ -23,6 +23,14 @@ abstract final class SettingsStrings {
   static const prefKeepScreenOnHint =
       'Der Bildschirm bleibt an, solange die App offen ist.';
   static const prefUse24hHint = 'Aus: Uhrzeiten mit AM/PM.';
+  static const prefDayStart = 'Tag beginnt um';
+  static const prefDayStartHint =
+      'Was davor passiert, zählt in der Zeitleiste zum Abend davor.';
+
+  /// "06:00"
+  static String hourOfDay(int minutes) =>
+      '${(minutes ~/ 60).toString().padLeft(2, '0')}:'
+      '${(minutes % 60).toString().padLeft(2, '0')}';
 
   // ---------------------------------------------------------- set overrides
   static const overrideActive = 'Angepasst';

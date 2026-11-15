@@ -30,6 +30,7 @@ abstract final class UiPrefsKeys {
   static const keepScreenOn = 'keepScreenOn';
   static const use24h = 'use24h';
   static const csvSeparator = 'csvSeparator';
+  static const dayStartMinutes = 'dayStartMinutes';
 
   static const all = [
     layout,
@@ -45,6 +46,7 @@ abstract final class UiPrefsKeys {
     keepScreenOn,
     use24h,
     csvSeparator,
+    dayStartMinutes,
   ];
 }
 
@@ -64,6 +66,7 @@ final class UiPrefs {
     this.keepScreenOn = false,
     this.use24h = true,
     this.csvSeparator = CsvSeparator.semicolon,
+    this.dayStartMinutes = defaultDayStartMinutes,
   });
 
   factory UiPrefs.fromJson(JsonMap json) => UiPrefs(
@@ -100,9 +103,17 @@ final class UiPrefs {
       json[UiPrefsKeys.csvSeparator],
       CsvSeparator.semicolon,
     ),
+    dayStartMinutes: _dayStart(json[UiPrefsKeys.dayStartMinutes]),
   );
 
   static const defaults = UiPrefs();
+
+  /// A day starts at 06:00: what happens after midnight still belongs to
+  /// the evening before.
+  static const int defaultDayStartMinutes = 6 * 60;
+
+  /// The latest a day may start (12:00).
+  static const int maxDayStartMinutes = 12 * 60;
 
   static const double minDigitScale = 0.7;
   static const double maxDigitScale = 1.6;
@@ -131,6 +142,14 @@ final class UiPrefs {
   final bool keepScreenOn;
   final bool use24h;
   final CsvSeparator csvSeparator;
+
+  /// Minutes after midnight at which a day of the timeline starts.
+  final int dayStartMinutes;
+
+  static int _dayStart(Object? v) {
+    final minutes = v is num ? v.round() : defaultDayStartMinutes;
+    return minutes.clamp(0, maxDayStartMinutes);
+  }
 
   static T _byName<T extends Enum>(List<T> values, Object? name, T fallback) {
     for (final v in values) {
@@ -175,6 +194,7 @@ final class UiPrefs {
     bool? keepScreenOn,
     bool? use24h,
     CsvSeparator? csvSeparator,
+    int? dayStartMinutes,
   }) => UiPrefs(
     layout: layout ?? this.layout,
     density: density ?? this.density,
@@ -193,6 +213,10 @@ final class UiPrefs {
     keepScreenOn: keepScreenOn ?? this.keepScreenOn,
     use24h: use24h ?? this.use24h,
     csvSeparator: csvSeparator ?? this.csvSeparator,
+    dayStartMinutes: (dayStartMinutes ?? this.dayStartMinutes).clamp(
+      0,
+      maxDayStartMinutes,
+    ),
   );
 
   JsonMap toJson() => {
@@ -209,6 +233,7 @@ final class UiPrefs {
     UiPrefsKeys.keepScreenOn: keepScreenOn,
     UiPrefsKeys.use24h: use24h,
     UiPrefsKeys.csvSeparator: csvSeparator.name,
+    UiPrefsKeys.dayStartMinutes: dayStartMinutes,
   };
 
   @override

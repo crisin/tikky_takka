@@ -46,9 +46,9 @@ Bauen des jeweiligen Pakets klären.
 
 | Nr. | Frage | So gezeichnet |
 |---|---|---|
-| O1 | **Abend senkrecht?** Neue Ansicht mit einer Spalte pro Person neben dem bestehenden waagerechten Streifen. | senkrecht |
-| O2 | **Liste und Zusammenfassung** sind keine eigenen Ansichten mehr. Reicht „Kompakt“ im Abend und Summen in Spaltenkopf, Woche und Monat? | ja |
-| O3 | **„Tag beginnt um 06:00“** als neue Einstellung, damit Einträge nach Mitternacht zum Abend davor zählen. Passt 06:00 als Standard? | 06:00 |
+| O1 | **Abend senkrecht?** Neue Ansicht mit einer Spalte pro Person neben dem bestehenden waagerechten Streifen. | senkrecht – **entschieden: senkrecht** |
+| O2 | **Liste und Zusammenfassung** sind keine eigenen Ansichten mehr. Reicht „Kompakt“ im Abend und Summen in Spaltenkopf, Woche und Monat? Entschieden: **die Liste bleibt** als „Kompakt“ des Abends; die Zusammenfassung entfällt. | ja |
+| O3 | **„Tag beginnt um 06:00“** als neue Einstellung, damit Einträge nach Mitternacht zum Abend davor zählen. Passt 06:00 als Standard? Entschieden: **06:00**. | 06:00 |
 | O4 | **Vier gebündelte Schriften** (Martian Mono, Space Mono, Silkscreen, Fredoka). Nach den Einträgen bei Google Fonts und Font Squirrel stehen sie unter der SIL Open Font License; die Lizenztexte selbst sind nicht nachgelesen. Tabellenziffern sind für keine der vier geprüft. | alle vier |
 | O5 | **Anzahl (×3) auf den Erfassen-Feldern:** immer sichtbar oder erst mit Schalter? Entschieden: **mit Schalter, Standard aus**. | immer |
 | O6 | **Ampel pro Person** (Backlog Nr. 5) ist nicht gezeichnet. Die Karten in „Jetzt“ zeigen nur die Zeit seit dem letzten Eintrag und den selbst eingestellten Abstand. | keine Ampel |

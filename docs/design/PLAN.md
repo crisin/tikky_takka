@@ -79,10 +79,10 @@ Abgleich aufgefallen sind. Die Spalte „Vorschlag“ ist nur ein Vorschlag.
 | E2 | Wo liegt Stoppen, wenn es nur einen Nebenknopf gibt? | langer Druck auf den **Hauptknopf** und der Stopp-Knopf im Zustand „pausiert“; langer Druck auf die Fläche bleibt Bearbeiten. Für Zähler und Erinnerung (kein „pausiert“) zusätzlich „Stoppen“ im Bearbeiten-Blatt und als Aktion für Screenreader | P2 |
 | E3 | Die untere Leiste ab 720 px Breite: Seitenleiste mit Spuren / Tippfeld / Zeitleiste und Einstellungen darunter? | ja | P3 |
 | O7 | Tippen auf die Spur öffnet den Fokus? | ja; bis P9 tut Tippen nichts | P9 |
-| O1 | Abend senkrecht? | – | P6 |
-| O2 | Liste und Zusammenfassung gehen in „Kompakt“ und den Summen auf? | – | P6 |
-| O3 | „Tag beginnt um 06:00“? | – | P6 |
-| E4 | Trefferflächen unter 48: Wochenzeilen 48 statt 42, Kalenderzellen 48 statt 46, Chips im Abend mit 48er Trefferfläche und Wahl des nächstliegenden? | ja | P6 |
+| O1 | Abend senkrecht? | **entschieden: senkrecht** | P6 |
+| O2 | Liste und Zusammenfassung gehen in „Kompakt“ und den Summen auf? | **entschieden: Liste bleibt** als „Kompakt“ des Abends (Einträge nach Zeit); die Zusammenfassung geht in den Summen auf | P6 |
+| O3 | „Tag beginnt um 06:00“? | **entschieden: 06:00** | P6 |
+| E4 | Trefferflächen unter 48: Wochenzeilen 48 statt 42, Kalenderzellen 48 statt 46, Chips im Abend mit 48er Trefferfläche und Wahl des nächstliegenden? | **entschieden: ja** | P6 |
 | O4b | Space Mono, Silkscreen, Fredoka bündeln? | nach Prüfung der Ziffernbreite je Schrift | P8 |
 | O6 | Ampel pro Person | bleibt draußen | – |
 
@@ -396,6 +396,28 @@ Abweichungen in Teil 1:
 ### P6 · Abend, Woche, Monat; Verlauf geht auf
 
 Entwürfe `3-2` bis `3-5`. Vorher O1, O2, O3, E4.
+
+**Stand: Teil 1 erledigt** (P6.1, P6.2, P6.4 und der Bereichszugriff aus
+P6.3; Zweig `pult`). Offen: Teil 2 Woche und Monat (P6.5, P6.6, Zahlen aus
+P6.3), Teil 3 Eintragsblatt, Export, Verlauf (P6.7–P6.9). Abweichungen:
+
+- Der Umschalter zeigt vorerst nur „Jetzt“ und „Abend“; Woche und Monat
+  kommen mit ihren Ansichten dazu.
+- „Kompakt“ ist die bisherige Liste, beschränkt auf den Abend (O2). Die
+  Zusammenfassung ist entfallen (`timeline_summary.dart`).
+- „Jetzt“ zeigt nur noch die offenen Sitzungen; die Zeiträume „Heute“ und
+  „Letzte 24 h“ entfallen mit `TimelineScope`.
+- Neue Schlüssel: `ui.timelineLevel.<setId>` und `ui.timelineCompact.<setId>`;
+  `ui.timelineMode.<setId>` wird nur noch gelesen.
+- „Tag beginnt um“ steht unter Verhalten als Regler in ganzen Stunden
+  (00:00–12:00), Schlüssel `dayStartMinutes` in den UI-Einstellungen.
+- Der Maßstab beginnt zur halben Stunde vor dem ersten Eintrag; unter 60 px
+  je Stunde wird der Abend länger und rollt. Spalten sind mindestens 120
+  breit; bei mehr Personen rollt der Abend seitwärts.
+- Erster Tipp auf einen Eintrag zeigt die Kette, ein Tipp auf einen Eintrag
+  der gezeigten Kette öffnet ihn (vorerst im bisherigen Blatt der Liste).
+- In der Spuren-Spalte: laufende Abschnitte als Balken, Runden und Tipps als
+  Querstrich; der gestrichelte Rest eines Timers fehlt noch.
 
 - **P6.1** `ui_prefs.dart`: `dayStartMinutes` (Standard nach O3). Reine
   Funktionen in `lib/core/engine/`: logischer Tag zu einem Zeitpunkt, Beginn

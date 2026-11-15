@@ -458,7 +458,9 @@ class HeaderRoundButton extends StatelessWidget {
 
   final IconData icon;
   final String label;
-  final VoidCallback onPressed;
+
+  /// `null` = disabled (dimmed).
+  final VoidCallback? onPressed;
 
   /// The fill; the surface by default (on a sheet: the background).
   final Color? color;
@@ -468,25 +470,31 @@ class HeaderRoundButton extends StatelessWidget {
     final t = context.tikky;
     return Semantics(
       button: true,
+      enabled: onPressed != null,
       label: label,
       excludeSemantics: true,
       onTap: onPressed,
       child: Tooltip(
         message: label,
         excludeFromSemantics: true,
-        child: Material(
-          color: color ?? t.colors.surface,
-          shape: RoundedRectangleBorder(
-            borderRadius: t.radii.pillAll,
-            side: t.hairline,
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            splashFactory: isCupertino(context) ? NoSplash.splashFactory : null,
-            onTap: onPressed,
-            child: SizedBox.square(
-              dimension: t.sizes.minTapTarget,
-              child: Icon(icon, size: t.sizes.iconMd, color: t.colors.text),
+        child: Opacity(
+          opacity: onPressed == null ? 0.5 : 1,
+          child: Material(
+            color: color ?? t.colors.surface,
+            shape: RoundedRectangleBorder(
+              borderRadius: t.radii.pillAll,
+              side: t.hairline,
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              splashFactory: isCupertino(context)
+                  ? NoSplash.splashFactory
+                  : null,
+              onTap: onPressed,
+              child: SizedBox.square(
+                dimension: t.sizes.minTapTarget,
+                child: Icon(icon, size: t.sizes.iconMd, color: t.colors.text),
+              ),
             ),
           ),
         ),

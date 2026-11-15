@@ -276,6 +276,36 @@ abstract final class TracksStrings {
       '$time, $track, $text';
 
   // --------------------------------------------------------------- strip
+  // ------------------------------------------------- levels and evening
+  static const levelSwitch = 'Zeitraum';
+  static const levelNow = 'Jetzt';
+  static const levelEvening = 'Abend';
+  static const eveningPrevious = 'Abend davor';
+  static const eveningNext = 'Nächster Abend';
+  static const eveningCompact = 'Kompakt';
+  static const eveningCompactSemantics = 'Kompakt: ohne Maßstab, als Liste';
+  static const eveningTracks = 'Spuren';
+  static const eveningNow = 'jetzt';
+  static const eveningEmpty = 'An diesem Abend ist nichts eingetragen.';
+
+  /// "Abend · seit 20:50"
+  static String eveningSince(String time) => 'Abend · seit $time';
+  static const eveningPlain = 'Abend';
+
+  /// "Abstand bis 00:15": the lockout the user set on the chosen thing.
+  static String eveningLockoutUntil(String time) => 'Abstand bis $time';
+
+  /// Read for a chip: "Krille, Bier, 21:20".
+  static String eveningChipSemantics(
+    String person,
+    String thing,
+    String time,
+  ) => '$person, $thing, $time';
+
+  /// Read for the line of a chain: "Abstände Bier, Krille".
+  static String eveningChainSemantics(String thing, String person) =>
+      'Abstände $thing, $person';
+
   static const stripAll = 'Alles';
   static const stripFit = 'Alles zeigen';
   static const stripNow = 'Jetzt';

@@ -18,7 +18,6 @@ import '../../../protocol/protocol_widgets.dart';
 import '../../lane_view.dart';
 import '../../now_selector.dart';
 import '../../tracks_strings.dart';
-import '../timeline_logic.dart';
 import 'strip_detail.dart';
 import 'strip_model.dart';
 import 'strip_open.dart';
@@ -118,7 +117,6 @@ class _NowPulse extends ChangeNotifier {
 class StripView extends ConsumerStatefulWidget {
   const StripView({
     required this.setId,
-    required this.scope,
     required this.tracks,
     required this.sessions,
     required this.sinceMs,
@@ -129,15 +127,14 @@ class StripView extends ConsumerStatefulWidget {
   });
 
   final String setId;
-  final TimelineScope scope;
 
   /// Ordered, non-archived tracks of the set.
   final List<Track> tracks;
 
-  /// What `HistoryRepository.watchSetActivity` delivered for [scope].
+  /// What `HistoryRepository.watchSetActivity` delivered.
   final List<HistorySession> sessions;
 
-  /// Start of [scope]; `null` = the open sessions.
+  /// Start of the range; `null` = the open sessions.
   final int? sinceMs;
   final bool showLifecycle;
   final Set<String> hiddenTracks;
@@ -192,7 +189,8 @@ class StripViewState extends ConsumerState<StripView> {
   @override
   void didUpdateWidget(StripView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.setId != widget.setId || oldWidget.scope != widget.scope) {
+    if (oldWidget.setId != widget.setId ||
+        oldWidget.sinceMs != widget.sinceMs) {
       _needsFit = true;
     }
   }

@@ -5,6 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:tikky_takka/core/domain/domain.dart';
 import 'package:tikky_takka/core/engine/engine.dart';
 import 'package:tikky_takka/core/repo/repo.dart';
+import 'package:tikky_takka/adaptive/adaptive.dart';
+import 'package:tikky_takka/features/tracks/timeline/evening/evening_view.dart';
 import 'package:tikky_takka/features/tracks/timeline/timeline_event_sheet.dart';
 import 'package:tikky_takka/features/tracks/timeline/timeline_mode.dart';
 import 'package:tikky_takka/features/tracks/timeline/timeline_view.dart';
@@ -19,12 +21,12 @@ import '../../../support/test_app.dart';
 import '../tracks_harness.dart';
 
 extension on TracksHarness {
-  /// Shows the timeline in its list mode (the strip is the default and
-  /// has its own tests).
+  /// Shows the evening as a list ("Kompakt"; the strip of "Jetzt" and
+  /// the evening itself have their own tests).
   Future<void> showTimeline() => run(() async {
-    await container
-        .read(timelineModesProvider.notifier)
-        .show(activeSet.id, TimelineMode.list);
+    final choices = container.read(timelineChoicesProvider.notifier);
+    await choices.show(activeSet.id, TimelineLevel.evening);
+    await choices.setCompact(activeSet.id, compact: true);
     await container
         .read(tracksViewsProvider.notifier)
         .show(activeSet.id, TracksView.timeline);
@@ -59,25 +61,6 @@ extension on TracksHarness {
     await tester.pump();
     await tap(find.byKey(key));
   }
-
-  /// Switches between "Zeitleiste" and "Zusammenfassung".
-  Future<void> mode(String label) => tap(
-    find.descendant(
-      of: find.byKey(TimelineKeys.mode),
-      matching: find.text(label),
-    ),
-  );
-
-  /// Chooses a range from the scope chip's sheet.
-  Future<void> pickScope(String label) async {
-    await tap(find.byKey(TimelineKeys.scope));
-    await tap(find.text(label).last);
-  }
-
-  Finder scopeShows(String label) => find.descendant(
-    of: find.byKey(TimelineKeys.scope),
-    matching: find.text(label),
-  );
 }
 
 /// A counter with labels and three ticks: Reiher, a minute later Ente,
@@ -352,195 +335,69 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('scope: open sessions by default, today and the last 24 hours '
-      'also show what has ended', (tester) async {
+  testWidgets('the evening: one logical day, back and forth; the next '
+      'one only up to the evening going on', (tester) async {
     final h = await TracksHarness.start(tester);
-    // A closed session ...
-    final old = await h.tick(h.counter);
-    await h.run(() => h.commands.stopTrack(h.counter.id));
-    await h.advance(const Duration(minutes: 2));
-    // ... and an open one.
     final (_, ticks) = await _birds(h);
     await h.showTimeline();
-
-    expect(h.scopeShows(TracksStrings.scopeOpen), findsOneWidget);
     expect(h.row(ticks[0]), findsOneWidget);
-    expect(h.row(old), findsNothing);
+    expect(
+      find.descendant(
+        of: find.byKey(TimelineKeys.day),
+        matching: find.text(Fmt.dayShort(ticks[0].at)),
+      ),
+      findsOneWidget,
+    );
+    bool canGoOn() =>
+        tester
+            .widget<HeaderRoundButton>(find.byKey(TimelineKeys.next))
+            .onPressed !=
+        null;
+    expect(canGoOn(), isFalse);
 
-    // The chip offers the three ranges.
-    await h.tap(find.byKey(TimelineKeys.scope));
-    expect(find.text(TracksStrings.scopeToday), findsOneWidget);
-    expect(find.text(TracksStrings.scopeLast24h), findsOneWidget);
-    await h.tap(find.text(TracksStrings.scopeLast24h));
-    expect(h.scopeShows(TracksStrings.scopeLast24h), findsOneWidget);
-    expect(h.row(old), findsOneWidget);
-    expect(h.row(ticks[0]), findsOneWidget);
-
-    await h.pickScope(TracksStrings.scopeToday);
-    expect(h.scopeShows(TracksStrings.scopeToday), findsOneWidget);
-    expect(h.row(ticks[2]), findsOneWidget);
-
-    // Two days later nothing of this is in "the last 24 hours" - but the
-    // session that is still open stays in "Laufende Sitzungen".
-    await h.advance(const Duration(days: 2));
-    await h.pickScope(TracksStrings.scopeOpen);
-    expect(h.row(ticks[0]), findsOneWidget);
-    await h.pickScope(TracksStrings.scopeLast24h);
-    await h.settle();
+    await h.tap(find.byKey(TimelineKeys.previous));
     expect(h.row(ticks[0]), findsNothing);
-    expect(h.row(old), findsNothing);
-    expect(find.text(TracksStrings.timelineEmptyRange), findsOneWidget);
+    expect(find.text(TracksStrings.eveningEmpty), findsOneWidget);
+    expect(canGoOn(), isTrue);
+    await h.tap(find.byKey(TimelineKeys.next));
+    expect(h.row(ticks[0]), findsOneWidget);
+
+    // Two days later the evening going on is another one.
+    await h.advance(const Duration(days: 2));
+    await h.settle();
+    await h.tap(find.byKey(TimelineKeys.previous));
+    await h.tap(find.byKey(TimelineKeys.next));
+    expect(h.row(ticks[0]), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('an empty set of open sessions says so', (tester) async {
+  testWidgets('"Kompakt" switches between the evening and its list; the '
+      'choice is remembered per set', (tester) async {
+    final h = await TracksHarness.start(tester);
+    await _birds(h);
+    await h.showTimeline();
+    expect(find.byKey(TimelineKeys.list), findsOneWidget);
+    await h.tap(find.byKey(TimelineKeys.compact));
+    expect(find.byKey(TimelineKeys.list), findsNothing);
+    expect(find.byKey(EveningKeys.view), findsOneWidget);
+    final id = h.activeSet.id;
+    expect(
+      h.app.settings.getString('${SettingsKeys.timelineCompactPrefix}$id'),
+      'false',
+    );
+    expect(
+      h.app.settings.getString('${SettingsKeys.timelineLevelPrefix}$id'),
+      'evening',
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('an empty evening says so', (tester) async {
     final h = await TracksHarness.start(tester);
     await h.showTimeline();
     expect(find.text(TracksStrings.timelineEmptyTitle), findsOneWidget);
-    expect(find.text(TracksStrings.timelineEmptyOpen), findsOneWidget);
-    await h.mode(TracksStrings.modeSummary);
-    expect(find.text(TracksStrings.summaryEmptyTitle), findsOneWidget);
+    expect(find.text(TracksStrings.eveningEmpty), findsOneWidget);
     expect(tester.takeException(), isNull);
-  });
-
-  group('summary', () {
-    testWidgets('counts per label with first, last and average gap; sorted '
-        'by count, or by last time', (tester) async {
-      final h = await TracksHarness.start(tester);
-      final birds = await h.addTrack(
-        const CounterConfig(labels: ['Reiher', 'Ente', 'Specht']),
-        name: 'Vögel',
-      );
-      final first = await h.tick(birds, label: 'Reiher');
-      await h.advance(const Duration(minutes: 4));
-      await h.tick(birds, label: 'Reiher');
-      await h.advance(const Duration(minutes: 4));
-      final lastReiher = await h.tick(birds, label: 'Reiher');
-      await h.advance(const Duration(minutes: 1));
-      final ente = await h.tick(birds, label: 'Ente');
-      await h.run(() => h.commands.startTrack(h.stopwatch.id));
-      await h.advance(const Duration(seconds: 75));
-      await h.run(() => h.commands.lap(h.stopwatch.id));
-      await h.run(() => h.commands.pauseTrack(h.stopwatch.id));
-      await h.showTimeline();
-
-      await h.mode(TracksStrings.modeSummary);
-      expect(find.byKey(TimelineKeys.list), findsNothing);
-      expect(find.byKey(TimelineKeys.summary), findsOneWidget);
-      final group = find.byKey(TimelineKeys.group('Vögel'));
-      Finder inGroup(String text) =>
-          find.descendant(of: group, matching: find.text(text));
-
-      expect(inGroup('Reiher'), findsOneWidget);
-      expect(inGroup('Ente'), findsOneWidget);
-      // Never tapped: not listed.
-      expect(inGroup('Specht'), findsNothing);
-      expect(inGroup(TracksStrings.summaryCount(3)), findsOneWidget);
-      expect(inGroup(TracksStrings.summaryCount(1)), findsOneWidget);
-      expect(inGroup(TracksStrings.summaryTotal(4)), findsOneWidget);
-      expect(
-        inGroup(
-          '${Fmt.time(first.at)} – ${Fmt.time(lastReiher.at)} · '
-          '${TracksStrings.summaryAvgGap('4 min')}',
-        ),
-        findsOneWidget,
-      );
-      expect(inGroup(Fmt.time(ente.at)), findsOneWidget);
-      // Most frequent first.
-      expect(h.top(inGroup('Reiher')), lessThan(h.top(inGroup('Ente'))));
-
-      // The stopwatch: net time and laps.
-      final watch = find.byKey(TimelineKeys.group(Strings.seedStopwatchName));
-      expect(
-        find.descendant(of: watch, matching: find.text('01:15')),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(
-          of: watch,
-          matching: find.text(
-            '${TracksStrings.summaryNetTime} · ${TracksStrings.summaryLaps(1)}',
-          ),
-        ),
-        findsOneWidget,
-      );
-
-      // By last time: the duck was seen last.
-      Finder sortShows(String label) => find.descendant(
-        of: find.byKey(TimelineKeys.sort),
-        matching: find.text(label),
-      );
-      expect(sortShows(TracksStrings.sortByCount), findsOneWidget);
-      await h.tapChip(TimelineKeys.sort);
-      expect(sortShows(TracksStrings.sortByLast), findsOneWidget);
-      expect(h.top(inGroup('Ente')), lessThan(h.top(inGroup('Reiher'))));
-
-      // Back to the timeline.
-      await h.mode(TracksStrings.modeTimeline);
-      expect(find.byKey(TimelineKeys.list), findsOneWidget);
-      expect(tester.takeException(), isNull);
-    });
-
-    testWidgets('protocol: per person per substance, counts and times - no '
-        'amounts, no judgement', (tester) async {
-      final h = await TracksHarness.start(tester);
-      final people = h.container.read(peopleRepositoryProvider);
-      final jacke = await h.run(() => people.createPerson(name: 'Jacke'));
-      final kim = await h.run(() => people.createPerson(name: 'Kim'));
-      final gbl = await h.run(
-        () => people.createSubstance(name: 'GBL', lockoutMs: 2 * 3600 * 1000),
-      );
-      final water = await h.run(() => people.createSubstance(name: 'Wasser'));
-      final tent = await h.addTrack(const ProtocolConfig(), name: 'Zelt');
-      Future<void> entry(Person p, Substance s, {String? amount}) => h.run(
-        () => h.commands.addEntry(
-          tent.id,
-          personId: p.id,
-          substanceId: s.id,
-          amount: amount,
-        ),
-      );
-      await entry(jacke, gbl, amount: '1 ml');
-      await h.advance(const Duration(minutes: 10));
-      await entry(jacke, gbl, amount: '2 ml');
-      await entry(jacke, water, amount: '0,5 l');
-      await entry(kim, water);
-      await h.showTimeline();
-      await h.mode(TracksStrings.modeSummary);
-
-      final jackeGroup = find.byKey(TimelineKeys.group('Zelt · Jacke'));
-      final kimGroup = find.byKey(TimelineKeys.group('Zelt · Kim'));
-      expect(jackeGroup, findsOneWidget);
-      expect(kimGroup, findsOneWidget);
-      Finder inJacke(String text) =>
-          find.descendant(of: jackeGroup, matching: find.text(text));
-      expect(inJacke('GBL'), findsOneWidget);
-      expect(inJacke('Wasser'), findsOneWidget);
-      expect(inJacke(TracksStrings.summaryCount(2)), findsOneWidget);
-      expect(inJacke(TracksStrings.summaryTotal(3)), findsOneWidget);
-      expect(h.top(inJacke('GBL')), lessThan(h.top(inJacke('Wasser'))));
-      // The person with more entries comes first.
-      expect(h.top(jackeGroup), lessThan(h.top(kimGroup)));
-
-      // Nothing but counts and times: no amounts, no sums, no intervals,
-      // no lockout, no warning.
-      final texts = [
-        for (final text in tester.widgetList<Text>(
-          find.descendant(
-            of: find.byKey(TimelineKeys.summary),
-            matching: find.byType(Text),
-          ),
-        ))
-          text.data ?? '',
-      ];
-      for (final text in texts) {
-        expect(text.contains('ml'), isFalse, reason: text);
-        expect(text.contains('0,5'), isFalse, reason: text);
-        expect(text.contains('Schnitt'), isFalse, reason: text);
-        expect(text.contains('frühestens'), isFalse, reason: text);
-      }
-      expect(tester.takeException(), isNull);
-    });
   });
 
   testWidgets('the stream rests while a page covers the tracks screen and '
@@ -616,7 +473,9 @@ void main() {
       expect(tester.takeException(), isNull);
       await tester.ensureVisible(find.byKey(EventSheetKeys.save));
       await h.tap(find.byKey(EventSheetKeys.save));
-      await h.mode(TracksStrings.modeSummary);
+      // The evening itself fits as well.
+      await h.tap(find.byKey(TimelineKeys.compact));
+      expect(find.byKey(EveningKeys.view), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   }

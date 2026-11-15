@@ -207,6 +207,7 @@ class _BehaviourSection extends ConsumerWidget {
     UiPrefsKeys.haptics,
     UiPrefsKeys.keepScreenOn,
     UiPrefsKeys.use24h,
+    UiPrefsKeys.dayStartMinutes,
   ];
 
   @override

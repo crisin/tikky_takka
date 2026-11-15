@@ -26,10 +26,9 @@ Finder _segment(String label) => find.descendant(
   matching: find.text(label),
 );
 
-/// A segment of the mode switch of the timeline ("Streifen", "Liste",
-/// "Zusammenfassung").
-Finder _timelineMode(String label) => find.descendant(
-  of: find.byKey(TimelineKeys.mode),
+/// A segment of the level switch of the timeline ("Jetzt", "Abend").
+Finder _timelineLevel(String label) => find.descendant(
+  of: find.byKey(TimelineKeys.level),
   matching: find.text(label),
 );
 
@@ -250,8 +249,9 @@ void main() {
     await h.tap(_segment(TracksStrings.viewTimeline));
     final timeline = tester.element(find.byKey(TimelineKeys.view));
     expect(timeline.tikky.theme.id, ThemePresets.blackId);
-    // The strip is the default mode; the times as text are in the list.
-    await h.tap(_timelineMode(TracksStrings.modeTimeline));
+    // "Jetzt" is the default; the times as text are in the evening's list.
+    await h.tap(_timelineLevel(TracksStrings.levelEvening));
+    await h.tap(find.byKey(TimelineKeys.compact));
     expect(
       find.text(Fmt.time(h.app.clock.nowMs(), use24h: false, seconds: true)),
       findsOneWidget,
@@ -278,8 +278,9 @@ void main() {
       expect(await h.snapshot(h.stopwatch), isNull);
 
       await h.tap(_segment(TracksStrings.viewTimeline));
-      // The strip is the default mode; this walks through the list.
-      await h.tap(_timelineMode(TracksStrings.modeTimeline));
+      // "Jetzt" is the default; this walks through the evening's list.
+      await h.tap(_timelineLevel(TracksStrings.levelEvening));
+      await h.tap(find.byKey(TimelineKeys.compact));
       expect(find.byKey(TimelineKeys.list), findsOneWidget);
       expect(find.text('Tipp 1'), findsOneWidget);
       await h.tap(find.text('Tipp 1'));

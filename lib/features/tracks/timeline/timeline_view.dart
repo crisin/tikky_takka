@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../adaptive/adaptive.dart';
-import '../../../core/clock.dart';
 import '../../../core/domain/domain.dart';
 import '../../../core/engine/engine.dart';
 import '../../../core/repo/repo.dart';
@@ -10,65 +9,62 @@ import '../../../core/services/haptics.dart';
 import '../../../l10n/formatters.dart';
 import '../../../l10n/strings.dart';
 import '../../../theme/theme.dart';
-import '../../protocol/protocol_logic.dart';
+import '../../protocol/entry_edit_sheet.dart';
 import '../../protocol/protocol_widgets.dart';
+import '../now_selector.dart';
 import '../tracks_strings.dart';
+import 'evening/evening_view.dart';
 import 'person_cards.dart';
 import 'strip/strip_view.dart';
 import 'timeline_event_sheet.dart';
 import 'timeline_logic.dart';
 import 'timeline_mode.dart';
-import 'timeline_summary.dart';
 
 /// Keys of the timeline view (for tests).
 abstract final class TimelineKeys {
   static const view = ValueKey('timeline-view');
   static const list = ValueKey('timeline-list');
-  static const summary = ValueKey('timeline-summary');
   static const order = ValueKey('timeline-order');
   static const lifecycle = ValueKey('timeline-lifecycle');
-  static const mode = ValueKey('timeline-mode');
-  static const scope = ValueKey('timeline-scope');
-  static const sort = ValueKey('timeline-sort');
+  static const level = ValueKey('timeline-level');
+  static const previous = ValueKey('timeline-previous');
+  static const next = ValueKey('timeline-next');
+  static const day = ValueKey('timeline-day');
+  static const compact = ValueKey('timeline-compact');
   static Key trackChip(String trackId) => ValueKey('timeline-track-$trackId');
   static Key row(String eventId) => ValueKey('timeline-row-$eventId');
-  static Key group(String title) => ValueKey('timeline-group-$title');
 }
 
-/// The sessions behind the timeline of one set for one scope: a stream
-/// that is scoped to the range in the database
-/// (`HistoryRepository.watchSetActivity`) and only lives while the
-/// timeline is shown. A moving range is re-evaluated on every reload.
+/// What the timeline of a set reads: the open sessions (`from` `null`),
+/// or the sessions of a range.
+typedef TimelineRange = ({String setId, int? from, int? to});
+
+/// The sessions behind the timeline of one set: a stream scoped to the
+/// range in the database (`HistoryRepository.watchSetActivity`) that only
+/// lives while the timeline is shown.
 final timelineActivityProvider = StreamProvider.autoDispose
-    .family<List<HistorySession>, ({String setId, TimelineScope scope})>((
-      ref,
-      key,
-    ) {
-      final clock = ref.watch(clockProvider);
+    .family<List<HistorySession>, TimelineRange>((ref, key) {
+      final from = key.from;
       return ref
           .watch(historyRepositoryProvider)
           .watchSetActivity(
             key.setId,
-            sinceMs: key.scope == TimelineScope.open
-                ? null
-                : () => timelineSince(key.scope, clock.nowMs()),
+            sinceMs: from == null ? null : () => from,
+            untilMs: key.to,
           );
     });
 
-/// "Zeitleiste": everything that happened in a set, across all its
-/// tracks - as a strip with the time from left to right ("Streifen", the
-/// default), as a list to walk through ("Liste") or, switched to
-/// "Zusammenfassung", what came together overall. The mode is remembered
-/// per set ([timelineModeProvider]).
+/// "Zeitleiste": everything that happened in a set, across its tracks.
+/// The level is remembered per set ([timelineChoiceProvider]):
 ///
-/// * With the strip: a card per person above it ([PersonCards]).
-/// * Scope (a chip that opens the choices): the open sessions (default),
-///   today, or the last 24 hours.
-/// * Strip: see [StripView]. The scope and the filters apply to it too.
-/// * List: newest first (or oldest first), lifecycle events hidden
-///   unless asked for, tracks can be filtered, a marker where more than
-///   [timelineGapThresholdMs] passed. A tap opens the event editor.
-/// * Summary: grouped totals, see [buildSummary].
+/// * "Jetzt": the strip of the open sessions ([StripView]) with a card
+///   per person above it ([PersonCards]).
+/// * "Abend": one logical day (it starts at the time set in the
+///   preferences, 06:00 by default), the time running downwards
+///   ([EveningView]); "Kompakt" shows the same day as a list - newest (or
+///   oldest) first, a marker where more than [timelineGapThresholdMs]
+///   passed, a tap opens the event editor.
+/// * Start and stop are hidden unless asked for; tracks can be hidden.
 ///
 /// While the tracks destination is not the visible one, the data stream
 /// is paused (`TickerMode` off, see `watchTables`) and catches up with a
@@ -86,10 +82,10 @@ class TimelineView extends ConsumerStatefulWidget {
 }
 
 class _TimelineViewState extends ConsumerState<TimelineView> {
-  TimelineScope _scope = TimelineScope.open;
+  /// The evening shown; `null` = the one going on now.
+  LocalDay? _day;
   bool _newestFirst = true;
   bool _showLifecycle = false;
-  SummarySort _sort = SummarySort.count;
   final Set<String> _hiddenTracks = {};
 
   void _set(VoidCallback change) {
@@ -97,164 +93,118 @@ class _TimelineViewState extends ConsumerState<TimelineView> {
     setState(change);
   }
 
-  static String _scopeLabel(TimelineScope scope) => switch (scope) {
-    TimelineScope.open => TracksStrings.scopeOpen,
-    TimelineScope.today => TracksStrings.scopeToday,
-    TimelineScope.last24h => TracksStrings.scopeLast24h,
-  };
-
-  Future<void> _pickScope() async {
-    final picked = await showAdaptiveActionSheet<TimelineScope>(
-      context,
-      title: TracksStrings.scopeLabel,
-      actions: [
-        for (final scope in TimelineScope.values)
-          AdaptiveSheetAction(
-            value: scope,
-            label: _scopeLabel(scope),
-            selected: scope == _scope,
-          ),
-      ],
-    );
-    if (picked == null || !mounted) return;
-    _set(() => _scope = picked);
+  @override
+  void didUpdateWidget(TimelineView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.setId != widget.setId) _day = null;
   }
 
   @override
   Widget build(BuildContext context) {
     final t = context.tikky;
     final tracks = widget.tracks;
-    final mode = ref.watch(timelineModeProvider(widget.setId));
-    final chipRowPadding = EdgeInsets.symmetric(horizontal: t.space.page);
+    final choice = ref.watch(timelineChoiceProvider(widget.setId));
+    final dayStart = t.prefs.dayStartMinutes;
+    // The evening going on changes with the time: listen to the day.
+    return NowSelector<LocalDay>(
+      selector: (now) => logicalDayOf(now, dayStart),
+      builder: (context, today) => _build(context, t, tracks, choice, today),
+    );
+  }
 
-    Widget chipRow(List<Widget> chips) => SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: chipRowPadding,
-      child: Row(
-        children: [
-          for (var i = 0; i < chips.length; i++) ...[
-            if (i > 0) SizedBox(width: t.space.sm),
-            chips[i],
-          ],
-        ],
+  Widget _build(
+    BuildContext context,
+    TikkyTokens t,
+    List<Track> tracks,
+    TimelineChoice choice,
+    LocalDay today,
+  ) {
+    final dayStart = t.prefs.dayStartMinutes;
+    final choices = ref.read(timelineChoicesProvider.notifier);
+    final day = _day ?? today;
+    final evening = choice.level == TimelineLevel.evening;
+    final compact = evening && choice.compact;
+
+    // "Jetzt" / "Abend" ("Woche" and "Monat" follow).
+    final levelRow = Padding(
+      padding: EdgeInsets.symmetric(horizontal: t.space.page),
+      child: Semantics(
+        container: true,
+        label: TracksStrings.levelSwitch,
+        child: KeyedSubtree(
+          key: TimelineKeys.level,
+          child: AdaptiveSegmented<TimelineLevel>(
+            segments: const {
+              TimelineLevel.now: TracksStrings.levelNow,
+              TimelineLevel.evening: TracksStrings.levelEvening,
+            },
+            selected: choice.level,
+            onChanged: (next) {
+              ref.read(hapticsProvider).selection();
+              choices.show(widget.setId, next);
+            },
+          ),
+        ),
       ),
     );
 
-    // Row 1: strip, list or summary, and the order of the list.
-    final modeRow = Padding(
+    final filterRow = SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
       padding: EdgeInsets.symmetric(horizontal: t.space.page),
       child: Row(
         children: [
-          Expanded(
-            child: Semantics(
-              container: true,
-              label: TracksStrings.modeSwitch,
-              child: KeyedSubtree(
-                key: TimelineKeys.mode,
-                child: AdaptiveSegmented<TimelineMode>(
-                  segments: const {
-                    TimelineMode.strip: TracksStrings.modeStrip,
-                    TimelineMode.list: TracksStrings.modeTimeline,
-                    TimelineMode.summary: TracksStrings.modeSummary,
-                  },
-                  // Three words have to share the width of a phone.
-                  fitLabels: true,
-                  selected: mode,
-                  onChanged: (next) {
-                    ref.read(hapticsProvider).selection();
-                    ref
-                        .read(timelineModesProvider.notifier)
-                        .show(widget.setId, next);
-                  },
-                ),
-              ),
-            ),
+          FilterChip(
+            key: TimelineKeys.lifecycle,
+            label: const Text(TracksStrings.timelineShowLifecycle),
+            selected: _showLifecycle,
+            onSelected: (on) => _set(() => _showLifecycle = on),
           ),
-          if (mode == TimelineMode.list)
-            AdaptiveIconButton(
-              key: TimelineKeys.order,
-              icon: _newestFirst
-                  ? Icons.arrow_downward_rounded
-                  : Icons.arrow_upward_rounded,
-              semanticLabel: _newestFirst
-                  ? TracksStrings.timelineNewestFirst
-                  : TracksStrings.timelineOldestFirst,
-              onPressed: () => _set(() => _newestFirst = !_newestFirst),
-            ),
+          if (tracks.length > 1)
+            for (final track in tracks) ...[
+              SizedBox(width: t.space.sm),
+              FilterChip(
+                key: TimelineKeys.trackChip(track.id),
+                avatar: ColorDot(color: t.trackColor(track)),
+                label: Text(track.name),
+                selected: !_hiddenTracks.contains(track.id),
+                onSelected: (on) => _set(() {
+                  if (on) {
+                    _hiddenTracks.remove(track.id);
+                  } else {
+                    _hiddenTracks.add(track.id);
+                  }
+                }),
+              ),
+            ],
         ],
       ),
     );
 
-    // Row 2: the range, then the filters (timeline) or the sorting
-    // (summary). The range and the lifecycle filter come first, so they
-    // are in view on a phone; the track chips scroll.
-    final filterRow = chipRow([
-      Semantics(
-        container: true,
-        label: TracksStrings.scopeLabel,
-        child: ActionChip(
-          key: TimelineKeys.scope,
-          avatar: Icon(AdaptiveIcons.calendar(context), size: t.sizes.iconSm),
-          label: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(_scopeLabel(_scope)),
-              Icon(AdaptiveIcons.chevronDown(context), size: t.sizes.iconSm),
-            ],
-          ),
-          onPressed: _pickScope,
-        ),
-      ),
-      if (mode == TimelineMode.summary)
-        Semantics(
-          container: true,
-          label: TracksStrings.sortLabel,
-          child: ActionChip(
-            key: TimelineKeys.sort,
-            avatar: Icon(Icons.sort_rounded, size: t.sizes.iconSm),
-            label: Text(
-              _sort == SummarySort.count
-                  ? TracksStrings.sortByCount
-                  : TracksStrings.sortByLast,
-            ),
-            onPressed: () => _set(
-              () => _sort = _sort == SummarySort.count
-                  ? SummarySort.last
-                  : SummarySort.count,
-            ),
-          ),
-        )
-      else ...[
-        FilterChip(
-          key: TimelineKeys.lifecycle,
-          label: const Text(TracksStrings.timelineShowLifecycle),
-          selected: _showLifecycle,
-          onSelected: (on) => _set(() => _showLifecycle = on),
-        ),
-        if (tracks.length > 1)
-          for (final track in tracks)
-            FilterChip(
-              key: TimelineKeys.trackChip(track.id),
-              avatar: ColorDot(color: t.trackColor(track)),
-              label: Text(track.name),
-              selected: !_hiddenTracks.contains(track.id),
-              onSelected: (on) => _set(() {
-                if (on) {
-                  _hiddenTracks.remove(track.id);
-                } else {
-                  _hiddenTracks.add(track.id);
-                }
-              }),
-            ),
-      ],
-    ]);
+    final from = evening ? logicalDayStartMs(day, dayStart) : null;
+    final to = evening ? logicalDayEndMs(day, dayStart) : null;
 
     return Column(
       key: TimelineKeys.view,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        modeRow,
+        levelRow,
         SizedBox(height: t.space.xs),
+        if (evening)
+          _DayRow(
+            setId: widget.setId,
+            day: day,
+            fromMs: from!,
+            toMs: to!,
+            isToday: day == today,
+            compact: compact,
+            newestFirst: _newestFirst,
+            onDay: (next) => _set(() => _day = next == today ? null : next),
+            onCompact: () {
+              ref.read(hapticsProvider).selection();
+              choices.setCompact(widget.setId, compact: !compact);
+            },
+            onOrder: () => _set(() => _newestFirst = !_newestFirst),
+          ),
         filterRow,
         Divider(height: t.space.sm, color: t.colors.border),
         Expanded(
@@ -263,13 +213,14 @@ class _TimelineViewState extends ConsumerState<TimelineView> {
             enabled: Visibility.of(context),
             child: _TimelineBody(
               setId: widget.setId,
-              scope: _scope,
               tracks: tracks,
-              mode: mode,
+              level: choice.level,
+              compact: compact,
+              fromMs: from,
+              toMs: to,
               newestFirst: _newestFirst,
               showLifecycle: _showLifecycle,
               hiddenTracks: _hiddenTracks,
-              sort: _sort,
             ),
           ),
         ),
@@ -278,32 +229,153 @@ class _TimelineViewState extends ConsumerState<TimelineView> {
   }
 }
 
-class _TimelineBody extends ConsumerWidget {
-  const _TimelineBody({
+/// The evening shown: back, the day with since when, forward,
+/// "Kompakt" (and in it the order of the list).
+class _DayRow extends ConsumerWidget {
+  const _DayRow({
     required this.setId,
-    required this.scope,
-    required this.tracks,
-    required this.mode,
+    required this.day,
+    required this.fromMs,
+    required this.toMs,
+    required this.isToday,
+    required this.compact,
     required this.newestFirst,
-    required this.showLifecycle,
-    required this.hiddenTracks,
-    required this.sort,
+    required this.onDay,
+    required this.onCompact,
+    required this.onOrder,
   });
 
   final String setId;
-  final TimelineScope scope;
+  final LocalDay day;
+  final int fromMs;
+  final int toMs;
+  final bool isToday;
+  final bool compact;
+  final bool newestFirst;
+  final ValueChanged<LocalDay> onDay;
+  final VoidCallback onCompact;
+  final VoidCallback onOrder;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = context.tikky;
+    final sessions = ref
+        .watch(timelineActivityProvider((setId: setId, from: fromMs, to: toMs)))
+        .value;
+    int? first;
+    for (final item in sessions ?? const <HistorySession>[]) {
+      final track = item.track;
+      if (track == null) continue;
+      for (final e in item.events) {
+        if (e.at < fromMs || e.at >= toMs) continue;
+        if (track.mode == TrackMode.protocol && e.type != EventType.entry) {
+          continue;
+        }
+        if (first == null || e.at < first) first = e.at;
+      }
+    }
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        t.space.pageLanes,
+        0,
+        t.space.pageLanes,
+        t.space.xs,
+      ),
+      child: Row(
+        children: [
+          HeaderRoundButton(
+            key: TimelineKeys.previous,
+            icon: AdaptiveIcons.chevronLeft(context),
+            label: TracksStrings.eveningPrevious,
+            onPressed: () => onDay(logicalDayShift(day, -1)),
+          ),
+          Expanded(
+            child: Semantics(
+              container: true,
+              liveRegion: true,
+              child: Column(
+                key: TimelineKeys.day,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    Fmt.dayShort(fromMs),
+                    style: t.text.headline,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    first == null
+                        ? TracksStrings.eveningPlain
+                        : TracksStrings.eveningSince(
+                            Fmt.time(first, use24h: t.prefs.use24h),
+                          ),
+                    style: t.text.caption,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          HeaderRoundButton(
+            key: TimelineKeys.next,
+            icon: AdaptiveIcons.chevronRight(context),
+            label: TracksStrings.eveningNext,
+            onPressed: isToday ? null : () => onDay(logicalDayShift(day, 1)),
+          ),
+          SizedBox(width: t.space.sm),
+          SheetChip(
+            key: TimelineKeys.compact,
+            label: TracksStrings.eveningCompact,
+            semanticLabel: TracksStrings.eveningCompactSemantics,
+            selected: compact,
+            onTap: onCompact,
+          ),
+          if (compact)
+            AdaptiveIconButton(
+              key: TimelineKeys.order,
+              icon: newestFirst
+                  ? Icons.arrow_downward_rounded
+                  : Icons.arrow_upward_rounded,
+              semanticLabel: newestFirst
+                  ? TracksStrings.timelineNewestFirst
+                  : TracksStrings.timelineOldestFirst,
+              onPressed: onOrder,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TimelineBody extends ConsumerWidget {
+  const _TimelineBody({
+    required this.setId,
+    required this.tracks,
+    required this.level,
+    required this.compact,
+    required this.fromMs,
+    required this.toMs,
+    required this.newestFirst,
+    required this.showLifecycle,
+    required this.hiddenTracks,
+  });
+
+  final String setId;
   final List<Track> tracks;
-  final TimelineMode mode;
+  final TimelineLevel level;
+  final bool compact;
+  final int? fromMs;
+  final int? toMs;
   final bool newestFirst;
   final bool showLifecycle;
   final Set<String> hiddenTracks;
-  final SummarySort sort;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = context.tikky;
     final async = ref.watch(
-      timelineActivityProvider((setId: setId, scope: scope)),
+      timelineActivityProvider((setId: setId, from: fromMs, to: toMs)),
     );
     final sessions = async.value;
     if (sessions == null) {
@@ -315,34 +387,16 @@ class _TimelineBody extends ConsumerWidget {
             )
           : const AdaptiveProgress();
     }
-    final now = ref.watch(clockProvider).nowMs();
-    final since = timelineSince(scope, now);
-    final personNames = {
-      for (final p in ref.watch(personsByIdProvider).values) p.id: p.name,
-    };
-    final substanceNames = {
-      for (final s in ref.watch(substancesByIdProvider).values) s.id: s.name,
-    };
 
-    Widget empty(String title, [String? message]) => AdaptiveEmptyState(
-      icon: AdaptiveIcons.history(context),
-      title: title,
-      message: message,
-    );
-    final emptyMessage = scope == TimelineScope.open
-        ? TracksStrings.timelineEmptyOpen
-        : TracksStrings.timelineEmptyRange;
-
-    if (mode == TimelineMode.strip) {
+    if (level == TimelineLevel.now) {
       final strip = StripView(
         setId: setId,
-        scope: scope,
         tracks: tracks,
         sessions: sessions,
-        sinceMs: since,
+        sinceMs: null,
         showLifecycle: showLifecycle,
         hiddenTracks: hiddenTracks,
-        emptyMessage: emptyMessage,
+        emptyMessage: TracksStrings.timelineEmptyOpen,
       );
       // Low (a phone held sideways): the strip keeps all the room.
       return LayoutBuilder(
@@ -359,41 +413,33 @@ class _TimelineBody extends ConsumerWidget {
       );
     }
 
-    if (mode == TimelineMode.summary) {
-      final groups = buildSummary(
+    if (!compact) {
+      return EveningView(
         sessions: sessions,
-        sinceMs: since,
-        sort: sort,
-        personNames: personNames,
-        substanceNames: substanceNames,
-      );
-      if (groups.isEmpty) {
-        return empty(TracksStrings.summaryEmptyTitle, emptyMessage);
-      }
-      return ListView.separated(
-        key: TimelineKeys.summary,
-        padding: EdgeInsets.all(t.space.page),
-        itemCount: groups.length,
-        separatorBuilder: (_, _) => SizedBox(height: t.space.sm),
-        itemBuilder: (context, index) => Center(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: t.sizes.maxContentWidth),
-            child: _SummaryCard(group: groups[index], nowMs: now),
-          ),
-        ),
+        fromMs: fromMs!,
+        toMs: toMs!,
+        hiddenTracks: hiddenTracks,
       );
     }
 
+    Widget empty(String message) => AdaptiveEmptyState(
+      icon: AdaptiveIcons.history(context),
+      title: TracksStrings.timelineEmptyTitle,
+      message: message,
+    );
     final rows = buildTimelineRows(
       sessions: sessions,
-      sinceMs: since,
-      personNames: personNames,
-      substanceNames: substanceNames,
+      sinceMs: fromMs,
+      untilMs: toMs,
+      personNames: {
+        for (final p in ref.watch(personsByIdProvider).values) p.id: p.name,
+      },
+      substanceNames: {
+        for (final s in ref.watch(substancesByIdProvider).values) s.id: s.name,
+      },
       newestFirst: newestFirst,
     );
-    if (rows.isEmpty) {
-      return empty(TracksStrings.timelineEmptyTitle, emptyMessage);
-    }
+    if (rows.isEmpty) return empty(TracksStrings.eveningEmpty);
     final items = withGapMarkers(
       filterTimelineRows(
         rows,
@@ -401,12 +447,7 @@ class _TimelineBody extends ConsumerWidget {
         hiddenTrackIds: hiddenTracks,
       ),
     );
-    if (items.isEmpty) {
-      return empty(
-        TracksStrings.timelineEmptyTitle,
-        TracksStrings.timelineAllHidden,
-      );
-    }
+    if (items.isEmpty) return empty(TracksStrings.timelineAllHidden);
     return ListView.builder(
       key: TimelineKeys.list,
       padding: EdgeInsets.symmetric(vertical: t.space.sm),
@@ -600,122 +641,6 @@ class _GapMarker extends StatelessWidget {
           ),
           line,
         ],
-      ),
-    );
-  }
-}
-
-/// The totals of one group of the summary.
-class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({required this.group, required this.nowMs});
-
-  final SummaryGroup group;
-  final int nowMs;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.tikky;
-    final use24h = t.prefs.use24h;
-    String time(int at) => entryTimeLabel(at, nowMs: nowMs, use24h: use24h);
-
-    final header = Row(
-      children: [
-        ColorDot(color: t.trackColor(group.track)),
-        SizedBox(width: t.space.sm),
-        Expanded(
-          child: Semantics(
-            header: true,
-            child: Text(
-              group.title,
-              style: t.text.headline,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ),
-        if (group.lines.length > 1)
-          Text(TracksStrings.summaryTotal(group.total), style: t.text.caption),
-      ],
-    );
-
-    final List<Widget> body;
-    if (group.kind == SummaryGroupKind.stopwatch) {
-      body = [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Expanded(
-              child: Text(
-                [
-                  TracksStrings.summaryNetTime,
-                  if (group.lapCount > 0)
-                    TracksStrings.summaryLaps(group.lapCount),
-                ].join(TracksStrings.separator),
-                style: t.text.body,
-              ),
-            ),
-            Text(
-              Fmt.clock(group.netMs),
-              style: t.text.digitsMedium,
-              semanticsLabel: Fmt.compact(group.netMs),
-            ),
-          ],
-        ),
-      ];
-    } else {
-      body = [
-        for (final line in group.lines)
-          Padding(
-            padding: EdgeInsets.only(top: t.space.xs),
-            child: MergeSemantics(
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(line.label, style: t.text.body),
-                        Text(
-                          [
-                            TracksStrings.summaryFirstLast(
-                              time(line.firstAt),
-                              time(line.lastAt),
-                            ),
-                            // Only counters: how regularly it was counted.
-                            if (group.kind == SummaryGroupKind.counter)
-                              if (line.averageGapMs case final gap?)
-                                TracksStrings.summaryAvgGap(Fmt.compact(gap)),
-                          ].join(TracksStrings.separator),
-                          style: t.text.caption,
-                        ),
-                      ],
-                    ),
-                  ),
-                  SizedBox(width: t.space.md),
-                  Text(
-                    TracksStrings.summaryCount(line.count),
-                    style: t.text.digitsMedium,
-                  ),
-                ],
-              ),
-            ),
-          ),
-      ];
-    }
-
-    return DecoratedBox(
-      key: TimelineKeys.group(group.title),
-      decoration: t.surfaceDecoration(),
-      child: Padding(
-        padding: EdgeInsets.all(t.space.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            header,
-            SizedBox(height: t.space.xs),
-            ...body,
-          ],
-        ),
       ),
     );
   }

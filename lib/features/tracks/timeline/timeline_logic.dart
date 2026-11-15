@@ -10,29 +10,8 @@ import '../tracks_strings.dart';
 // range, the rows, the filters and the gap markers. Unit tested.
 
 /// What the timeline and the summary cover.
-enum TimelineScope {
-  /// The events of all sessions of the set that are open right now.
-  open,
-
-  /// Everything since local midnight.
-  today,
-
-  /// Everything of the last 24 hours.
-  last24h,
-}
-
-const int _dayMs = 24 * 60 * 60 * 1000;
-
 /// A marker is shown between two rows that are further apart than this.
 const int timelineGapThresholdMs = 5 * 60 * 1000;
-
-/// The start of [scope] at [nowMs] (UTC ms); `null` = no lower bound (the
-/// open sessions, however long they have been running).
-int? timelineSince(TimelineScope scope, int nowMs) => switch (scope) {
-  TimelineScope.open => null,
-  TimelineScope.today => LocalDay.fromMs(nowMs).startMs,
-  TimelineScope.last24h => nowMs - _dayMs,
-};
 
 /// What a row stands for.
 enum TimelineRowKind {
@@ -207,6 +186,7 @@ List<TimelineRow> _rowsOfSession(
 List<TimelineRow> buildTimelineRows({
   required Iterable<HistorySession> sessions,
   int? sinceMs,
+  int? untilMs,
   Map<String, String> personNames = const {},
   Map<String, String> substanceNames = const {},
   bool newestFirst = true,
@@ -221,7 +201,9 @@ List<TimelineRow> buildTimelineRows({
       personNames: personNames,
       substanceNames: substanceNames,
     )) {
-      if (sinceMs == null || row.at >= sinceMs) rows.add(row);
+      if (sinceMs != null && row.at < sinceMs) continue;
+      if (untilMs != null && row.at >= untilMs) continue;
+      rows.add(row);
     }
   }
   rows.sort((a, b) {

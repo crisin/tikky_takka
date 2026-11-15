@@ -103,6 +103,8 @@ abstract final class AdaptiveIcons {
   );
   static IconData chevronRight(BuildContext c) =>
       _pick(c, Icons.chevron_right_rounded, CupertinoIcons.chevron_right);
+  static IconData chevronLeft(BuildContext c) =>
+      _pick(c, Icons.chevron_left_rounded, CupertinoIcons.chevron_left);
   static IconData chevronDown(BuildContext c) =>
       _pick(c, Icons.expand_more_rounded, CupertinoIcons.chevron_down);
   static IconData copy(BuildContext c) =>
