@@ -46,6 +46,7 @@ class UiPrefField extends StatelessWidget {
     UiPrefsKeys.showTenths => Strings.prefShowTenths,
     UiPrefsKeys.showProgressBar => Strings.prefShowProgress,
     UiPrefsKeys.showSubLine => Strings.prefShowSubLine,
+    UiPrefsKeys.showEntryCounts => Strings.prefShowEntryCounts,
     UiPrefsKeys.leftHanded => Strings.prefLeftHanded,
     UiPrefsKeys.haptics => Strings.prefHaptics,
     UiPrefsKeys.keepScreenOn => Strings.prefKeepScreenOn,
@@ -170,6 +171,10 @@ class UiPrefField extends StatelessWidget {
       UiPrefsKeys.showSubLine => toggle(
         prefs.showSubLine,
         (v) => prefs.copyWith(showSubLine: v),
+      ),
+      UiPrefsKeys.showEntryCounts => toggle(
+        prefs.showEntryCounts,
+        (v) => prefs.copyWith(showEntryCounts: v),
       ),
       UiPrefsKeys.leftHanded => toggle(
         prefs.leftHanded,

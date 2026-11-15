@@ -50,7 +50,7 @@ Bauen des jeweiligen Pakets klären.
 | O2 | **Liste und Zusammenfassung** sind keine eigenen Ansichten mehr. Reicht „Kompakt“ im Abend und Summen in Spaltenkopf, Woche und Monat? | ja |
 | O3 | **„Tag beginnt um 06:00“** als neue Einstellung, damit Einträge nach Mitternacht zum Abend davor zählen. Passt 06:00 als Standard? | 06:00 |
 | O4 | **Vier gebündelte Schriften** (Martian Mono, Space Mono, Silkscreen, Fredoka). Nach den Einträgen bei Google Fonts und Font Squirrel stehen sie unter der SIL Open Font License; die Lizenztexte selbst sind nicht nachgelesen. Tabellenziffern sind für keine der vier geprüft. | alle vier |
-| O5 | **Anzahl (×3) auf den Erfassen-Feldern:** immer sichtbar oder erst mit Schalter? | immer |
+| O5 | **Anzahl (×3) auf den Erfassen-Feldern:** immer sichtbar oder erst mit Schalter? Entschieden: **mit Schalter, Standard aus**. | immer |
 | O6 | **Ampel pro Person** (Backlog Nr. 5) ist nicht gezeichnet. Die Karten in „Jetzt“ zeigen nur die Zeit seit dem letzten Eintrag und den selbst eingestellten Abstand. | keine Ampel |
 | O7 | **Wie kommt man in den Fokus?** Vorschlag: Tippen auf die Spur außerhalb der Knöpfe; langer Druck bleibt Bearbeiten. Ebenfalls nur Vorschlag: Stufenwechsel der Zeitleiste mit zwei Fingern und die Schwelle für Falten (20 Minuten). | Tippen |
 

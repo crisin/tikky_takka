@@ -165,11 +165,7 @@ class ProtocolChoice extends StatelessWidget {
                     ColorDot(color: color!),
                     SizedBox(width: t.space.sm),
                   ] else if (icon != null) ...[
-                    Icon(
-                      icon,
-                      size: t.sizes.iconSm,
-                      color: t.colors.textMuted,
-                    ),
+                    Icon(icon, size: t.sizes.iconSm, color: t.colors.textMuted),
                     SizedBox(width: t.space.sm),
                   ],
                   Flexible(
@@ -349,10 +345,7 @@ class ProtocolColorPicker extends StatelessWidget {
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: colors[i] == selected
-                          ? Border.all(
-                              color: t.colors.text,
-                              width: t.space.xxs,
-                            )
+                          ? Border.all(color: t.colors.text, width: t.space.xxs)
                           : null,
                     ),
                     child: ColorDot(
@@ -365,6 +358,48 @@ class ProtocolColorPicker extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+/// The initial of a person in a circle of the person's colour.
+class PersonInitial extends StatelessWidget {
+  const PersonInitial({
+    required this.name,
+    required this.color,
+    required this.size,
+    this.style,
+    super.key,
+  });
+
+  final String name;
+
+  /// The person's colour; `null` for someone unknown.
+  final Color? color;
+  final double size;
+  final TextStyle? style;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tikky;
+    final roles = color == null ? null : t.roles(color!);
+    final initial = name.isEmpty ? '' : name.characters.first.toUpperCase();
+    return ExcludeSemantics(
+      child: Container(
+        width: size,
+        height: size,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: roles?.solid ?? t.colors.textMuted,
+          borderRadius: t.radii.pillAll,
+        ),
+        child: Text(
+          initial,
+          style: (style ?? t.text.laneLabel).copyWith(
+            color: roles?.on ?? t.onColor(t.colors.textMuted),
+          ),
+        ),
+      ),
     );
   }
 }

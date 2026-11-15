@@ -13,7 +13,12 @@ import 'pad_model.dart';
 
 /// What a tap on the pad wrote, for the undo bar.
 final class PadResult {
-  const PadResult({required this.what, required this.at, this.undo});
+  const PadResult({
+    required this.what,
+    required this.at,
+    this.undo,
+    this.entry,
+  });
 
   /// "Reiher", "Stoppuhr · Runde 3", "Jacke · GBL".
   final String what;
@@ -25,6 +30,9 @@ final class PadResult {
   /// possible (starting or resuming an exclusive stopwatch also pauses
   /// the others).
   final Future<void> Function()? undo;
+
+  /// The protocol entry that was written, for "Ändern".
+  final AddedEntry? entry;
 }
 
 /// The write side of the tap pad. Every tap is ONE command (one database
@@ -75,6 +83,7 @@ class PadActions {
         result = await _entry(button, personName, substanceName);
       case PadTapAction.openPerson ||
           PadTapAction.openSheet ||
+          PadTapAction.openOther ||
           PadTapAction.none:
         result = null;
     }
@@ -204,6 +213,7 @@ class PadActions {
       what: TracksStrings.padEntry(personName, substanceName),
       at: added.event.at,
       undo: () => protocol.undoAdd(added),
+      entry: added,
     );
   }
 

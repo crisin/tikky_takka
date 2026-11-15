@@ -130,13 +130,14 @@ Die Seite einer Person. Sie zeigt nur, was zum Eintragen nötig ist.
   von jetzt.“ Die Leiste hat immer dieselbe Höhe.
 - **Kopf:** Zurück (48), Kürzel im Kreis (40), Name (24/700).
 - **Felder:** bis zu fünf Sachen plus „Anderes“, 2 × 3, je etwa 175 hoch. Auf
-  dem Feld steht der **Name groß (28/700)** und klein die Anzahl heute („×3“).
+  dem Feld steht der **Name groß (28/700)** und klein die Anzahl heute („×3“),
+  diese nur mit dem Schalter „Anzahl auf den Erfassen-Feldern zeigen“ (O5).
 - **Eine Zeit steht nur, wo ein eigener Abstand läuft:** „Abstand: noch 34 min“
   in Warnfarbe mit einem 4-px-Balken. Das Feld bleibt antippbar; die App sperrt
   nichts.
 - **Keine Zeit-Knöpfe, kein Dock, keine „vor … min“-Zeilen.** Der Schalter
   `zeiten` in den Entwürfen blendet „vor 26 min“ auf allen Feldern ein, zum
-  Vergleich (offener Punkt O5 betrifft nur die Anzahl).
+  Vergleich (O5 betrifft nur die Anzahl).
 - **Reihenfolge der Felder** wie heute: erst die Sachen der Szene, dann die
   häufigsten dieser Person.
 - Bei genau einer Person in der Szene entfällt der Schritt „Wer“.

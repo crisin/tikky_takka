@@ -241,11 +241,10 @@ void main() {
     expect(tester.getSize(counter).height, greaterThanOrEqualTo(72 * 1.5));
     await h.tap(counter);
     // The set's 12-hour clock, in the undo bar ...
-    final stamp = Fmt.time(h.app.clock.nowMs(), use24h: false, seconds: true);
-    expect(
-      tester.widget<InlineUndoBar>(find.byKey(PadKeys.undoBar)).message,
-      '${Strings.seedCounterName} · $stamp',
-    );
+    final stamp = Fmt.time(h.app.clock.nowMs(), use24h: false);
+    final bar = tester.widget<InlineUndoBar>(find.byKey(PadKeys.undoBar));
+    expect(bar.message, Strings.seedCounterName);
+    expect(bar.detail, TracksStrings.padWhen(stamp, TracksStrings.padNow));
 
     // ... and in the timeline.
     await h.tap(_segment(TracksStrings.viewTimeline));
@@ -253,7 +252,10 @@ void main() {
     expect(timeline.tikky.theme.id, ThemePresets.blackId);
     // The strip is the default mode; the times as text are in the list.
     await h.tap(_timelineMode(TracksStrings.modeTimeline));
-    expect(find.text(stamp), findsOneWidget);
+    expect(
+      find.text(Fmt.time(h.app.clock.nowMs(), use24h: false, seconds: true)),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
   });
 

@@ -877,7 +877,7 @@ class _EmptyStatus extends StatelessWidget {
   }
 }
 
-//// One person of step 1: a tile with the initial, the name and the last
+/// One person of step 1: a tile with the initial, the name and the last
 /// entry; the whole of it is the button.
 class _PersonCard extends StatelessWidget {
   const _PersonCard({

@@ -53,6 +53,9 @@ extension on TracksHarness {
   String get barMessage =>
       tester.widget<InlineUndoBar>(find.byKey(PadKeys.undoBar)).message;
 
+  String? get barDetail =>
+      tester.widget<InlineUndoBar>(find.byKey(PadKeys.undoBar)).detail;
+
   bool get barHasUndo =>
       tester.widget<InlineUndoBar>(find.byKey(PadKeys.undoBar)).onUndo != null;
 
@@ -78,7 +81,8 @@ extension on TracksHarness {
   Future<void> tapUndo() => press(find.byKey(InlineUndoBar.undoKey));
 }
 
-String _stamp(TracksHarness h) => Fmt.time(h.app.clock.nowMs(), seconds: true);
+String _stamp(TracksHarness h) =>
+    TracksStrings.padWhen(Fmt.time(h.app.clock.nowMs()), TracksStrings.padNow);
 
 /// People, substances and a scene for a protocol track.
 class _Protocol {
@@ -117,6 +121,7 @@ class _Protocol {
   String person(Person p) => 'p:${track.id}:${p.id}';
   String substance(Person p, Substance s) => 'x:${track.id}:${p.id}:${s.id}';
   String more([Person? p]) => 'm:${track.id}:${p?.id ?? '-'}';
+  String other(Person p) => 'o:${track.id}:${p.id}';
 
   Future<List<TrackEvent>> entries(TracksHarness h) =>
       h.ofType(track, EventType.entry);
@@ -137,20 +142,21 @@ void main() {
       expect(find.byKey(TracksScreenKeys.list), findsNothing);
       for (final label in _birdLabels) {
         expect(h.button(id(label)), findsOneWidget);
-        expect(h.value(id(label)), '0');
+        expect(h.value(id(label)), TracksStrings.padCount(0));
         expect(h.sub(id(label)), '');
       }
       expect(await h.snapshot(birds), isNull);
-      expect(h.barMessage, TracksStrings.padUndoIdle);
+      expect(h.barMessage, TracksStrings.padReady);
       expect(h.barHasUndo, isFalse);
 
       await h.press(h.button(id('Reiher')));
       final first = (await h.snapshot(birds))! as CounterSnapshot;
       expect(first.count, 1);
       expect(first.labelCounts['Reiher'], 1);
-      expect(h.value(id('Reiher')), '1');
-      expect(h.value(id('Ente')), '0');
-      expect(h.barMessage, 'Reiher · ${_stamp(h)}');
+      expect(h.value(id('Reiher')), TracksStrings.padCount(1));
+      expect(h.value(id('Ente')), TracksStrings.padCount(0));
+      expect(h.barMessage, 'Reiher');
+      expect(h.barDetail, _stamp(h));
       expect(h.barHasUndo, isTrue);
 
       await h.wait(const Duration(seconds: 12));
@@ -160,9 +166,9 @@ void main() {
       final ticks = await h.ofType(birds, EventType.tick);
       expect([for (final e in ticks) e.label], ['Reiher', 'Ente', 'Reiher']);
       expect(ticks.last.at, h.app.clock.nowMs());
-      expect(h.value(id('Reiher')), '2');
-      expect(h.value(id('Ente')), '1');
-      expect(h.value(id('Specht')), '0');
+      expect(h.value(id('Reiher')), TracksStrings.padCount(2));
+      expect(h.value(id('Ente')), TracksStrings.padCount(1));
+      expect(h.value(id('Specht')), TracksStrings.padCount(0));
 
       expect(find.byType(SnackBar), findsNothing);
       expect(find.byType(AlertDialog), findsNothing);
@@ -178,8 +184,9 @@ void main() {
       await h.wait();
       await h.press(h.button(id));
       expect(((await h.snapshot(h.counter))! as CounterSnapshot).count, 2);
-      expect(h.value(id), '2');
-      expect(h.barMessage, '${Strings.seedCounterName} · ${_stamp(h)}');
+      expect(h.value(id), TracksStrings.padCount(2));
+      expect(h.barMessage, Strings.seedCounterName);
+      expect(h.barDetail, _stamp(h));
       expect(tester.takeException(), isNull);
     });
 
@@ -322,11 +329,11 @@ void main() {
       expect(await h.ofType(h.counter, EventType.tick), hasLength(1));
       // One session, one start.
       expect(await h.ofType(birds, EventType.start), hasLength(1));
-      expect(h.value(id('Reiher')), '2');
-      expect(h.value(id('Ente')), '2');
-      expect(h.value(id('Specht')), '1');
+      expect(h.value(id('Reiher')), TracksStrings.padCount(2));
+      expect(h.value(id('Ente')), TracksStrings.padCount(2));
+      expect(h.value(id('Specht')), TracksStrings.padCount(1));
       // The bar is about the last tap.
-      expect(h.barMessage, startsWith('Ente · '));
+      expect(h.barMessage, 'Ente');
       expect(tester.takeException(), isNull);
     });
 
@@ -372,7 +379,7 @@ void main() {
       await h.tapUndo();
       final ticks = await h.ofType(birds, EventType.tick);
       expect([for (final e in ticks) e.label], ['Reiher', 'Ente']);
-      expect(h.value(id('Reiher')), '1');
+      expect(h.value(id('Reiher')), TracksStrings.padCount(1));
       expect(h.barMessage, startsWith(TracksStrings.padUndone));
       // Nothing more to take back.
       expect(h.barHasUndo, isFalse);
@@ -383,7 +390,7 @@ void main() {
       expect(await h.snapshot(h.counter), isNotNull);
       await h.tapUndo();
       expect(await h.snapshot(h.counter), isNull);
-      expect(h.value(plain), '0');
+      expect(h.value(plain), TracksStrings.padCount(0));
       expect(find.byType(SnackBar), findsNothing);
       expect(tester.takeException(), isNull);
     });
@@ -463,7 +470,7 @@ void main() {
 
       await tester.pump(const Duration(seconds: 5));
       await h.settle();
-      expect(h.barMessage, TracksStrings.padUndoIdle);
+      expect(h.barMessage, TracksStrings.padReady);
       expect(h.barHasUndo, isFalse);
       expect(tester.getRect(find.byKey(PadKeys.undoBar)), barRect);
       expect(tester.takeException(), isNull);
@@ -512,7 +519,7 @@ void main() {
           .map((r) => r.bottom)
           .reduce((a, b) => a > b ? a : b);
       expect(top, closeTo(bar.bottom + tokens.space.sm, 0.5));
-      expect(bottom, closeTo(pad.bottom - tokens.space.md, 0.5));
+      expect(bottom, closeTo(pad.bottom - tokens.space.sm, 0.5));
       for (final rect in before.values) {
         expect(
           rect.height,
@@ -656,9 +663,11 @@ void main() {
       await h.press(h.button(p.person(p.kim)));
       expect(find.bySemanticsLabel(TracksStrings.padBackToPad), findsOneWidget);
       expect(
-        find.bySemanticsLabel(
-          TracksStrings.padButtonSemantics('Zelt', 'GBL', '0'),
-        ),
+        find.bySemanticsLabel(TracksStrings.padSubstanceSemantics('GBL')),
+        findsOneWidget,
+      );
+      expect(
+        find.bySemanticsLabel(TracksStrings.padOtherSemantics),
         findsOneWidget,
       );
       handle.dispose();
@@ -691,10 +700,17 @@ void main() {
       await h.press(h.button(p.person(p.jacke)));
       expect(await h.snapshot(p.track), isNull);
       expect(find.byKey(PadKeys.back), findsOneWidget);
-      expect(find.text(TracksStrings.padPersonTitle('Jacke')), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(PadKeys.pad),
+          matching: find.text('Jacke'),
+        ),
+        findsOneWidget,
+      );
+      expect(h.barMessage, TracksStrings.padWhatTitle);
       expect(h.button(p.substance(p.jacke, p.gbl)), findsOneWidget);
       expect(h.button(p.substance(p.jacke, p.water)), findsOneWidget);
-      expect(h.button(p.more(p.jacke)), findsOneWidget);
+      expect(h.button(p.other(p.jacke)), findsOneWidget);
       // Only this person's buttons.
       expect(h.button(p.person(p.kim)), findsNothing);
       expect(h.button('s:${h.stopwatch.id}'), findsNothing);
@@ -713,24 +729,134 @@ void main() {
       expect(find.byType(AlertDialog), findsNothing);
       expect(find.byType(SnackBar), findsNothing);
       expect(find.text(Strings.protocolNewEntry), findsNothing);
+      expect(h.barMessage, 'Jacke · GBL');
+      expect(h.barDetail, _stamp(h));
 
-      // Back on the main pad, with the entry in the undo bar.
+      // Back on the main pad after a moment, the entry in the undo bar.
+      await h.wait(TikkyTokens.fallback.motion.captureConfirm);
       expect(find.byKey(PadKeys.back), findsNothing);
       expect(h.button(p.person(p.kim)), findsOneWidget);
-      expect(h.value(p.person(p.jacke)), '1');
-      expect(h.value(p.person(p.kim)), '0');
-      expect(h.barMessage, 'Jacke · GBL · ${_stamp(h)}');
+      expect(
+        h.sub(p.person(p.jacke)),
+        TracksStrings.padPersonLast('GBL', padSince(entry.at, entry.at)),
+      );
+      expect(h.sub(p.person(p.kim)), '');
+      expect(h.barMessage, 'Jacke · GBL');
 
       // Undo deletes the entry - and the session it had opened.
       await h.tapUndo();
       expect(await h.snapshot(p.track), isNull);
-      expect(h.value(p.person(p.jacke)), '0');
+      expect(h.sub(p.person(p.jacke)), '');
 
       // The back button leaves a person without writing.
       await h.press(h.button(p.person(p.kim)));
       await h.press(find.byKey(PadKeys.back));
       expect(find.byKey(PadKeys.back), findsNothing);
       expect(await h.snapshot(p.track), isNull);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('"eingetragen" on the field, nothing moves; "Ändern" opens '
+        'the entry that was just written', (tester) async {
+      final h = await TracksHarness.start(tester);
+      final p = await _Protocol.create(h, scenePersons: ['Kim', 'Jacke']);
+      await h.showPad();
+      await h.press(h.button(p.person(p.jacke)));
+      final ids = [
+        p.substance(p.jacke, p.gbl),
+        p.substance(p.jacke, p.water),
+        p.other(p.jacke),
+      ];
+      Map<String, Rect> rects() => {
+        for (final id in ids) id: tester.getRect(h.button(id)),
+        'bar': tester.getRect(find.byKey(PadKeys.undoBar)),
+      };
+      final before = rects();
+      Finder captured(String id) => find.descendant(
+        of: h.button(id),
+        matching: find.text(TracksStrings.padCaptured),
+      );
+
+      // Within the moment the pad stays: write without letting time pass.
+      await tester.tap(h.button(ids[1]));
+      for (var i = 0; i < 6; i++) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 5)),
+        );
+        await tester.pump(const Duration(milliseconds: 10));
+      }
+      expect(captured(ids[1]), findsOneWidget);
+      expect(captured(ids[0]), findsNothing);
+      expect(rects(), before);
+      expect(
+        tester
+            .widget<InlineUndoBar>(find.byKey(PadKeys.undoBar))
+            .secondaryLabel,
+        TracksStrings.padEdit,
+      );
+
+      await h.press(find.byKey(InlineUndoBar.secondaryKey));
+      expect(find.text(Strings.protocolEditEntry), findsOneWidget);
+      await tester.enterText(find.byKey(const ValueKey('amount')), '0,5 l');
+      await tester.ensureVisible(find.byKey(const ValueKey('save-entry')));
+      await h.press(find.byKey(const ValueKey('save-entry')));
+      await h.settle();
+      final entry = (await p.entries(h)).single;
+      expect(entry.substanceId, p.water.id);
+      expect(entry.amount, '0,5 l');
+      expect(h.barMessage, 'Jacke · Wasser · 0,5 l');
+      // Undo still takes the (changed) entry back.
+      await h.tapUndo();
+      expect(await h.snapshot(p.track), isNull);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('"Anderes": the remaining substances, one tap writes; a new '
+        'name is created and written', (tester) async {
+      final h = await TracksHarness.start(tester);
+      final p = await _Protocol.create(h, scenePersons: ['Kim', 'Jacke']);
+      final tea = await h.run(
+        () => h.container
+            .read(peopleRepositoryProvider)
+            .createSubstance(name: 'Tee'),
+      );
+      await h.showPad();
+      await h.press(h.button(p.person(p.kim)));
+      await h.press(h.button(p.other(p.kim)));
+      expect(find.byKey(PadKeys.other), findsOneWidget);
+      expect(h.barMessage, TracksStrings.padOtherTitle);
+      // Only what is not on "Was?" already.
+      expect(h.button(p.substance(p.kim, tea)), findsOneWidget);
+      expect(h.button(p.substance(p.kim, p.gbl)), findsNothing);
+
+      // Back goes to "Was?", not to the pad.
+      await h.press(find.byKey(PadKeys.back));
+      expect(find.byKey(PadKeys.other), findsNothing);
+      expect(h.button(p.substance(p.kim, p.gbl)), findsOneWidget);
+      await h.wait();
+      await h.press(h.button(p.other(p.kim)));
+
+      await h.press(h.button(p.substance(p.kim, tea)));
+      expect((await p.entries(h)).single.substanceId, tea.id);
+      expect(h.barMessage, 'Kim · Tee');
+      await h.wait(TikkyTokens.fallback.motion.captureConfirm);
+      expect(find.byKey(PadKeys.back), findsNothing);
+
+      // A new one: typed, "Eintragen", in the list and in the entry.
+      await h.press(h.button(p.person(p.kim)));
+      await h.press(h.button(p.other(p.kim)));
+      await tester.enterText(find.byKey(PadKeys.newName), 'Mate');
+      await h.press(find.byKey(PadKeys.newSave));
+      await h.drain();
+      final substances = await h.run(
+        () => h.container.read(peopleRepositoryProvider).getSubstances(),
+      );
+      final mate = substances.singleWhere((s) => s.name == 'Mate');
+      final entries = await p.entries(h);
+      expect(entries.last.substanceId, mate.id);
+      expect(entries.last.personId, p.kim.id);
+      expect(h.barMessage, 'Kim · Mate');
+      expect(find.byType(AlertDialog), findsNothing);
       expect(tester.takeException(), isNull);
     });
 
@@ -744,7 +870,7 @@ void main() {
       expect(h.button(p.person(p.jacke)), findsNothing);
       expect(h.button(p.substance(p.kim, p.gbl)), findsOneWidget);
       expect(h.button(p.substance(p.kim, p.water)), findsOneWidget);
-      expect(h.button(p.more(p.kim)), findsOneWidget);
+      expect(h.button(p.other(p.kim)), findsOneWidget);
       // Next to the other tracks.
       expect(h.button('s:${h.stopwatch.id}'), findsOneWidget);
       final places = {
@@ -763,8 +889,16 @@ void main() {
       );
       expect(entries.every((e) => e.personId == p.kim.id), isTrue);
       expect(entries.every((e) => e.amount == null), isTrue);
-      expect(h.value(p.substance(p.kim, p.water)), '2');
       expect(find.byKey(PadKeys.back), findsNothing);
+      // O5: the count only with the setting.
+      expect(
+        find.byKey(PadKeys.value(p.substance(p.kim, p.water))),
+        findsNothing,
+      );
+      await h.setPrefs(const UiPrefs(showEntryCounts: true));
+      await h.settle();
+      expect(h.value(p.substance(p.kim, p.water)), TracksStrings.padCount(2));
+      expect(h.value(p.substance(p.kim, p.gbl)), TracksStrings.padCount(1));
       expect(h.barMessage, startsWith('Kim · GBL'));
       // Water is the most used now - the buttons stay where they were.
       for (final s in [p.gbl, p.water]) {
@@ -782,9 +916,9 @@ void main() {
       expect(h.button(p.person(p.jacke)), findsOneWidget);
       expect(h.button(p.person(p.kim)), findsOneWidget);
 
-      await h.press(h.button(p.person(p.kim)));
-      await h.press(h.button(p.more(p.kim)));
+      await h.press(h.button(p.more()));
       expect(find.text(Strings.protocolNewEntry), findsOneWidget);
+      await h.press(find.byKey(ValueKey('person-${p.kim.id}')));
       await h.press(find.byKey(ValueKey('substance-${p.water.id}')));
       await tester.ensureVisible(find.byKey(const ValueKey('save-entry')));
       await h.press(find.byKey(const ValueKey('save-entry')));
@@ -816,7 +950,7 @@ void main() {
       final water = p.substance(p.kim, p.water);
       Finder lockout(String id) => find.descendant(
         of: h.button(id),
-        matching: find.textContaining('frühestens wieder in'),
+        matching: find.textContaining(TracksStrings.padLockout('')),
       );
       expect(lockout(gbl), findsNothing);
 

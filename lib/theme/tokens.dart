@@ -128,6 +128,24 @@ final class TikkySizes {
   double get personAvatar => 32;
   double get personTileMinWidth => 140;
 
+  /// The initial of a person on the tap pad and in the head of its page.
+  double get padAvatar => 40;
+
+  /// Height of a field on the page "Anderes" of the tap pad.
+  double get padOtherField => 88 * _prefs.buttonScale;
+
+  /// The bar under "Abstand: noch ..." on a field of the tap pad.
+  double get padLockoutBar => 4;
+
+  /// Outline of a field of the tap pad that was just tapped.
+  double get padHitOutline => 2;
+
+  /// Outline of a ready field and of "Anderes" on the tap pad.
+  double get padOutline => 1.5;
+
+  /// Dash and gap of the outline of "Anderes".
+  double get padDash => 6;
+
   double get iconSm => 20;
   double get iconMd => 24;
   double get iconLg => 28;
@@ -182,6 +200,13 @@ final class TikkyTextStyles {
     required this.laneDigitsIdle,
     required this.laneLabelCount,
     required this.laneLabel,
+    required this.labelStrong,
+    required this.padName,
+    required this.padNameLarge,
+    required this.padCount,
+    required this.padHint,
+    required this.padDigits,
+    required this.padInitial,
     required this.navLabel,
     required this.pageTitle,
     required this.pageTitleCompact,
@@ -222,6 +247,24 @@ final class TikkyTextStyles {
   /// The count on a label button of a counter, and its label.
   final TextStyle laneLabelCount;
   final TextStyle laneLabel;
+
+  /// A pill button, the first line of an undo bar.
+  final TextStyle labelStrong;
+
+  /// The name on a field of the tap pad; larger on the page "Was?".
+  final TextStyle padName;
+  final TextStyle padNameLarge;
+
+  /// "×3" on a field of the tap pad, and its small line. Coloured by the
+  /// field (`roles(..).ink`).
+  final TextStyle padCount;
+  final TextStyle padHint;
+
+  /// The time on a field of a stopwatch or timer.
+  final TextStyle padDigits;
+
+  /// The initial of a person on the tap pad.
+  final TextStyle padInitial;
 
   /// An entry of the navigation pill.
   final TextStyle navLabel;
@@ -597,6 +640,25 @@ class TikkyTokens extends ThemeExtension<TikkyTokens> {
       laneDigitsIdle: laneDigits(sizes.digitsMedium, 26 / 22, colors.textMuted),
       laneLabelCount: laneDigits(15, 1.2, colors.text),
       laneLabel: base(15, FontWeight.w600, colors.text, height: 1.2),
+      labelStrong: base(15, FontWeight.w600, colors.text, height: 1.2),
+      padName: base(
+        22,
+        FontWeight.w700,
+        colors.text,
+        height: 1.2,
+        letterSpacing: 22 * -0.01,
+      ),
+      padNameLarge: base(
+        28,
+        FontWeight.w700,
+        colors.text,
+        height: 1.2,
+        letterSpacing: 28 * -0.01,
+      ),
+      padCount: laneDigits(18 * prefs.digitScale, 1.2, colors.text),
+      padHint: base(14, FontWeight.w400, colors.text, height: 1.25),
+      padDigits: laneDigits(sizes.digitsMedium, 26 / 22, colors.text),
+      padInitial: base(18, FontWeight.w700, colors.text, height: 1),
       navLabel: base(15, FontWeight.w600, colors.text, height: 1.2),
       pageTitle: base(
         30,

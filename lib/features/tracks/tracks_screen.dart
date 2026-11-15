@@ -41,17 +41,13 @@ abstract final class TracksScreenKeys {
 }
 
 /// Opens the settings as a page of their own.
-Future<void> openSettings(BuildContext context) => pushAdaptivePage<void>(
-  context,
-  builder: (_) => const SettingsScreen(),
-);
+Future<void> openSettings(BuildContext context) =>
+    pushAdaptivePage<void>(context, builder: (_) => const SettingsScreen());
 
 /// Opens the history as a page of its own (until the timeline takes it
 /// over).
-Future<void> openHistory(BuildContext context) => pushAdaptivePage<void>(
-  context,
-  builder: (_) => const HistoryScreen(),
-);
+Future<void> openHistory(BuildContext context) =>
+    pushAdaptivePage<void>(context, builder: (_) => const HistoryScreen());
 
 /// The icon of a view on the navigation rail.
 IconData tracksViewIcon(BuildContext c, TracksView view) => switch (view) {
@@ -283,51 +279,6 @@ Future<void> _openMore(BuildContext context) async {
       await openSettings(context);
     case _More.history:
       await openHistory(context);
-  }
-}
-
-/// A round button of the head: a tap target, outlined, on the surface.
-class HeaderRoundButton extends StatelessWidget {
-  const HeaderRoundButton({
-    required this.icon,
-    required this.label,
-    required this.onPressed,
-    super.key,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.tikky;
-    return Semantics(
-      button: true,
-      label: label,
-      excludeSemantics: true,
-      onTap: onPressed,
-      child: Tooltip(
-        message: label,
-        excludeFromSemantics: true,
-        child: Material(
-          color: t.colors.surface,
-          shape: RoundedRectangleBorder(
-            borderRadius: t.radii.pillAll,
-            side: t.hairline,
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            splashFactory: isCupertino(context) ? NoSplash.splashFactory : null,
-            onTap: onPressed,
-            child: SizedBox.square(
-              dimension: t.sizes.minTapTarget,
-              child: Icon(icon, size: t.sizes.iconMd, color: t.colors.text),
-            ),
-          ),
-        ),
-      ),
-    );
   }
 }
 

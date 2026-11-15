@@ -345,10 +345,11 @@ class _SetSheetState extends ConsumerState<_SetSheet> {
                       child: Text(TracksStrings.setsTitle, style: t.text.title),
                     ),
                   ),
-                  _OutlinedPillButton(
+                  PillButton(
                     key: SetSheetKeys.newSet,
                     label: Strings.newSet,
                     icon: AdaptiveIcons.add(context),
+                    outlined: true,
                     onPressed: _create,
                   ),
                 ],
@@ -410,56 +411,6 @@ class _SetSheetState extends ConsumerState<_SetSheet> {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-/// A pill with an outline: "+ Neues Set".
-class _OutlinedPillButton extends StatelessWidget {
-  const _OutlinedPillButton({
-    required this.label,
-    required this.icon,
-    required this.onPressed,
-    super.key,
-  });
-
-  final String label;
-  final IconData icon;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.tikky;
-    return Semantics(
-      button: true,
-      label: label,
-      excludeSemantics: true,
-      onTap: onPressed,
-      child: Material(
-        color: t.colors.background,
-        shape: RoundedRectangleBorder(
-          borderRadius: t.radii.pillAll,
-          side: t.hairline,
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onPressed,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minHeight: t.sizes.minTapTarget),
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: t.space.lg),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(icon, size: t.sizes.iconSm, color: t.colors.text),
-                  SizedBox(width: t.space.sm),
-                  Text(label, style: t.text.label),
-                ],
-              ),
-            ),
-          ),
         ),
       ),
     );

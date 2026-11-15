@@ -373,6 +373,124 @@ class AdaptiveTextButton extends StatelessWidget {
   }
 }
 
+/// A round-ended button of one tap target height: filled in the primary
+/// colour ("Rückgängig", "Eintragen") or outlined ("Ändern", "Neues Set").
+class PillButton extends StatelessWidget {
+  const PillButton({
+    required this.label,
+    required this.onPressed,
+    this.icon,
+    this.outlined = false,
+    this.semanticLabel,
+    super.key,
+  });
+
+  final String label;
+  final IconData? icon;
+  final VoidCallback? onPressed;
+  final bool outlined;
+
+  /// Read instead of [label] ("Diesen Eintrag ändern: ...").
+  final String? semanticLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tikky;
+    final enabled = onPressed != null;
+    final foreground = outlined ? t.colors.text : t.colors.onPrimary;
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      label: semanticLabel ?? label,
+      excludeSemantics: true,
+      onTap: onPressed,
+      child: Opacity(
+        opacity: enabled ? 1 : 0.5,
+        child: Material(
+          color: outlined ? t.colors.background : t.colors.primary,
+          shape: RoundedRectangleBorder(
+            borderRadius: t.radii.pillAll,
+            side: outlined ? t.hairline : BorderSide.none,
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            splashFactory: isCupertino(context) ? NoSplash.splashFactory : null,
+            onTap: onPressed,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: t.sizes.minTapTarget),
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: t.space.lg),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (icon != null) ...[
+                      Icon(icon, size: t.sizes.iconSm, color: foreground),
+                      SizedBox(width: t.space.sm),
+                    ],
+                    Flexible(
+                      child: Text(
+                        label,
+                        style: t.text.labelStrong.copyWith(color: foreground),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A round button of a head (tracks screen, pages of the tap pad): a tap target, outlined, on the surface.
+class HeaderRoundButton extends StatelessWidget {
+  const HeaderRoundButton({
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+    super.key,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tikky;
+    return Semantics(
+      button: true,
+      label: label,
+      excludeSemantics: true,
+      onTap: onPressed,
+      child: Tooltip(
+        message: label,
+        excludeFromSemantics: true,
+        child: Material(
+          color: t.colors.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: t.radii.pillAll,
+            side: t.hairline,
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            splashFactory: isCupertino(context) ? NoSplash.splashFactory : null,
+            onTap: onPressed,
+            child: SizedBox.square(
+              dimension: t.sizes.minTapTarget,
+              child: Icon(icon, size: t.sizes.iconMd, color: t.colors.text),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Platform activity indicator.
 class AdaptiveProgress extends StatelessWidget {
   const AdaptiveProgress({super.key});

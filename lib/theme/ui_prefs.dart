@@ -24,6 +24,7 @@ abstract final class UiPrefsKeys {
   static const showTenths = 'showTenths';
   static const showProgressBar = 'showProgressBar';
   static const showSubLine = 'showSubLine';
+  static const showEntryCounts = 'showEntryCounts';
   static const leftHanded = 'leftHanded';
   static const haptics = 'haptics';
   static const keepScreenOn = 'keepScreenOn';
@@ -38,6 +39,7 @@ abstract final class UiPrefsKeys {
     showTenths,
     showProgressBar,
     showSubLine,
+    showEntryCounts,
     leftHanded,
     haptics,
     keepScreenOn,
@@ -56,6 +58,7 @@ final class UiPrefs {
     this.showTenths = false,
     this.showProgressBar = true,
     this.showSubLine = true,
+    this.showEntryCounts = false,
     this.leftHanded = false,
     this.haptics = true,
     this.keepScreenOn = false,
@@ -64,13 +67,21 @@ final class UiPrefs {
   });
 
   factory UiPrefs.fromJson(JsonMap json) => UiPrefs(
-    layout: _byName(LaneLayout.values, json[UiPrefsKeys.layout], LaneLayout.rows),
+    layout: _byName(
+      LaneLayout.values,
+      json[UiPrefsKeys.layout],
+      LaneLayout.rows,
+    ),
     density: _byName(
       UiDensity.values,
       json[UiPrefsKeys.density],
       UiDensity.normal,
     ),
-    digitScale: _scale(json[UiPrefsKeys.digitScale], minDigitScale, maxDigitScale),
+    digitScale: _scale(
+      json[UiPrefsKeys.digitScale],
+      minDigitScale,
+      maxDigitScale,
+    ),
     buttonScale: _scale(
       json[UiPrefsKeys.buttonScale],
       minButtonScale,
@@ -79,6 +90,7 @@ final class UiPrefs {
     showTenths: jsonBool(json[UiPrefsKeys.showTenths], false),
     showProgressBar: jsonBool(json[UiPrefsKeys.showProgressBar], true),
     showSubLine: jsonBool(json[UiPrefsKeys.showSubLine], true),
+    showEntryCounts: jsonBool(json[UiPrefsKeys.showEntryCounts], false),
     leftHanded: jsonBool(json[UiPrefsKeys.leftHanded], false),
     haptics: jsonBool(json[UiPrefsKeys.haptics], true),
     keepScreenOn: jsonBool(json[UiPrefsKeys.keepScreenOn], false),
@@ -108,6 +120,10 @@ final class UiPrefs {
   final bool showTenths;
   final bool showProgressBar;
   final bool showSubLine;
+
+  /// "×3" on the capture fields of the tap pad (how often today's
+  /// session has it). Off by default.
+  final bool showEntryCounts;
 
   /// Primary button on the left side of a lane.
   final bool leftHanded;
@@ -153,6 +169,7 @@ final class UiPrefs {
     bool? showTenths,
     bool? showProgressBar,
     bool? showSubLine,
+    bool? showEntryCounts,
     bool? leftHanded,
     bool? haptics,
     bool? keepScreenOn,
@@ -170,6 +187,7 @@ final class UiPrefs {
     showTenths: showTenths ?? this.showTenths,
     showProgressBar: showProgressBar ?? this.showProgressBar,
     showSubLine: showSubLine ?? this.showSubLine,
+    showEntryCounts: showEntryCounts ?? this.showEntryCounts,
     leftHanded: leftHanded ?? this.leftHanded,
     haptics: haptics ?? this.haptics,
     keepScreenOn: keepScreenOn ?? this.keepScreenOn,
@@ -185,6 +203,7 @@ final class UiPrefs {
     UiPrefsKeys.showTenths: showTenths,
     UiPrefsKeys.showProgressBar: showProgressBar,
     UiPrefsKeys.showSubLine: showSubLine,
+    UiPrefsKeys.showEntryCounts: showEntryCounts,
     UiPrefsKeys.leftHanded: leftHanded,
     UiPrefsKeys.haptics: haptics,
     UiPrefsKeys.keepScreenOn: keepScreenOn,

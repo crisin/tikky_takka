@@ -75,7 +75,7 @@ Abgleich aufgefallen sind. Die Spalte „Vorschlag“ ist nur ein Vorschlag.
 |---|---|---|---|
 | E1 | Im Arbeitsstand liegen ungesicherte Änderungen (Alarme, Diagnose, App-Icon, die Design-Dokumente). Vor dem Umbau committen? | ja, als eigene Commits | Etappe 0 |
 | O4a | Martian Mono bündeln (Lizenztext lesen, Tabellenziffern prüfen)? | ja | P2 |
-| O5 | Anzahl (×3) auf den Feldern immer sichtbar? | immer, wie gezeichnet | P4 |
+| O5 | Anzahl (×3) auf den Feldern immer sichtbar? | **entschieden: mit Schalter**, Standard aus | P4 |
 | E2 | Wo liegt Stoppen, wenn es nur einen Nebenknopf gibt? | langer Druck auf den **Hauptknopf** und der Stopp-Knopf im Zustand „pausiert“; langer Druck auf die Fläche bleibt Bearbeiten. Für Zähler und Erinnerung (kein „pausiert“) zusätzlich „Stoppen“ im Bearbeiten-Blatt und als Aktion für Screenreader | P2 |
 | E3 | Die untere Leiste ab 720 px Breite: Seitenleiste mit Spuren / Tippfeld / Zeitleiste und Einstellungen darunter? | ja | P3 |
 | O7 | Tippen auf die Spur öffnet den Fokus? | ja; bis P9 tut Tippen nichts | P9 |
@@ -241,6 +241,28 @@ Entwürfe `1-2-spuren`, `2-7-sets-und-szene`.
 ### P4 · Tippfeld und Erfassen in Stufen
 
 Entwürfe `2-1` bis `2-6`. Vorher O5.
+
+**Stand: Teil 1 erledigt** (P4.1–P4.4, P4.7; Zweig `pult`). Offen: P4.5,
+P4.6 (neues Blatt „Ändern“) und P4.8 (Protokoll-Spur ohne eigene
+Erfassung). Abweichungen:
+
+- **O5 entschieden: mit Schalter.** „Anzahl auf den Erfassen-Feldern zeigen“
+  unter Anzeige der Spuren (`UiPrefsKeys.showEntryCounts`, Standard aus,
+  auch je Set). Gilt für „Was?“ und Stufe 1; ein Zähler zeigt seine Anzahl
+  immer, sie ist sein Wert. Gezählt wird die offene Sitzung, nicht der
+  Kalendertag.
+- `PadButton` bleibt nur die Identität eines Feldes. Anzahl, letzter
+  Eintrag und Abstand rechnen reine Funktionen in `pad_model.dart`
+  (`padCount`, `padLastEntry`, `padLockout`).
+- Das Raster hat mindestens zwei Spalten, auf breiten Fenstern mehr.
+  „Was?“ hat immer das Raster für fünf Sachen und „Anderes“ (2 × 3).
+- „Ändern“ öffnet bis P4.5 das bisherige Eintragsblatt im Bearbeiten-Modus.
+- Auf der Hauptseite bleibt das „+“-Feld einer Protokoll-Spur (volles
+  Formular, z. B. ohne Person). Es ist wie „Anderes“ gestrichelt und heißt
+  „Eintrag“.
+- Die Rückgängig-Leiste hat überall (Spuren, Tippfeld, Protokoll-Spur) die
+  Form des Entwurfs: Fläche mit Rand, „Ändern“ als Umriss-Pille,
+  „Rückgängig“ als gefüllte Pille.
 
 - **P4.1** `pad_model.dart`: `PadButton` bekommt `count`, `since` und
   `lockoutRemaining` als getrennte Felder (heute rechnet die Kachel die Sperre

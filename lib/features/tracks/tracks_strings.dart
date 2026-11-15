@@ -130,7 +130,46 @@ abstract final class TracksStrings {
   static const viewTimeline = 'Zeitleiste';
 
   // ------------------------------------------------------------- tap pad
-  static const padUndoIdle = 'Die letzte Erfassung erscheint hier.';
+  static const padReady = 'Bereit';
+  static const padUndoIdle = 'Die letzte Erfassung steht hier, mit Rückgängig.';
+  static const padWhatTitle = 'Was hattest du?';
+  static const padWhatHint = 'Ein Tipp trägt ein, mit der Uhrzeit von jetzt.';
+  static const padOtherTitle = 'Was anderes?';
+  static const padOtherHint = 'Auch hier: ein Tipp trägt ein.';
+  static const padCaptured = 'eingetragen';
+  static const padEdit = 'Ändern';
+  static const padEditSemantics = 'Diesen Eintrag ändern: Zeit, Menge, Notiz';
+  static const padNow = 'jetzt';
+  static const padBack = 'Zurück';
+  static const padOtherSemantics = 'Etwas anderes eintragen';
+  static const padNewLabel = 'Steht nicht da? Neu anlegen';
+  static const padNewHint = 'Name';
+  static const padNewSave = 'Eintragen';
+  static const padNewNote =
+      'Farbe und eigener Abstand lassen sich später einstellen.';
+
+  /// "×3" on a field.
+  static String padCount(int n) => '×$n';
+
+  /// "23:41 · jetzt", "23:36 · vor 5 min" under the last action.
+  static String padWhen(String time, String relative) => '$time · $relative';
+
+  /// "Kippe · vor 8 min" on a person field.
+  static String padPersonLast(String substance, String ago) =>
+      '$substance · $ago';
+
+  /// Semantics of a capture field: "Bier, 3 Mal, Abstand: noch 34 min".
+  static String padSubstanceSemantics(
+    String name, {
+    int? count,
+    String? lockout,
+    bool captured = false,
+  }) => [
+    name,
+    if (count != null) '$count Mal',
+    if (captured) 'gerade eingetragen',
+    ?lockout,
+  ].join(', ');
   static const padUndone = 'Zurückgenommen';
   static const padTapToStart = 'Tippen zum Starten';
   static const padTapForLap = 'Tippen für eine Runde';
@@ -138,6 +177,7 @@ abstract final class TracksStrings {
   static const padTapToDismiss = 'Fertig · tippen zum Ausschalten';
   static const padTapToAck = 'Fällig · tippen für erledigt';
   static const padMore = 'Anderes';
+  static const padMoreEntry = 'Eintrag';
   static const padMoreSymbol = '+';
   static const padBackToPad = 'Zurück zum Tippfeld';
 
@@ -162,7 +202,7 @@ abstract final class TracksStrings {
   static String padLapSince(int lap, String ago) => 'Runde $lap · $ago';
 
   /// A lockout the user set, on a substance button of the pad.
-  static String padLockout(String duration) => 'frühestens wieder in $duration';
+  static String padLockout(String duration) => 'Abstand: noch $duration';
 
   /// Semantics of a pad button: "Vögel: Reiher, 3".
   static String padButtonSemantics(String track, String title, String value) =>
