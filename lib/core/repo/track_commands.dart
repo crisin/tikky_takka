@@ -208,6 +208,59 @@ class TrackCommands {
     return event;
   }
 
+  /// "+1′" of a ringing timer, "+10′" of a due reminder: it is due again
+  /// [ms] of counting time from now. A paused reminder is resumed first.
+  /// Returns the `extend` event, or `null` when there is nothing to put
+  /// off.
+  Future<TrackEvent?> extend(String trackId, int ms) async {
+    if (ms <= 0) return null;
+    final event = await _db.transaction(() async {
+      final open = await getOpenSession(trackId);
+      if (open == null) return null;
+      final snapshot = _snapshot(open);
+      final OpenSession current;
+      switch (snapshot) {
+        case CountdownSnapshot(:final finished, :final autoRestart)
+            when finished && !autoRestart && snapshot.isRinging:
+          current = open;
+        case ReminderSnapshot(:final due) when due && snapshot.isOpen:
+          if (snapshot.isPaused) {
+            final resume = await _append(open, EventType.resume);
+            current = OpenSession(
+              session: open.session,
+              events: [...open.events, resume],
+            );
+          } else {
+            current = open;
+          }
+        default:
+          return null;
+      }
+      return _append(
+        current,
+        EventType.extend,
+        extra: {TrackEvent.extendKey: ms},
+      );
+    });
+    await _syncAlarms({trackId});
+    return event;
+  }
+
+  /// "nächste Runde" of a running interval: jumps to the start of the next
+  /// round. Not in the last round (that would end the program). Returns
+  /// the `skip` event.
+  Future<TrackEvent?> skipRound(String trackId) async {
+    final event = await _db.transaction(() async {
+      final open = await getOpenSession(trackId);
+      if (open == null) return null;
+      final snapshot = _snapshot(open);
+      if (snapshot is! IntervalSnapshot || !snapshot.canSkip) return null;
+      return _append(open, EventType.skip);
+    });
+    await _syncAlarms({trackId});
+    return event;
+  }
+
   /// Adds a protocol entry. Creates the session when the track has none.
   /// [at] defaults to now (pass it to back-date an entry).
   Future<TrackEvent?> addEntry(
@@ -473,6 +526,7 @@ class TrackCommands {
     String? substanceId,
     String? amount,
     String? note,
+    JsonMap extra = const {},
   }) => _writer.append(
     open,
     type,
@@ -482,5 +536,6 @@ class TrackCommands {
     substanceId: substanceId,
     amount: amount,
     note: note,
+    extra: extra,
   );
 }

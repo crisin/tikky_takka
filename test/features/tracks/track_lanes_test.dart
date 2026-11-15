@@ -160,6 +160,56 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('a ringing timer shows "+1′": it rings again a minute later', (
+    tester,
+  ) async {
+    final h = await TracksHarness.start(tester);
+    final track = h.timer;
+
+    await h.tap(h.primary(track));
+    await h.advance(const Duration(minutes: 10, seconds: 20));
+    expect((await h.snapshot(track))!.isRinging, isTrue);
+    final plus = h.secondary(track, LaneSecondaryKind.plusMinute);
+    expect(
+      find.descendant(of: plus, matching: find.text(TracksStrings.plusMinute)),
+      findsOneWidget,
+    );
+
+    await h.tap(plus);
+    expect((await h.snapshot(track))!.isRunning, isTrue);
+    expect(h.digits(track), '01:00');
+    await h.advance(const Duration(minutes: 1));
+    expect((await h.snapshot(track))!.isRinging, isTrue);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a due reminder shows "+10′"; a running interval "nächste '
+      'Runde"', (tester) async {
+    final h = await TracksHarness.start(tester);
+    final reminder = await h.addTrack(
+      const ReminderConfig(intervalMs: 30 * 60 * 1000),
+      name: 'Wasser',
+    );
+    final interval = await h.addTrack(
+      const IntervalConfig(workMs: 30000, restMs: 10000, rounds: 3),
+      name: 'Dehnen',
+    );
+    await h.tap(h.primary(reminder));
+    await h.tap(h.primary(interval));
+    await h.advance(const Duration(seconds: 10));
+
+    await h.tap(h.secondary(interval, LaneSecondaryKind.nextRound));
+    expect(h.subLine(interval), contains(Strings.roundOf(2, 3)));
+    expect(h.digits(interval), '00:30');
+
+    await h.advance(const Duration(minutes: 31));
+    expect((await h.snapshot(reminder))!.isRinging, isTrue);
+    await h.tap(h.secondary(reminder, LaneSecondaryKind.snooze));
+    expect((await h.snapshot(reminder))!.isRunning, isTrue);
+    expect(h.digits(reminder), '10:00');
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('interval: round, phase and finish', (tester) async {
     final h = await TracksHarness.start(tester);
     final track = await h.addTrack(

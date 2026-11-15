@@ -83,7 +83,10 @@ SessionSummary summarizeSession({
         ticks++;
       case EventType.ack:
         acks++;
-      case EventType.entry || EventType.stop:
+      case EventType.entry ||
+          EventType.stop ||
+          EventType.extend ||
+          EventType.skip:
         break;
     }
   }

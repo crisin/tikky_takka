@@ -216,6 +216,7 @@ final class TikkyTextStyles {
     required this.sheetTitle,
     required this.chip,
     required this.rowValue,
+    required this.laneButton,
     required this.navLabel,
     required this.pageTitle,
     required this.pageTitleCompact,
@@ -283,6 +284,9 @@ final class TikkyTextStyles {
 
   /// The value of a folded row of a sheet ("Wer  Krille").
   final TextStyle rowValue;
+
+  /// Text on a round button of a lane ("+1′", "+10′").
+  final TextStyle laneButton;
 
   /// An entry of the navigation pill.
   final TextStyle navLabel;
@@ -686,6 +690,7 @@ class TikkyTokens extends ThemeExtension<TikkyTokens> {
       ),
       chip: base(14, FontWeight.w600, colors.text, height: 1.2),
       rowValue: base(16, FontWeight.w600, colors.text, height: 1.25),
+      laneButton: base(14, FontWeight.w700, colors.text, height: 1),
       navLabel: base(15, FontWeight.w600, colors.text, height: 1.2),
       pageTitle: base(
         30,

@@ -159,6 +159,7 @@ class SessionWriter {
     String? substanceId,
     String? amount,
     String? note,
+    JsonMap extra = const {},
   }) async {
     final now = _clock.nowMs();
     var lastAt = open.session.startedAt;
@@ -181,6 +182,7 @@ class SessionWriter {
       note: note,
       createdAt: now,
       updatedAt: now,
+      extra: extra,
     );
     await db.into(db.events).insert(event.toRow());
     await touchSession(open.session.id);

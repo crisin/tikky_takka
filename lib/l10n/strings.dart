@@ -106,6 +106,8 @@ abstract final class Strings {
     EventType.entry => 'Eintrag',
     EventType.ack => 'Bestätigt',
     EventType.stop => 'Stopp',
+    EventType.extend => 'Später',
+    EventType.skip => 'Nächste Runde',
   };
 
   // ------------------------------------------------------------ seed data

@@ -67,6 +67,15 @@ final class TrackEvent {
   final int updatedAt;
   final JsonMap extra;
 
+  /// Key of the added time of an [EventType.extend] event in [extra].
+  static const extendKey = 'ms';
+
+  /// The time an [EventType.extend] event adds (never negative).
+  int get extendMs {
+    final ms = jsonInt(extra[extendKey], 0);
+    return ms < 0 ? 0 : ms;
+  }
+
   TrackEvent copyWith({
     String? id,
     String? sessionId,

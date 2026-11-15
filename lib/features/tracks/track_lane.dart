@@ -729,6 +729,7 @@ class _Segments extends StatelessWidget {
 class _RoundButton extends StatelessWidget {
   const _RoundButton({
     required this.icon,
+    this.text,
     required this.tooltip,
     required this.semanticLabel,
     required this.onPressed,
@@ -741,7 +742,9 @@ class _RoundButton extends StatelessWidget {
     this.longPressHint,
   });
 
-  final IconData icon;
+  /// The symbol; [text] instead, when set.
+  final IconData? icon;
+  final String? text;
   final String tooltip;
   final String semanticLabel;
   final VoidCallback? onPressed;
@@ -799,11 +802,25 @@ class _RoundButton extends StatelessWidget {
                 onLongPress: onLongPress,
                 child: SizedBox.square(
                   dimension: diameter,
-                  child: Icon(
-                    icon,
-                    size: iconSize,
-                    color: enabled ? foreground : t.colors.textMuted,
-                  ),
+                  child: text == null
+                      ? Icon(
+                          icon,
+                          size: iconSize,
+                          color: enabled ? foreground : t.colors.textMuted,
+                        )
+                      : Center(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              text!,
+                              style: t.text.laneButton.copyWith(
+                                color: enabled
+                                    ? foreground
+                                    : t.colors.textMuted,
+                              ),
+                            ),
+                          ),
+                        ),
                 ),
               ),
             ),
@@ -884,8 +901,14 @@ class _SecondaryButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tikky;
-    final (IconData icon, String label) = switch (action.kind) {
+    final (IconData? icon, String label) = switch (action.kind) {
       LaneSecondaryKind.lap => (AdaptiveIcons.lap(context), Strings.actionLap),
+      LaneSecondaryKind.plusMinute => (null, TracksStrings.actionPlusMinute),
+      LaneSecondaryKind.snooze => (null, TracksStrings.actionSnooze),
+      LaneSecondaryKind.nextRound => (
+        AdaptiveIcons.nextRound(context),
+        TracksStrings.actionNextRound,
+      ),
       LaneSecondaryKind.restart => (
         AdaptiveIcons.reset(context),
         Strings.actionRestart,
@@ -909,6 +932,12 @@ class _SecondaryButton extends StatelessWidget {
     };
     return _RoundButton(
       icon: icon,
+      // "+1′" and "+10′" are written out, as in the drafts.
+      text: switch (action.kind) {
+        LaneSecondaryKind.plusMinute => TracksStrings.plusMinute,
+        LaneSecondaryKind.snooze => TracksStrings.snooze,
+        _ => null,
+      },
       tooltip: label,
       semanticLabel: '${track.name}: $label',
       onPressed: onPressed,

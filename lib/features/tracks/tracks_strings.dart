@@ -64,6 +64,14 @@ abstract final class TracksStrings {
   /// Text of a label button: "Hund".
   static String labelCount(String label, int count) => '$label  $count';
   static const actionAckEarly = 'Jetzt schon erledigt';
+
+  /// The secondary buttons "+1′", "+10′" and "nächste Runde": the text on
+  /// the button and what a screen reader says.
+  static const plusMinute = '+1′';
+  static const actionPlusMinute = 'eine Minute dazu';
+  static const snooze = '+10′';
+  static const actionSnooze = 'in 10 Minuten wieder';
+  static const actionNextRound = 'nächste Runde';
   static const actionStopSession = 'Sitzung beenden';
   static const actionStopHint = 'Stoppen und sichern';
 
@@ -260,6 +268,10 @@ abstract final class TracksStrings {
   static const timelinePaused = 'Pausiert';
   static const timelineResumed = 'Fortgesetzt';
   static const timelineStopped = 'Beendet';
+
+  /// "+1′" / "+10′": "1 min später"
+  static String timelineExtended(String duration) => '$duration später';
+  static const timelineSkipped = 'Nächste Runde';
 
   /// Semantics of a timeline row: "14:02:11, Vögel, Reiher · 3".
   static String timelineRowSemantics(String time, String track, String text) =>

@@ -116,9 +116,30 @@ class LaneActions {
         );
   }
 
+  /// What "+1′" adds to a ringing timer and "+10′" to a due reminder.
+  static const plusMinuteMs = 60 * 1000;
+  static const snoozeMs = 10 * 60 * 1000;
+
+  /// "+1′" / "+10′": due again in [ms].
+  Future<void> extend(Track track, int ms) async {
+    final event = await _commands.extend(track.id, ms);
+    if (event != null) _haptics.primary();
+    _refresh();
+  }
+
+  /// "nächste Runde" of an interval.
+  Future<void> nextRound(Track track) async {
+    final event = await _commands.skipRound(track.id);
+    if (event != null) _haptics.primary();
+    _refresh();
+  }
+
   /// The secondary button of a lane.
   Future<void> secondary(Track track, LaneSecondaryKind kind) => switch (kind) {
     LaneSecondaryKind.lap => lap(track),
+    LaneSecondaryKind.plusMinute => extend(track, plusMinuteMs),
+    LaneSecondaryKind.snooze => extend(track, snoozeMs),
+    LaneSecondaryKind.nextRound => nextRound(track),
     LaneSecondaryKind.restart => restart(track),
     LaneSecondaryKind.reset || LaneSecondaryKind.stop => stop(track),
     LaneSecondaryKind.undo => undoTick(track),

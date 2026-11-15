@@ -216,6 +216,9 @@ final class IntervalSnapshot extends TrackSnapshot {
     return p < 0 ? 0 : (p > 1 ? 1 : p);
   }
 
+  /// "nächste Runde" is possible: running, and not in the last round.
+  bool get canSkip => isRunning && !finished && round < rounds;
+
   /// 0..1 share of the current phase that has elapsed.
   double get phaseProgress {
     if (phaseDurationMs <= 0) return 1;

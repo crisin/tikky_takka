@@ -185,6 +185,12 @@ List<TimelineRow> _rowsOfSession(
       case EventType.stop:
         kind = TimelineRowKind.lifecycle;
         text = TracksStrings.timelineStopped;
+      case EventType.extend:
+        kind = TimelineRowKind.lifecycle;
+        text = TracksStrings.timelineExtended(Fmt.compact(e.extendMs));
+      case EventType.skip:
+        kind = TimelineRowKind.lifecycle;
+        text = TracksStrings.timelineSkipped;
     }
     rows.add(TimelineRow(event: e, track: track, kind: kind, text: text));
   }

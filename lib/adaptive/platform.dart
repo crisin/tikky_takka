@@ -66,6 +66,8 @@ abstract final class AdaptiveIcons {
     Icons.restart_alt_rounded,
     CupertinoIcons.arrow_counterclockwise,
   );
+  static IconData nextRound(BuildContext c) =>
+      _pick(c, Icons.skip_next_rounded, CupertinoIcons.forward_end_fill);
   static IconData undo(BuildContext c) =>
       _pick(c, Icons.undo_rounded, CupertinoIcons.arrow_uturn_left);
   static IconData plusOne(BuildContext c) =>

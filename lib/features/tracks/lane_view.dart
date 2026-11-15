@@ -12,7 +12,20 @@ import 'tracks_strings.dart';
 enum LanePrimary { start, pause, resume, dismiss, ack, tick, none }
 
 /// The secondary button of a lane (at most one at a time).
-enum LaneSecondaryKind { lap, restart, reset, undo, stop, ackEarly }
+///
+/// [plusMinute]: "+1′" of a ringing timer; [snooze]: "+10′" of a due
+/// reminder; [nextRound]: "nächste Runde" of a running interval.
+enum LaneSecondaryKind {
+  lap,
+  restart,
+  reset,
+  undo,
+  stop,
+  ackEarly,
+  plusMinute,
+  snooze,
+  nextRound,
+}
 
 /// How a lane looks: its surface, outline and lamp.
 ///
@@ -268,7 +281,7 @@ LaneLook _look(TrackSnapshot s, {bool due = false}) => switch (s.state) {
 /// The "Stopp" button of a paused lane.
 const _stopWhenPaused = LaneSecondary(LaneSecondaryKind.stop, enabled: true);
 
-/// Timer and interval: "neu starten" while open, "Stopp" while paused.
+/// "neu starten" while open, "Stopp" while paused.
 LaneSecondary? _restartOrStop(TrackSnapshot s) => switch (s.state) {
   RunState.running || RunState.ringing => const LaneSecondary(
     LaneSecondaryKind.restart,
@@ -390,7 +403,10 @@ LanePrimary _startPause(TrackSnapshot s, {required LanePrimary onRinging}) =>
       status: _status(s),
       primary: _startPause(s, onRinging: LanePrimary.dismiss),
       canStop: s.isOpen,
-      secondary: _restartOrStop(s),
+      // Ringing: "+1′" (rings again in a minute); otherwise as usual.
+      secondary: s.isRinging && s.finished
+          ? const LaneSecondary(LaneSecondaryKind.plusMinute, enabled: true)
+          : _restartOrStop(s),
     ),
   );
 }
@@ -447,7 +463,11 @@ LanePrimary _startPause(TrackSnapshot s, {required LanePrimary onRinging}) =>
       status: s.finished ? Strings.phaseDone : _status(s),
       primary: _startPause(s, onRinging: LanePrimary.dismiss),
       canStop: s.isOpen,
-      secondary: _restartOrStop(s),
+      // Running: "nächste Runde" (not in the last round); ringing at the
+      // end: "neu starten".
+      secondary: s.isRunning
+          ? LaneSecondary(LaneSecondaryKind.nextRound, enabled: s.canSkip)
+          : _restartOrStop(s),
     ),
   );
 }
@@ -538,9 +558,12 @@ LanePrimary _startPause(TrackSnapshot s, {required LanePrimary onRinging}) =>
           enabled: true,
         ),
         RunState.paused => _stopWhenPaused,
-        // The primary button acknowledges; "+10′" needs an event of its
-        // own and follows later.
-        RunState.ringing || RunState.idle || RunState.stopped => null,
+        // The primary button acknowledges; "+10′" puts it off.
+        RunState.ringing => const LaneSecondary(
+          LaneSecondaryKind.snooze,
+          enabled: true,
+        ),
+        RunState.idle || RunState.stopped => null,
       },
     ),
   );

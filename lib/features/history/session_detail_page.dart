@@ -355,10 +355,17 @@ EventLine describeEvent(
             : HistoryStrings.ackDelayed(Fmt.compact(ack.delayMs)),
         note: event.note,
       );
+    case EventType.extend:
+      return EventLine(
+        title: Strings.eventTypeName(event.type),
+        detail: HistoryStrings.extendedBy(Fmt.compact(event.extendMs)),
+        note: event.note,
+      );
     case EventType.start ||
         EventType.pause ||
         EventType.resume ||
-        EventType.stop:
+        EventType.stop ||
+        EventType.skip:
       return EventLine(
         title: Strings.eventTypeName(event.type),
         note: event.note,

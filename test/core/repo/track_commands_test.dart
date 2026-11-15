@@ -68,7 +68,10 @@ void main() {
 
     test('start on a paused track resumes it', () async {
       final e = env();
-      final track = await e.makeTrack(await e.makeSet(), const StopwatchConfig());
+      final track = await e.makeTrack(
+        await e.makeSet(),
+        const StopwatchConfig(),
+      );
       await e.commands.startTrack(track.id);
       await e.commands.pauseTrack(track.id);
       expect(await e.commands.startTrack(track.id), TrackAction.resumed);
@@ -76,7 +79,10 @@ void main() {
 
     test('toggle cycles start -> pause -> resume', () async {
       final e = env();
-      final track = await e.makeTrack(await e.makeSet(), const StopwatchConfig());
+      final track = await e.makeTrack(
+        await e.makeSet(),
+        const StopwatchConfig(),
+      );
       expect(await e.commands.toggleTrack(track.id), TrackAction.started);
       e.clock.advanceMs(sec);
       expect(await e.commands.toggleTrack(track.id), TrackAction.paused);
@@ -86,7 +92,10 @@ void main() {
 
     test('a clock that jumps backwards cannot reorder the log', () async {
       final e = env();
-      final track = await e.makeTrack(await e.makeSet(), const StopwatchConfig());
+      final track = await e.makeTrack(
+        await e.makeSet(),
+        const StopwatchConfig(),
+      );
       await e.commands.startTrack(track.id);
       e.clock.advanceMs(10 * sec);
       await e.commands.pauseTrack(track.id);
@@ -101,65 +110,79 @@ void main() {
       expect(snapshot.state, RunState.running);
     });
 
-    test('exclusive stopwatch pauses other exclusive ones in the set', () async {
-      final e = env();
-      final set = await e.makeSet();
-      final other = await e.makeSet('Other');
-      const exclusive = StopwatchConfig(exclusive: true);
-      final a = await e.makeTrack(set, exclusive, name: 'A');
-      final b = await e.makeTrack(set, exclusive, name: 'B');
-      final free = await e.makeTrack(set, const StopwatchConfig(), name: 'Free');
-      final elsewhere = await e.makeTrack(other, exclusive, name: 'Elsewhere');
+    test(
+      'exclusive stopwatch pauses other exclusive ones in the set',
+      () async {
+        final e = env();
+        final set = await e.makeSet();
+        final other = await e.makeSet('Other');
+        const exclusive = StopwatchConfig(exclusive: true);
+        final a = await e.makeTrack(set, exclusive, name: 'A');
+        final b = await e.makeTrack(set, exclusive, name: 'B');
+        final free = await e.makeTrack(
+          set,
+          const StopwatchConfig(),
+          name: 'Free',
+        );
+        final elsewhere = await e.makeTrack(
+          other,
+          exclusive,
+          name: 'Elsewhere',
+        );
 
-      await e.commands.startTrack(a.id);
-      await e.commands.startTrack(free.id);
-      await e.commands.startTrack(elsewhere.id);
-      e.clock.advanceMs(5 * sec);
-      await e.commands.startTrack(b.id);
+        await e.commands.startTrack(a.id);
+        await e.commands.startTrack(free.id);
+        await e.commands.startTrack(elsewhere.id);
+        e.clock.advanceMs(5 * sec);
+        await e.commands.startTrack(b.id);
 
-      expect((await e.snapshot(a.id))!.state, RunState.paused);
-      expect((await e.snapshot(b.id))!.state, RunState.running);
-      // Non-exclusive tracks and other sets are untouched.
-      expect((await e.snapshot(free.id))!.state, RunState.running);
-      expect((await e.snapshot(elsewhere.id))!.state, RunState.running);
+        expect((await e.snapshot(a.id))!.state, RunState.paused);
+        expect((await e.snapshot(b.id))!.state, RunState.running);
+        // Non-exclusive tracks and other sets are untouched.
+        expect((await e.snapshot(free.id))!.state, RunState.running);
+        expect((await e.snapshot(elsewhere.id))!.state, RunState.running);
 
-      // Resuming A pauses B again.
-      e.clock.advanceMs(5 * sec);
-      expect(await e.commands.toggleTrack(a.id), TrackAction.resumed);
-      expect((await e.snapshot(a.id))!.state, RunState.running);
-      expect((await e.snapshot(b.id))!.state, RunState.paused);
-      expect((await e.snapshot(b.id))!.elapsedMs, 5 * sec);
-    });
+        // Resuming A pauses B again.
+        e.clock.advanceMs(5 * sec);
+        expect(await e.commands.toggleTrack(a.id), TrackAction.resumed);
+        expect((await e.snapshot(a.id))!.state, RunState.running);
+        expect((await e.snapshot(b.id))!.state, RunState.paused);
+        expect((await e.snapshot(b.id))!.elapsedMs, 5 * sec);
+      },
+    );
   });
 
   group('countdown, interval and alarms', () {
-    test('start schedules the alarm, pause cancels, resume reschedules', () async {
-      final e = env();
-      final track = await e.makeTrack(
-        await e.makeSet(),
-        const CountdownConfig(durationMs: 10 * min),
-      );
-      final start = e.clock.nowMs();
+    test(
+      'start schedules the alarm, pause cancels, resume reschedules',
+      () async {
+        final e = env();
+        final track = await e.makeTrack(
+          await e.makeSet(),
+          const CountdownConfig(durationMs: 10 * min),
+        );
+        final start = e.clock.nowMs();
 
-      await e.commands.startTrack(track.id);
-      expect(e.alarms.scheduled[track.id]!.single.at, start + 10 * min);
-      expect(
-        e.alarms.scheduled[track.id]!.single.kind,
-        AlarmKind.countdownDone,
-      );
+        await e.commands.startTrack(track.id);
+        expect(e.alarms.scheduled[track.id]!.single.at, start + 10 * min);
+        expect(
+          e.alarms.scheduled[track.id]!.single.kind,
+          AlarmKind.countdownDone,
+        );
 
-      e.clock.advanceMs(4 * min);
-      await e.commands.pauseTrack(track.id);
-      expect(e.alarms.scheduled, isEmpty);
-      expect(e.alarms.log.last, 'cancel:${track.id}');
+        e.clock.advanceMs(4 * min);
+        await e.commands.pauseTrack(track.id);
+        expect(e.alarms.scheduled, isEmpty);
+        expect(e.alarms.log.last, 'cancel:${track.id}');
 
-      e.clock.advanceMs(20 * min);
-      await e.commands.resumeTrack(track.id);
-      expect(e.alarms.scheduled[track.id]!.single.at, start + 30 * min);
+        e.clock.advanceMs(20 * min);
+        await e.commands.resumeTrack(track.id);
+        expect(e.alarms.scheduled[track.id]!.single.at, start + 30 * min);
 
-      await e.commands.stopTrack(track.id);
-      expect(e.alarms.scheduled, isEmpty);
-    });
+        await e.commands.stopTrack(track.id);
+        expect(e.alarms.scheduled, isEmpty);
+      },
+    );
 
     test('toggle on a ringing countdown dismisses it', () async {
       final e = env();
@@ -324,7 +347,10 @@ void main() {
 
     test('tick is refused on other modes', () async {
       final e = env();
-      final track = await e.makeTrack(await e.makeSet(), const StopwatchConfig());
+      final track = await e.makeTrack(
+        await e.makeSet(),
+        const StopwatchConfig(),
+      );
       expect(await e.commands.tick(track.id), isNull);
       expect(await e.commands.undoTick(track.id), isNull);
     });
@@ -366,10 +392,84 @@ void main() {
     });
   });
 
+  group('"+1′", "+10′" and "nächste Runde"', () {
+    test('"+1′" only for a ringing timer; it is stored with its time and '
+        'reschedules', () async {
+      final e = env();
+      final track = await e.makeTrack(
+        await e.makeSet(),
+        const CountdownConfig(durationMs: 10 * min),
+      );
+      final start = e.clock.nowMs();
+      await e.commands.startTrack(track.id);
+      // Not yet ringing: nothing to put off.
+      expect(await e.commands.extend(track.id, min), isNull);
+
+      e.clock.advanceMs(10 * min + 30 * sec);
+      final event = await e.commands.extend(track.id, min);
+      expect(event?.type, EventType.extend);
+      expect(event?.extendMs, min);
+      final s = (await e.snapshot(track.id))! as CountdownSnapshot;
+      expect(s.state, RunState.running);
+      expect(s.dueAt, start + 11 * min + 30 * sec);
+      expect(e.alarms.scheduled[track.id]!.single.at, s.dueAt);
+    });
+
+    test('"+10′" for a due reminder, also when it is paused', () async {
+      final e = env();
+      final track = await e.makeTrack(
+        await e.makeSet(),
+        const ReminderConfig(intervalMs: 30 * min),
+      );
+      final start = e.clock.nowMs();
+      await e.commands.startTrack(track.id);
+      expect(await e.commands.extend(track.id, 10 * min), isNull);
+
+      e.clock.advanceMs(31 * min);
+      await e.commands.pauseTrack(track.id);
+      expect(await e.commands.extend(track.id, 10 * min), isNotNull);
+      final s = (await e.snapshot(track.id))! as ReminderSnapshot;
+      expect(s.state, RunState.running);
+      expect(s.dueAt, start + 41 * min);
+      expect(e.alarms.scheduled[track.id]!.first.at, start + 41 * min);
+    });
+
+    test(
+      '"nächste Runde" while an interval runs, not in its last round',
+      () async {
+        final e = env();
+        final track = await e.makeTrack(
+          await e.makeSet(),
+          const IntervalConfig(workMs: 30 * sec, restMs: 10 * sec, rounds: 2),
+        );
+        expect(await e.commands.skipRound(track.id), isNull);
+        await e.commands.startTrack(track.id);
+        e.clock.advanceMs(5 * sec);
+        expect((await e.commands.skipRound(track.id))?.type, EventType.skip);
+        final s = (await e.snapshot(track.id))! as IntervalSnapshot;
+        expect(s.round, 2);
+        expect(s.phaseElapsedMs, 0);
+        // The last round: no jump.
+        expect(await e.commands.skipRound(track.id), isNull);
+        // Wrong mode: nothing.
+        final other = await e.makeTrack(
+          await e.makeSet(),
+          const StopwatchConfig(),
+        );
+        await e.commands.startTrack(other.id);
+        expect(await e.commands.skipRound(other.id), isNull);
+        expect(await e.commands.extend(other.id, min), isNull);
+      },
+    );
+  });
+
   group('protocol commands', () {
     test('addEntry creates the session lazily and stores all fields', () async {
       final e = env();
-      final track = await e.makeTrack(await e.makeSet(), const ProtocolConfig());
+      final track = await e.makeTrack(
+        await e.makeSet(),
+        const ProtocolConfig(),
+      );
       final alex = await e.people.createPerson(name: 'Alex');
       final thing = await e.people.createSubstance(
         name: 'Etwas',
@@ -394,14 +494,12 @@ void main() {
 
       e.clock.advanceMs(102 * min);
       final open = await e.commands.getOpenSession(track.id);
-      final snapshot =
-          deriveSnapshot(
-                config: open!.session.config,
-                events: open.events,
-                nowMs: e.clock.nowMs(),
-                lockoutMsBySubstance: {thing.id: thing.lockoutMs!},
-              )
-              as ProtocolSnapshot;
+      final snapshot = deriveSnapshot(
+        config: open!.session.config,
+        events: open.events,
+        nowMs: e.clock.nowMs(),
+        lockoutMsBySubstance: {thing.id: thing.lockoutMs!},
+      ) as ProtocolSnapshot;
       final status = snapshot.persons.single;
       expect(status.personId, alex.id);
       expect(status.sinceMs, 102 * min);
@@ -410,7 +508,10 @@ void main() {
 
     test('entries can be back-dated, edited and deleted with undo', () async {
       final e = env();
-      final track = await e.makeTrack(await e.makeSet(), const ProtocolConfig());
+      final track = await e.makeTrack(
+        await e.makeSet(),
+        const ProtocolConfig(),
+      );
       final now = e.clock.nowMs();
       final first = await e.commands.addEntry(track.id, personId: 'p1');
       final backdated = await e.commands.addEntry(
@@ -461,7 +562,10 @@ void main() {
   group('stop, reset, reopen', () {
     test('reset logs the run by default and can be undone', () async {
       final e = env();
-      final track = await e.makeTrack(await e.makeSet(), const StopwatchConfig());
+      final track = await e.makeTrack(
+        await e.makeSet(),
+        const StopwatchConfig(),
+      );
       await e.commands.startTrack(track.id);
       e.clock.advanceMs(5 * sec);
       final before = await e.commands.resetTrack(track.id);
@@ -479,7 +583,10 @@ void main() {
 
     test('reopen is refused while another session is open', () async {
       final e = env();
-      final track = await e.makeTrack(await e.makeSet(), const StopwatchConfig());
+      final track = await e.makeTrack(
+        await e.makeSet(),
+        const StopwatchConfig(),
+      );
       await e.commands.startTrack(track.id);
       final first = await e.commands.stopTrack(track.id);
       await e.commands.startTrack(track.id);
@@ -487,29 +594,32 @@ void main() {
       expect(await e.commands.reopenSession('missing'), isFalse);
     });
 
-    test('reset with discard removes the session; restore brings it back', () async {
-      final e = env();
-      final track = await e.makeTrack(
-        await e.makeSet(),
-        const CountdownConfig(durationMs: 10 * min),
-      );
-      await e.commands.startTrack(track.id);
-      e.clock.advanceMs(sec);
-      final discarded = await e.commands.resetTrack(track.id, discard: true);
-      expect(discarded!.events.length, 1);
-      expect(await e.commands.getOpenSession(track.id), isNull);
-      expect(
-        await e.history.getSessions(
-          HistoryFilter.all.copyWith(includeOpen: true),
-        ),
-        isEmpty,
-      );
-      expect(e.alarms.scheduled, isEmpty);
+    test(
+      'reset with discard removes the session; restore brings it back',
+      () async {
+        final e = env();
+        final track = await e.makeTrack(
+          await e.makeSet(),
+          const CountdownConfig(durationMs: 10 * min),
+        );
+        await e.commands.startTrack(track.id);
+        e.clock.advanceMs(sec);
+        final discarded = await e.commands.resetTrack(track.id, discard: true);
+        expect(discarded!.events.length, 1);
+        expect(await e.commands.getOpenSession(track.id), isNull);
+        expect(
+          await e.history.getSessions(
+            HistoryFilter.all.copyWith(includeOpen: true),
+          ),
+          isEmpty,
+        );
+        expect(e.alarms.scheduled, isEmpty);
 
-      await e.history.restoreSession(discarded);
-      expect(await e.commands.getOpenSession(track.id), isNotNull);
-      expect(e.alarms.scheduled[track.id], isNotNull);
-    });
+        await e.history.restoreSession(discarded);
+        expect(await e.commands.getOpenSession(track.id), isNotNull);
+        expect(e.alarms.scheduled[track.id], isNotNull);
+      },
+    );
 
     test('restart stops and starts a fresh session', () async {
       final e = env();
@@ -615,7 +725,10 @@ void main() {
   group('watchOpenSessions', () {
     test('emits on every change of the log', () async {
       final e = env();
-      final track = await e.makeTrack(await e.makeSet(), const StopwatchConfig());
+      final track = await e.makeTrack(
+        await e.makeSet(),
+        const StopwatchConfig(),
+      );
       final seen = <int>[];
       final sub = e.commands.watchOpenSessions().listen(
         (map) => seen.add(map[track.id]?.events.length ?? 0),

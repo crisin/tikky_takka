@@ -149,10 +149,8 @@ Entwürfe `1-2-spuren`, `1-3-zustaende`, `5-1-hell-oliv-test`.
   stoppt, „pausiert“ zeigt den Stopp-Knopf, langer Druck auf die Fläche
   bleibt Bearbeiten; dazu „Sitzung beenden“ im Bearbeiten-Blatt und die
   Screenreader-Aktion „Stoppen und sichern“.
-- **„+1′“, „+10′“ und „nächste Runde“ fehlen noch.** Sie brauchen eigene
-  Ereignisse (Engine, Alarmplan) und kommen als eigener Schritt **P2.9**.
-  Bis dahin: Timer und Intervall zeigen „neu starten“, auch beim Klingeln;
-  eine fällige Erinnerung hat keinen Nebenknopf.
+- **„+1′“, „+10′“ und „nächste Runde“** kamen als eigener Schritt
+  **P2.9** (siehe dort).
 - Die Kopfzeile zeigt Name und Art; der Zustand („pausiert“, „fertig“)
   steht wie bisher in der Nebenzeile, nicht in der Kopfzeile.
 - Auch die Erinnerung bekommt die Füllung (vorher Fortschrittsleiste).
@@ -164,9 +162,21 @@ Entwürfe `1-2-spuren`, `1-3-zustaende`, `5-1-hell-oliv-test`.
   „Andere“ und „Szene“ bleiben bis P4 erhalten.
 - Der Griff zum Sortieren bleibt an der Vorderkante (nicht gezeichnet).
 
-- **P2.9** (offen) Neue Ereignisse für „+1′“ (Timer klingelt), „+10′“
-  (Erinnerung fällig) und „nächste Runde“ (Intervall); Engine, Alarmplan,
-  `LaneControls.secondary`, Tests.
+- **P2.9** (erledigt) Zwei neue Ereignisse, `EventType.extend` (Zeit in
+  `extra['ms']`) und `EventType.skip`; keine Änderung an der Tabelle.
+  - „+1′“ beim klingelnden Timer: klingelt eine Minute nach dem Tipp
+    wieder. Vor dem Ende würde es das Ende verschieben (nur über den
+    Befehl, kein Knopf).
+  - „+10′“ bei fälliger Erinnerung: fällig zehn Minuten nach dem Tipp; das
+    nächste „Erledigt“ setzt den Rhythmus wie bisher neu. Eine pausierte
+    fällige Erinnerung läuft dabei weiter.
+  - „nächste Runde“ beim laufenden Intervall: springt an den Anfang der
+    nächsten Runde (aus Belastung oder Pause). In der letzten Runde ist der
+    Knopf ausgegraut, damit ein Tipp nicht das Programm beendet. Klingelt
+    das Intervall am Ende, bleibt „neu starten“.
+  - Der Timer zeigt während er läuft weiter „neu starten“.
+  - Alarmplan, Verlauf und Zeitleiste lesen die neuen Ereignisse
+    („1 min später“, „Nächste Runde“).
 
 - **P2.1** `lane_view.dart`: `LaneControls.secondary` liefert genau einen
   Nebenknopf nach Zustand (Stoppuhr: Runde, pausiert: Stopp · Timer: neu

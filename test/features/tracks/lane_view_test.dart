@@ -155,7 +155,8 @@ void main() {
       expect(view.time.alert, isTrue);
       expect(view.time.progress, 1);
       expect(view.time.subLine, startsWith(Strings.statusRinging));
-      expect(_enabled(view.controls), [LaneSecondaryKind.restart]);
+      // "+1′": rings again in a minute.
+      expect(_enabled(view.controls), [LaneSecondaryKind.plusMinute]);
       expect(view.controls.look, LaneLook.ringing);
       expect(view.ticking, isTrue);
     });
@@ -218,7 +219,18 @@ void main() {
       // The fill follows the phase: 5 of 10 seconds of rest are gone.
       expect(view.time.progress, closeTo(0.5, 0.001));
       expect(view.time.segments, const LaneSegments(current: 1, total: 3));
-      expect(_enabled(view.controls), [LaneSecondaryKind.restart]);
+      expect(_enabled(view.controls), [LaneSecondaryKind.nextRound]);
+
+      // Not in the last round: that would end the programme.
+      final last = buildLaneView(
+        track: track,
+        open: _open(track, log),
+        nowMs: 85 * sec,
+      );
+      expect(
+        last.controls.secondary,
+        const LaneSecondary(LaneSecondaryKind.nextRound, enabled: false),
+      );
     });
 
     test('finished: ringing and done', () {
@@ -321,7 +333,7 @@ void main() {
       expect(view.controls.primary, LanePrimary.ack);
       expect(view.controls.status, Strings.statusDue);
       expect(view.controls.look, LaneLook.due);
-      expect(view.controls.secondary, isNull);
+      expect(_enabled(view.controls), [LaneSecondaryKind.snooze]);
       expect(view.time.digits, '+02:00');
       expect(view.time.alert, isTrue);
     });
