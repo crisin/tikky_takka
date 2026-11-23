@@ -23,6 +23,14 @@ abstract final class SettingsStrings {
   static const prefKeepScreenOnHint =
       'Der Bildschirm bleibt an, solange die App offen ist.';
   static const prefUse24hHint = 'Aus: Uhrzeiten mit AM/PM.';
+  static const prefDayStart = 'Tag beginnt um';
+  static const prefDayStartHint =
+      'Was davor passiert, zählt in der Zeitleiste zum Abend davor.';
+
+  /// "06:00"
+  static String hourOfDay(int minutes) =>
+      '${(minutes ~/ 60).toString().padLeft(2, '0')}:'
+      '${(minutes % 60).toString().padLeft(2, '0')}';
 
   // ---------------------------------------------------------- set overrides
   static const overrideActive = 'Angepasst';
@@ -38,8 +46,7 @@ abstract final class SettingsStrings {
       'stellst du einen Wert wieder auf den App-Standard.';
 
   /// Semantic label of the per-field reset button.
-  static String overrideReset(String field) =>
-      'App-Standard verwenden: $field';
+  static String overrideReset(String field) => 'App-Standard verwenden: $field';
 
   // ----------------------------------------------------------- theme list
   static const themesTitle = 'Designs';
@@ -114,6 +121,15 @@ abstract final class SettingsStrings {
   static const contrastMutedOnSurface = 'Gedämpfter Text auf Fläche';
   static const contrastMutedOnBackground = 'Gedämpfter Text auf Hintergrund';
   static const contrastOnPrimary = 'Symbol auf Akzent';
+  static const contrastInkOnTint = 'Schrift in Spurfarbe auf der Spur';
+  static const contrastInkOnStrong = 'Schrift in Spurfarbe auf der Füllung';
+  static const contrastOnSolid = 'Symbol auf der Spurfarbe';
+  static const contrastTextOnStrong = 'Text auf der Füllung';
+  static const contrastWarningOnTint = 'Warntext auf der Spur';
+
+  /// "Spurfarbe 3 · Text auf der Füllung"
+  static String contrastPaletteEntry(int number, String pair) =>
+      'Spurfarbe $number · $pair';
 
   /// "Text auf Fläche: 2,1:1 (empfohlen mindestens 4,5:1)"
   static String contrastLine(String pair, double ratio, double required) =>
@@ -151,4 +167,33 @@ abstract final class SettingsStrings {
   // ------------------------------------------------------------------ about
   static const licenses = 'Open-Source-Lizenzen';
   static const aboutTagline = 'Mehrere Timer nebeneinander, komplett lokal.';
+
+  // ------------------------------------------------------------ diagnostics
+  static const diagnostics = 'Diagnose';
+  static const diagnosticsHint = 'Für Tests auf dem Gerät: Status und Fehler.';
+  static const diagApp = 'App';
+  static const diagBuild = 'Build';
+  static const diagBuildLocal = 'lokal';
+  static const diagMode = 'Modus';
+  static const diagPlatform = 'Plattform';
+  static const diagNotifications = 'Benachrichtigungen';
+  static const diagSupported = 'Unterstützt';
+  static const diagAllowed = 'Erlaubt';
+  static const diagExact = 'Exakte Alarme';
+  static const diagAppLock = 'App-Sperre möglich';
+  static const diagYes = 'Ja';
+  static const diagNo = 'Nein';
+  static const diagTestAlarm = 'Test-Alarm in 10 Sekunden';
+  static const diagTestAlarmHint =
+      'Danach die App schließen oder das Gerät sperren.';
+  static const diagTestAlarmSet = 'Test-Alarm kommt in 10 Sekunden.';
+  static const diagRequest = 'Erlaubnis anfragen';
+  static const diagErrors = 'Fehler dieser Sitzung';
+  static const diagErrorsFooter =
+      'Nur im Speicher, bis die App beendet wird. Verlässt das Gerät nur, '
+      'wenn du es kopierst.';
+  static const diagNoErrors = 'Keine Fehler.';
+  static const diagCopy = 'Bericht kopieren';
+  static const diagCopied = 'Bericht kopiert';
+  static const diagClear = 'Fehler leeren';
 }

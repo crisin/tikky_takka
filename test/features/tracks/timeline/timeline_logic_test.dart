@@ -2,7 +2,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:tikky_takka/core/domain/domain.dart';
 import 'package:tikky_takka/core/engine/engine.dart';
 import 'package:tikky_takka/features/tracks/timeline/timeline_logic.dart';
-import 'package:tikky_takka/features/tracks/timeline/timeline_summary.dart';
 import 'package:tikky_takka/features/tracks/tracks_strings.dart';
 import 'package:tikky_takka/l10n/strings.dart';
 
@@ -95,22 +94,6 @@ void main() {
       ..entry(13 * min)
       ..entry(14 * min, person: 'gone', substance: 'gone'),
   );
-
-  group('timelineSince', () {
-    test('open sessions have no lower bound; the last 24 hours move', () {
-      const now = 1700000000000;
-      expect(timelineSince(TimelineScope.open, now), isNull);
-      expect(timelineSince(TimelineScope.last24h, now), now - 24 * hour);
-    });
-
-    test('today starts at local midnight', () {
-      final now = DateTime(2026, 11, 14, 15, 30).millisecondsSinceEpoch;
-      expect(
-        timelineSince(TimelineScope.today, now),
-        DateTime(2026, 11, 14).millisecondsSinceEpoch,
-      );
-    });
-  });
 
   group('buildTimelineRows', () {
     test('one chronological list across all tracks, newest first by '
@@ -211,6 +194,14 @@ void main() {
         'Vögel: Tipp 4',
         'Vögel: Reiher · 3',
       ]);
+      // With an end: what came at or after it is left out.
+      final evening = buildTimelineRows(
+        sessions: [birdSession()],
+        sinceMs: 3 * min,
+        untilMs: rows[1].at,
+        newestFirst: false,
+      );
+      expect(_texts(evening), ['Vögel: Reiher · 2']);
     });
 
     test('sessions of a deleted track are left out', () {
@@ -293,158 +284,6 @@ void main() {
     expect(tickLabelChoices(birds, 'Uhu'), ['Reiher', 'Ente', 'Uhu']);
     expect(tickLabelChoices(birds, null), ['Reiher', 'Ente']);
     expect(tickLabelChoices(watch, null), isEmpty);
-  });
-
-  group('buildSummary', () {
-    test('counter: per label count, first, last and average gap, most '
-        'frequent first', () {
-      final groups = buildSummary(sessions: [birdSession()]);
-      final group = groups.single;
-      expect(group.kind, SummaryGroupKind.counter);
-      expect(group.title, 'Vögel');
-      expect(group.total, 5);
-      expect(group.lines, const [
-        SummaryLine(label: 'Reiher', count: 3, firstAt: 0, lastAt: 20 * min),
-        SummaryLine(
-          label: TracksStrings.summaryNoLabel,
-          count: 1,
-          firstAt: 4 * min,
-          lastAt: 4 * min,
-        ),
-        SummaryLine(label: 'Ente', count: 1, firstAt: 2 * min, lastAt: 2 * min),
-      ]);
-      expect(group.lines.first.averageGapMs, 10 * min);
-      expect(group.lines.last.averageGapMs, isNull);
-    });
-
-    test('sorting by last time', () {
-      final log = EventLog(sessionId: 'sb', trackId: birds.id)
-        ..start(0)
-        ..tick(0, label: 'Reiher')
-        ..tick(1 * min, label: 'Reiher')
-        ..tick(2 * min, label: 'Reiher')
-        ..tick(9 * min, label: 'Ente');
-      final byCount = buildSummary(sessions: [_session(birds, log)]);
-      expect(
-        [for (final l in byCount.single.lines) l.label],
-        ['Reiher', 'Ente'],
-      );
-      final byLast = buildSummary(
-        sessions: [_session(birds, log)],
-        sort: SummarySort.last,
-      );
-      expect(
-        [for (final l in byLast.single.lines) l.label],
-        ['Ente', 'Reiher'],
-      );
-    });
-
-    test('stopwatch: net time and laps', () {
-      final group = buildSummary(sessions: [watchSession()]).single;
-      expect(group.kind, SummaryGroupKind.stopwatch);
-      // 1:00 .. 8:00 minus one minute of pause.
-      expect(group.netMs, 6 * min);
-      expect(group.lapCount, 2);
-      expect(group.lines, isEmpty);
-    });
-
-    test('protocol: per person per substance - counts and times only', () {
-      final groups = buildSummary(
-        sessions: [tentSession()],
-        personNames: persons,
-        substanceNames: substances,
-      );
-      expect(
-        [for (final g in groups) g.title],
-        [
-          'Zelt · Jacke',
-          'Zelt · Kim',
-          'Zelt · ${Strings.protocolNoPerson}',
-          'Zelt · ${Strings.unknown}',
-        ],
-      );
-      final jacke = groups.first;
-      expect(jacke.kind, SummaryGroupKind.protocolPerson);
-      expect(jacke.total, 3);
-      expect(jacke.lines, const [
-        SummaryLine(
-          label: 'GBL',
-          count: 2,
-          firstAt: 90 * sec,
-          lastAt: 11 * min,
-        ),
-        SummaryLine(
-          label: 'Wasser',
-          count: 1,
-          firstAt: 12 * min,
-          lastAt: 12 * min,
-        ),
-      ]);
-      // Amounts are free text: nowhere in the summary, never added up.
-      for (final group in groups) {
-        for (final line in group.lines) {
-          expect(line.label.contains('ml'), isFalse);
-          expect(line.label.contains('0,5'), isFalse);
-        }
-      }
-      expect(groups[2].lines.single.label, Strings.protocolNoSubstance);
-    });
-
-    test('persons are ordered by the chosen sort', () {
-      final byLast = buildSummary(
-        sessions: [tentSession()],
-        sort: SummarySort.last,
-        personNames: persons,
-        substanceNames: substances,
-      );
-      expect(
-        [for (final g in byLast) g.title],
-        [
-          'Zelt · ${Strings.unknown}',
-          'Zelt · ${Strings.protocolNoPerson}',
-          'Zelt · Jacke',
-          'Zelt · Kim',
-        ],
-      );
-      expect([for (final l in byLast[2].lines) l.label], ['Wasser', 'GBL']);
-    });
-
-    test('groups follow the track order; the range applies; countdown '
-        'tracks have no totals', () {
-      final timer = _track('timer', const CountdownConfig(), sort: 9);
-      final timerSession = _session(
-        timer,
-        EventLog(sessionId: 'sc', trackId: timer.id)..start(0),
-      );
-      final groups = buildSummary(
-        sessions: [tentSession(), timerSession, watchSession(), birdSession()],
-        sinceMs: 3 * min,
-        personNames: persons,
-        substanceNames: substances,
-      );
-      expect(
-        [for (final g in groups) g.title],
-        [
-          'Vögel',
-          'Uhr',
-          'Zelt · Jacke',
-          'Zelt · Kim',
-          'Zelt · ${Strings.protocolNoPerson}',
-          'Zelt · ${Strings.unknown}',
-        ],
-      );
-      // Only the ticks from minute three on.
-      expect(groups.first.total, 3);
-      // Only the second lap.
-      expect(groups[1].lapCount, 1);
-      // Jacke's first entry was before the range.
-      expect(groups[2].total, 2);
-    });
-
-    test('nothing in range: no groups', () {
-      expect(buildSummary(sessions: [birdSession()], sinceMs: hour), isEmpty);
-      expect(buildSummary(sessions: const []), isEmpty);
-    });
   });
 
   group('HistoryRepository.getSetActivity', () {

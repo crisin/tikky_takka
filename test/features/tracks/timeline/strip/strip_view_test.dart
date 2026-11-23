@@ -6,6 +6,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:tikky_takka/adaptive/adaptive.dart';
 import 'package:tikky_takka/core/domain/domain.dart';
 import 'package:tikky_takka/core/repo/repo.dart';
+import 'package:tikky_takka/features/tracks/timeline/evening/evening_view.dart';
+import 'package:tikky_takka/features/tracks/timeline/person_cards.dart';
 import 'package:tikky_takka/features/tracks/timeline/strip/strip_detail.dart';
 import 'package:tikky_takka/features/tracks/timeline/strip/strip_model.dart';
 import 'package:tikky_takka/features/tracks/timeline/strip/strip_view.dart';
@@ -60,7 +62,7 @@ extension on TracksHarness {
 
   Future<void> mode(String label) => tap(
     find.descendant(
-      of: find.byKey(TimelineKeys.mode),
+      of: find.byKey(TimelineKeys.level),
       matching: find.text(label),
     ),
   );
@@ -100,8 +102,8 @@ Future<(Track, List<TrackEvent>)> _birds(TracksHarness h) async {
 }
 
 void main() {
-  testWidgets('the strip is the default mode; the order of the modes is '
-      'Streifen, Liste, Zusammenfassung', (tester) async {
+  testWidgets('"Jetzt" is the default level; "Abend" shows the evening, '
+      '"Kompakt" its list', (tester) async {
     final h = await TracksHarness.start(tester);
     await _birds(h);
     await h.showTimeline();
@@ -109,43 +111,33 @@ void main() {
     expect(find.byKey(StripKeys.view), findsOneWidget);
     expect(find.byKey(StripKeys.lanes), findsOneWidget);
     expect(find.byKey(TimelineKeys.list), findsNothing);
-    // The order toggle belongs to the list.
-    expect(find.byKey(TimelineKeys.order), findsNothing);
-    // The running timers stay pinned above.
-    expect(find.byKey(TimelineKeys.strip), findsOneWidget);
-    expect(
-      tester.getBottomLeft(find.byKey(TimelineKeys.strip)).dy,
-      lessThanOrEqualTo(tester.getTopLeft(find.byKey(StripKeys.view)).dy),
-    );
+    // The day and "Kompakt" belong to the evening.
+    expect(find.byKey(TimelineKeys.compact), findsNothing);
+    // Without a protocol there are no person cards above.
+    expect(find.byKey(PersonCardKeys.row), findsNothing);
 
     Finder segment(String label) => find.descendant(
-      of: find.byKey(TimelineKeys.mode),
+      of: find.byKey(TimelineKeys.level),
       matching: find.text(label),
     );
-    expect(TracksStrings.modeTimeline, 'Liste');
-    final xs = [
-      for (final label in [
-        TracksStrings.modeStrip,
-        TracksStrings.modeTimeline,
-        TracksStrings.modeSummary,
-      ])
-        tester.getCenter(segment(label)).dx,
-    ];
-    expect(xs[0], lessThan(xs[1]));
-    expect(xs[1], lessThan(xs[2]));
+    expect(
+      tester.getCenter(segment(TracksStrings.levelNow)).dx,
+      lessThan(tester.getCenter(segment(TracksStrings.levelEvening)).dx),
+    );
 
-    await h.mode(TracksStrings.modeTimeline);
+    await h.mode(TracksStrings.levelEvening);
+    expect(find.byKey(EveningKeys.view), findsOneWidget);
+    expect(find.byKey(StripKeys.view), findsNothing);
+    await h.tap(find.byKey(TimelineKeys.compact));
     expect(find.byKey(TimelineKeys.list), findsOneWidget);
     expect(find.byKey(TimelineKeys.order), findsOneWidget);
-    expect(find.byKey(StripKeys.view), findsNothing);
-    await h.mode(TracksStrings.modeSummary);
-    expect(find.byKey(TimelineKeys.summary), findsOneWidget);
-    await h.mode(TracksStrings.modeStrip);
+    await h.mode(TracksStrings.levelNow);
     expect(find.byKey(StripKeys.view), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('the mode is remembered per set', (tester) async {
+  testWidgets('the level is remembered per set; a stored mode of before is '
+      'taken over', (tester) async {
     final h = await TracksHarness.start(tester);
     final first = h.activeSet;
     await _birds(h);
@@ -163,18 +155,14 @@ void main() {
     );
     await h.showTimeline();
     expect(find.byKey(StripKeys.view), findsOneWidget);
-    expect(
-      h.app.settings.getString('${SettingsKeys.timelineModePrefix}${first.id}'),
-      isNull,
-    );
+    String? level(String setId) =>
+        h.app.settings.getString('${SettingsKeys.timelineLevelPrefix}$setId');
+    expect(level(first.id), isNull);
 
-    await h.mode(TracksStrings.modeSummary);
-    expect(
-      h.app.settings.getString('${SettingsKeys.timelineModePrefix}${first.id}'),
-      'summary',
-    );
+    await h.mode(TracksStrings.levelEvening);
+    expect(level(first.id), 'evening');
 
-    // Another set starts with the strip ...
+    // Another set starts with "Jetzt" ...
     await h.run(
       () => h.container.read(activeSetIdProvider.notifier).select(kitchen.id),
     );
@@ -186,40 +174,44 @@ void main() {
     await h.tick(noodles);
     await h.settle();
     expect(find.byKey(StripKeys.view), findsOneWidget);
-    // ... and remembers its own choice.
-    await h.mode(TracksStrings.modeTimeline);
-    expect(find.byKey(TimelineKeys.list), findsOneWidget);
-    expect(
-      h.app.settings.getString(
-        '${SettingsKeys.timelineModePrefix}${kitchen.id}',
-      ),
-      'list',
-    );
-
     await h.run(
       () => h.container.read(activeSetIdProvider.notifier).select(first.id),
     );
     await h.settle();
-    expect(find.byKey(TimelineKeys.summary), findsOneWidget);
-    expect(find.byKey(TimelineKeys.list), findsNothing);
+    expect(find.byKey(EveningKeys.view), findsOneWidget);
 
-    // A fresh start of the app reads the same choices from the store.
+    // The mode of before: the list is the evening as a list, the summary
+    // the evening, the strip "Jetzt".
+    await h.run(() async {
+      final store = h.app.settings;
+      await store.setString('${SettingsKeys.timelineModePrefix}a', 'list');
+      await store.setString('${SettingsKeys.timelineModePrefix}b', 'summary');
+      await store.setString('${SettingsKeys.timelineModePrefix}c', 'strip');
+      // Once there is a level, it wins.
+      await store.setString('${SettingsKeys.timelineModePrefix}d', 'list');
+      await store.setString('${SettingsKeys.timelineLevelPrefix}d', 'now');
+    });
     final restarted = ProviderContainer(overrides: h.app.overrides);
     addTearDown(restarted.dispose);
+    TimelineChoice choice(String setId) =>
+        restarted.read(timelineChoiceProvider(setId));
     expect(
-      restarted.read(timelineModeProvider(first.id)),
-      TimelineMode.summary,
+      choice('a'),
+      const TimelineChoice(TimelineLevel.evening, compact: true),
     );
-    expect(restarted.read(timelineModeProvider(kitchen.id)), TimelineMode.list);
-    expect(restarted.read(timelineModeProvider('unknown')), TimelineMode.strip);
-    expect(TimelineMode.fromName('nonsense'), TimelineMode.strip);
+    expect(choice('b'), const TimelineChoice(TimelineLevel.evening));
+    expect(choice('c'), TimelineChoice.initial);
+    expect(choice('d').level, TimelineLevel.now);
+    expect(choice(first.id).level, TimelineLevel.evening);
+    expect(choice('unknown'), TimelineChoice.initial);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('lanes and a fixed gutter for mixed track types', (tester) async {
+  testWidgets('the persons first, then the tracks; every lane has its name '
+      'above it', (tester) async {
     final h = await TracksHarness.start(
       tester,
-      surfaceSize: const Size(1270, 720),
+      surfaceSize: const Size(1270, 800),
     );
     final people = h.container.read(peopleRepositoryProvider);
     final jacke = await h.run(() => people.createPerson(name: 'Jacke'));
@@ -256,16 +248,17 @@ void main() {
     await h.advance(const Duration(minutes: 1));
     await h.showTimeline();
 
-    // Track order of the set: the seeded tracks, then the new ones. The
-    // seeded counter has no activity and gets no lane.
+    // The persons of the protocol first, each with its substances; then
+    // the tracks of the set in their order. The protocol has no lane of
+    // its own, the seeded counter without activity neither.
+    final gblLane = '${tent.id}/p/${jacke.id}/s/${gbl.id}';
     final ids = [
-      h.stopwatch.id,
-      h.timer.id,
-      tent.id,
       '${tent.id}/p/${jacke.id}',
-      '${tent.id}/p/${jacke.id}/s/${gbl.id}',
+      gblLane,
       '${tent.id}/p/${mo.id}',
       '${tent.id}/p/${mo.id}/s/${water.id}',
+      h.stopwatch.id,
+      h.timer.id,
       birds.id,
       '${birds.id}/l/Reiher',
       '${birds.id}/l/Ente',
@@ -274,6 +267,7 @@ void main() {
       expect(h.stripLane(id), findsOneWidget, reason: id);
     }
     expect(h.stripLane(h.counter.id), findsNothing);
+    expect(h.stripLane(tent.id), findsNothing);
     for (var i = 1; i < ids.length; i++) {
       expect(
         tester.getTopLeft(h.stripLane(ids[i])).dy,
@@ -281,29 +275,26 @@ void main() {
         reason: ids[i],
       );
     }
+    final watchName = h.inStripLane(h.stopwatch.id, Strings.seedStopwatchName);
+    expect(watchName, findsOneWidget);
+    final jackeName = h.inStripLane('${tent.id}/p/${jacke.id}', 'Jacke');
+    expect(jackeName, findsOneWidget);
     expect(
-      h.inStripLane(h.stopwatch.id, Strings.seedStopwatchName),
+      h.inStripLane('${tent.id}/p/${jacke.id}', TracksStrings.stripPersonOpen),
       findsOneWidget,
     );
-    expect(h.inStripLane(tent.id, 'Zelt'), findsOneWidget);
-    expect(h.inStripLane('${tent.id}/p/${jacke.id}', 'Jacke'), findsOneWidget);
     expect(h.inStripLane('${birds.id}/l/Reiher', 'Reiher'), findsOneWidget);
-    // Sub-lanes are indented, a person's substances further.
-    final gblLane = '${tent.id}/p/${jacke.id}/s/${gbl.id}';
+    // A person stands where a track does; its things are indented.
     expect(
-      tester.getTopLeft(h.inStripLane('${tent.id}/p/${jacke.id}', 'Jacke')).dx,
-      greaterThan(tester.getTopLeft(h.inStripLane(tent.id, 'Zelt')).dx),
+      tester.getTopLeft(jackeName).dx,
+      closeTo(tester.getTopLeft(watchName).dx, 0.01),
     );
     expect(
       tester.getTopLeft(h.inStripLane(gblLane, 'GBL')).dx,
-      greaterThan(
-        tester
-            .getTopLeft(h.inStripLane('${tent.id}/p/${jacke.id}', 'Jacke'))
-            .dx,
-      ),
+      greaterThan(tester.getTopLeft(jackeName).dx),
     );
-    // Every substance lane has its timer: time since its last entry, in
-    // the warning colour while the lockout the user set is running.
+    // Every substance has its timer next to its name: time since its last
+    // entry, in the warning colour while the lockout the user set runs.
     final gblTimer = find.byKey(StripKeys.timer(gblLane));
     expect(
       find.descendant(of: gblTimer, matching: find.text('04:00')),
@@ -316,7 +307,7 @@ void main() {
           )
           .style!
           .color,
-      TikkyTokens.fallback.colors.warning,
+      TikkyTokens.fallback.colors.warningText,
     );
     expect(
       find.descendant(
@@ -325,49 +316,61 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(find.byKey(StripKeys.timer(tent.id)), findsNothing);
-    // Wide: the buttons say what they do.
-    expect(find.text(TracksStrings.stripFit), findsOneWidget);
-    expect(find.text(TracksStrings.stripNow), findsOneWidget);
-    // The wide gutter, to the left of the lanes.
-    final gutter = tester.getRect(find.byKey(StripKeys.gutter));
+    // A track with an open session shows its live value.
+    expect(find.byKey(StripKeys.value(h.timer.id)), findsOneWidget);
+    expect(find.byKey(StripKeys.value(birds.id)), findsOneWidget);
+    // "Alles" and "Jetzt".
+    expect(find.text(TracksStrings.stripAll), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(StripKeys.now),
+        matching: find.text(TracksStrings.stripNow),
+      ),
+      findsOneWidget,
+    );
+    // The lanes use the whole width and the height that is left.
     final lanes = tester.getRect(find.byKey(StripKeys.lanes));
-    expect(gutter.width, TikkyTokens.fallback.strip.gutter);
-    expect(lanes.left, gutter.right);
-    // The strip uses the whole width and the height that is left.
     final view = tester.getRect(find.byKey(StripKeys.view));
+    expect(lanes.left, view.left);
     expect(lanes.right, view.right);
     expect(view.right, 1270);
-    expect(view.bottom, greaterThan(700));
+    expect(view.bottom, greaterThan(600));
 
-    // What is drawn: bars for every lane, the pause, the lap, the ticks,
-    // the entries - and a lockout band only for the substance with one.
+    // What is drawn: a bar or a line for every lane but the persons, the
+    // pause, the lap, the ticks, the entries - and a band only for the
+    // substance with a lockout that still runs.
     final layout = h.strip.layout;
     expect(layout.rowTops, hasLength(ids.length));
+    expect({for (final b in layout.bars) b.rowIndex}, {1, 3, 4, 5, 6, 7, 8});
     expect(
-      {for (final b in layout.bars) b.rowIndex},
-      {for (var i = 0; i < ids.length; i++) i},
-    );
-    expect(
-      layout.bars.where((b) => b.rowIndex == 0).map((b) => b.kind),
+      layout.bars.where((b) => b.rowIndex == 4).map((b) => b.kind),
       containsAll([StripBarKind.active, StripBarKind.paused]),
     );
-    expect(layout.bars.where((b) => b.rowIndex == 1).single.touchesNow, isTrue);
+    expect(layout.bars.where((b) => b.rowIndex == 5).single.touchesNow, isTrue);
     expect(
-      layout.markers.where((m) => m.rowIndex == 0).single.kind,
+      layout.markers.where((m) => m.rowIndex == 4).single.kind,
       StripMarkerKind.lap,
     );
-    expect(h.markerOf(ticks[0])!.rowIndex, 8);
-    expect(h.markerOf(ticks[1])!.rowIndex, 9);
-    expect(h.markerOf(withLockout)!.rowIndex, 4);
-    expect(h.markerOf(plain)!.rowIndex, 6);
+    expect(h.markerOf(ticks[0])!.rowIndex, 7);
+    expect(h.markerOf(ticks[1])!.rowIndex, 8);
+    expect(h.markerOf(withLockout)!.rowIndex, 1);
+    expect(h.markerOf(plain)!.rowIndex, 3);
     expect(h.markerOf(withLockout)!.event!.colorArgb, 0xFF112233);
+    // The line of a substance starts with its first entry.
+    final gblLine = layout.bars.where((b) => b.rowIndex == 1).single;
+    expect(
+      gblLine.rect.left,
+      closeTo(h.markerOf(withLockout)!.center.dx, 0.01),
+    );
     expect(layout.bands, hasLength(1));
-    expect(layout.bands.single.rowIndex, 4);
-    expect(layout.bands.single.colorArgb, 0xFF112233);
+    expect(layout.bands.single.rowIndex, 1);
     expect(
       layout.bands.single.rect.left,
       closeTo(h.markerOf(withLockout)!.center.dx, 0.01),
+    );
+    expect(
+      layout.bands.single.rect.height,
+      TikkyTokens.fallback.strip.warnBand,
     );
     // Everything of the scope is in view, now included.
     expect(layout.nowX, inInclusiveRange(0, lanes.width));
@@ -376,13 +379,135 @@ void main() {
     }
 
     // Panning moves the content, not the names.
-    final before = tester.getTopLeft(h.stripLane(tent.id));
+    final before = tester.getTopLeft(watchName);
     final x = h.markerOf(ticks[2])!.center.dx;
-    await h.tap(find.byKey(StripKeys.zoomIn));
+    h.viewport.zoomBy(TikkyTokens.fallback.strip.zoomStep);
+    await tester.pump();
     await tester.drag(find.byKey(StripKeys.lanes), const Offset(-160, 0));
     await tester.pump();
-    expect(tester.getTopLeft(h.stripLane(tent.id)), before);
+    expect(tester.getTopLeft(watchName), before);
     expect(h.markerOf(ticks[2])?.center.dx, isNot(x));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a tap on the name of a person folds it onto one line and '
+      'back; the strip remembers it per set', (tester) async {
+    final h = await TracksHarness.start(tester);
+    final people = h.container.read(peopleRepositoryProvider);
+    final jacke = await h.run(() => people.createPerson(name: 'Jacke'));
+    final mo = await h.run(() => people.createPerson(name: 'Mo'));
+    final beer = await h.run(() => people.createSubstance(name: 'Bier'));
+    final mate = await h.run(() => people.createSubstance(name: 'Mate'));
+    final tent = await h.addTrack(const ProtocolConfig(), name: 'Zelt');
+    Future<TrackEvent> add(Person p, Substance s) async =>
+        (await h.run<TrackEvent?>(
+          () => h.commands.addEntry(tent.id, personId: p.id, substanceId: s.id),
+        ))!;
+    final first = await add(jacke, mate);
+    await h.advance(const Duration(minutes: 5));
+    await add(jacke, beer);
+    await h.advance(const Duration(minutes: 5));
+    await add(mo, beer);
+    await h.advance(const Duration(minutes: 5));
+    await h.showTimeline();
+
+    final jackeLane = '${tent.id}/p/${jacke.id}';
+    final moLane = '${tent.id}/p/${mo.id}';
+    final mateLane = '$jackeLane/s/${mate.id}';
+    expect(h.stripLane(mateLane), findsOneWidget);
+    final key = '${SettingsKeys.stripOpenPrefix}${h.activeSet.id}';
+    expect(h.app.settings.getString(key), isNull);
+
+    // The tap target of the name is a full tap target high.
+    expect(
+      tester.getSize(h.stripLane(jackeLane)).height,
+      greaterThanOrEqualTo(TikkyTokens.fallback.sizes.minTapTarget),
+    );
+    await h.tap(h.inStripLane(jackeLane, 'Jacke'));
+    expect(h.stripLane(mateLane), findsNothing);
+    expect(
+      h.inStripLane(jackeLane, TracksStrings.stripPersonFolded(2)),
+      findsOneWidget,
+    );
+    // All its entries on its own line, the word below each.
+    final row = h.strip.layout.markers
+        .where((m) => m.event?.row.event.id == first.id)
+        .single;
+    expect(row.rowIndex, 0);
+    expect(h.strip.layout.markers.where((m) => m.rowIndex == 0), hasLength(2));
+    expect(h.app.settings.getString(key), moLane);
+
+    // Tapping the marker on the folded line opens the entry.
+    await h.tapMarker(first);
+    expect(find.byKey(StripDetailKeys.event), findsOneWidget);
+    await tester.tapAt(const Offset(4, 4));
+    await h.settle();
+
+    await h.tap(h.inStripLane(jackeLane, 'Jacke'));
+    expect(h.stripLane(mateLane), findsOneWidget);
+    expect(h.app.settings.getString(key)!.split('\n').toSet(), {
+      moLane,
+      jackeLane,
+    });
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a card per person above the strip; a tap opens "Was?" of '
+      'that person', (tester) async {
+    final h = await TracksHarness.start(tester);
+    final people = h.container.read(peopleRepositoryProvider);
+    final krille = await h.run(() => people.createPerson(name: 'Krille'));
+    final beer = await h.run(
+      () => people.createSubstance(name: 'Bier', lockoutMs: 60 * 60 * 1000),
+    );
+    final mate = await h.run(() => people.createSubstance(name: 'Mate'));
+    final tent = await h.addTrack(const ProtocolConfig(), name: 'Zelt');
+    await h.run(
+      () => h.commands.addEntry(
+        tent.id,
+        personId: krille.id,
+        substanceId: beer.id,
+      ),
+    );
+    await h.advance(const Duration(minutes: 10));
+    await h.run(
+      () => h.commands.addEntry(
+        tent.id,
+        personId: krille.id,
+        substanceId: mate.id,
+      ),
+    );
+    await h.advance(const Duration(minutes: 16));
+    await h.showTimeline();
+
+    final card = find.byKey(PersonCardKeys.card(tent.id, krille.id));
+    expect(card, findsOneWidget);
+    Finder inCard(String text) =>
+        find.descendant(of: card, matching: find.text(text));
+    // The lockout of the beer still runs: the card counts from it.
+    expect(inCard('Krille'), findsOneWidget);
+    expect(inCard('26:00'), findsOneWidget);
+    expect(inCard(TracksStrings.cardSince('Bier')), findsOneWidget);
+    expect(inCard(TracksStrings.cardLockout('34 min')), findsOneWidget);
+    // The card sits above the strip.
+    expect(
+      tester.getBottomLeft(card).dy,
+      lessThanOrEqualTo(tester.getTopLeft(find.byKey(StripKeys.view)).dy),
+    );
+
+    // Once it ran out: the last entry, and what came before it.
+    await h.advance(const Duration(minutes: 40));
+    expect(inCard(TracksStrings.cardSince('Mate')), findsOneWidget);
+    expect(
+      inCard(TracksStrings.cardOther('Bier', '1 h 6 min')),
+      findsOneWidget,
+    );
+
+    await h.tap(card);
+    expect(
+      h.container.read(tracksViewProvider(h.activeSet.id)),
+      TracksView.pad,
+    );
     expect(tester.takeException(), isNull);
   });
 
@@ -465,7 +590,8 @@ void main() {
     expect(find.text('Jacke · GBL · 1 ml'), findsOneWidget);
     expect(find.text(Strings.lockoutRemaining('1 h 30 min')), findsOneWidget);
     await h.tap(find.byKey(StripDetailKeys.edit));
-    expect(find.text(Strings.protocolEditEntry), findsOneWidget);
+    // The sheet "Ändern" of the entry.
+    expect(find.text('GBL · Jacke'), findsOneWidget);
     expect(find.text(TracksStrings.eventEditTitle), findsNothing);
     expect(
       tester
@@ -583,8 +709,8 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('zoom buttons, "Alles zeigen" and "Jetzt"; following stops '
-      'when the user pans', (tester) async {
+  testWidgets('"Alles" and "Jetzt"; following stops when the user '
+      'pans', (tester) async {
     final h = await TracksHarness.start(tester);
     await _birds(h);
     await h.run(() => h.commands.startTrack(h.stopwatch.id));
@@ -592,21 +718,20 @@ void main() {
     await h.showTimeline();
     final v = h.viewport;
     final step = TikkyTokens.fallback.strip.zoomStep;
-    // On a phone all four are icons; their names are the tooltips.
     bool canJump() =>
-        tester
-            .widget<AdaptiveIconButton>(
-              find.descendant(
-                of: find.byKey(StripKeys.now),
-                matching: find.byType(AdaptiveIconButton),
-              ),
-            )
-            .onPressed !=
-        null;
-    expect(find.byTooltip(TracksStrings.stripFit), findsOneWidget);
-    expect(find.byTooltip(TracksStrings.stripNow), findsOneWidget);
-    expect(find.byTooltip(TracksStrings.stripZoomIn), findsOneWidget);
-    expect(find.byTooltip(TracksStrings.stripZoomOut), findsOneWidget);
+        tester.widget<PillButton>(find.byKey(StripKeys.now)).onPressed != null;
+    expect(find.text(TracksStrings.stripAll), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(StripKeys.now),
+        matching: find.text(TracksStrings.stripNow),
+      ),
+      findsOneWidget,
+    );
+    Future<void> zoom(double factor) async {
+      v.zoomBy(factor);
+      await tester.pump();
+    }
 
     // The first view shows everything, with a little air.
     final now = h.app.clock.nowMs();
@@ -617,11 +742,11 @@ void main() {
     expect(v.xOf(now), lessThan(v.width));
     expect(v.xOf(now), greaterThan(v.width * 0.9));
 
-    await h.tap(find.byKey(StripKeys.zoomIn));
+    await zoom(step);
     expect(v.msPerPx, closeTo(fitScale / step, 1e-6));
-    await h.tap(find.byKey(StripKeys.zoomIn));
+    await zoom(step);
     expect(v.msPerPx, closeTo(fitScale / step / step, 1e-6));
-    await h.tap(find.byKey(StripKeys.zoomOut));
+    await zoom(1 / step);
     expect(v.msPerPx, closeTo(fitScale / step, 1e-6));
     // The middle stayed where it was.
     expect(
@@ -629,12 +754,12 @@ void main() {
       closeTo(fitStart + fitScale * v.width / 2, 1),
     );
     // Not further out than everything.
-    await h.tap(find.byKey(StripKeys.zoomOut));
-    await h.tap(find.byKey(StripKeys.zoomOut));
+    await zoom(1 / step);
+    await zoom(1 / step);
     expect(v.msPerPx, closeTo(fitScale, 1e-6));
 
-    await h.tap(find.byKey(StripKeys.zoomIn));
-    await h.tap(find.byKey(StripKeys.zoomIn));
+    await zoom(step);
+    await zoom(step);
     await tester.drag(find.byKey(StripKeys.lanes), const Offset(120, 0));
     await tester.pump();
     await h.tap(find.byKey(StripKeys.fit));
@@ -642,8 +767,8 @@ void main() {
     expect(v.startMs, closeTo(fitStart, 1e-6));
 
     // "Jetzt" jumps to the now line and follows it.
-    await h.tap(find.byKey(StripKeys.zoomIn));
-    await h.tap(find.byKey(StripKeys.zoomIn));
+    await zoom(step);
+    await zoom(step);
     expect(canJump(), isTrue);
     await h.tap(find.byKey(StripKeys.now));
     expect(v.following, isTrue);
@@ -656,7 +781,7 @@ void main() {
     expect(v.xOf(h.app.clock.nowMs()), closeTo(anchor, 1e-6));
     expect(h.strip.layout.nowX, closeTo(anchor, 1e-6));
     // Zooming keeps following.
-    await h.tap(find.byKey(StripKeys.zoomIn));
+    await zoom(step);
     expect(v.following, isTrue);
     expect(v.xOf(h.app.clock.nowMs()), closeTo(anchor, 1e-6));
 
@@ -844,7 +969,8 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('the scope and the filters apply to the strip', (tester) async {
+  testWidgets('"Jetzt" shows the open sessions; the filters apply to the '
+      'strip', (tester) async {
     final h = await TracksHarness.start(tester);
     // A closed session ...
     final old = await h.tick(h.counter);
@@ -860,21 +986,6 @@ void main() {
     expect(h.stripLane(h.stopwatch.id), findsOneWidget);
     expect(h.stripLane(h.counter.id), findsNothing);
     expect(h.markerOf(old), isNull);
-    final openStart = h.viewport.extentStart;
-
-    // "Letzte 24 h" also shows what has ended - and fits the view again.
-    await h.tap(find.byKey(TimelineKeys.scope));
-    await h.tap(find.text(TracksStrings.scopeLast24h).last);
-    expect(h.stripLane(h.counter.id), findsOneWidget);
-    expect(h.viewport.extentStart, lessThan(openStart));
-    expect(h.viewport.xOf(old.at), inInclusiveRange(0, h.viewport.width));
-    expect(
-      h.strip.layout.markers.any((m) => m.event?.row.event.id == old.id) ||
-          h.strip.layout.clusters.any(
-            (c) => c.events.any((e) => e.row.event.id == old.id),
-          ),
-      isTrue,
-    );
 
     // Start and stop become markers only with the chip.
     bool lifecycle() =>
@@ -912,11 +1023,8 @@ void main() {
     expect(find.byKey(StripKeys.lanes), findsNothing);
     expect(find.text(TracksStrings.timelineEmptyTitle), findsOneWidget);
     expect(find.text(TracksStrings.timelineEmptyOpen), findsOneWidget);
-    // The mode switch and the scope are still there.
-    expect(find.byKey(TimelineKeys.mode), findsOneWidget);
-    await h.tap(find.byKey(TimelineKeys.scope));
-    await h.tap(find.text(TracksStrings.scopeToday).last);
-    expect(find.text(TracksStrings.timelineEmptyRange), findsOneWidget);
+    // The level switch is still there.
+    expect(find.byKey(TimelineKeys.level), findsOneWidget);
 
     // The first event brings the strip, fitted to it.
     final tick = await h.tick(h.counter);
@@ -951,7 +1059,7 @@ void main() {
     final last = h.stripLane(birds.id);
     final before = tester.getTopLeft(last).dy;
     await tester.dragFrom(
-      tester.getTopLeft(find.byKey(StripKeys.gutter)) + const Offset(40, 20),
+      h.lanesOrigin + const Offset(40, 20),
       const Offset(0, -60),
     );
     await tester.pump();
@@ -1017,17 +1125,15 @@ void main() {
       expect(tester.takeException(), isNull);
       expect(find.byKey(StripKeys.lanes), findsOneWidget);
 
-      // The narrow gutter on a phone: colour dot and the cut-off name.
-      final gutter = tester.getSize(find.byKey(StripKeys.gutter)).width;
-      final strip = TikkyTokens.fallback.strip;
-      expect(
-        gutter,
-        size.width < strip.narrowBreakpoint ? strip.gutterNarrow : strip.gutter,
-      );
+      // The lanes take the whole width; long names are cut off.
       expect(tester.getRect(find.byKey(StripKeys.lanes)).right, size.width);
+      expect(
+        tester.getRect(find.byKey(StripKeys.lanes)).left,
+        tester.getRect(find.byKey(StripKeys.view)).left,
+      );
 
-      await h.tap(find.byKey(StripKeys.zoomIn));
-      await h.tap(find.byKey(StripKeys.zoomOut));
+      h.viewport.zoomBy(2);
+      await tester.pump();
       await h.tap(find.byKey(StripKeys.now));
       await h.tap(find.byKey(StripKeys.fit));
       await h.tapChip(TimelineKeys.lifecycle);
@@ -1075,12 +1181,7 @@ void main() {
         ),
         findsOne,
       );
-      for (final label in [
-        TracksStrings.stripZoomIn,
-        TracksStrings.stripZoomOut,
-        TracksStrings.stripFit,
-        TracksStrings.stripNow,
-      ]) {
+      for (final label in [TracksStrings.stripFit, TracksStrings.stripToNow]) {
         expect(find.semantics.byLabel(label), findsAtLeast(1), reason: label);
       }
 
@@ -1109,7 +1210,8 @@ void main() {
       expect(after.center.dx, lessThan(before.center.dx - 20));
       expect(after.center.dx, closeTo(h.markerOf(ticks[2])!.center.dx, 0.5));
       // What left the view has no node any more.
-      await h.tap(find.byKey(StripKeys.zoomIn));
+      h.viewport.zoomBy(TikkyTokens.fallback.strip.zoomStep);
+      await tester.pump();
       await tester.pump();
       expect(h.markerOf(ticks[0]), isNull);
       expect(

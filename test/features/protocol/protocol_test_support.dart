@@ -167,11 +167,8 @@ class ProtocolFixture {
     return set!;
   }
 
-  /// The key of a person card (step 1).
+  /// The key of a person card.
   static Key card(Person person) => ValueKey('person-card-${person.id}');
-
-  /// The key of a one-tap substance button (step 2).
-  static Key button(Substance substance) => ValueKey('capture-${substance.id}');
 
   Future<TrackEvent?> entry({
     String? personId,

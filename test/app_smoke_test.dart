@@ -3,15 +3,19 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:tikky_takka/adaptive/adaptive.dart';
 import 'package:tikky_takka/core/repo/repo.dart';
 import 'package:tikky_takka/core/services/alarms/alarm_service.dart';
 import 'package:tikky_takka/features/history/history_screen.dart';
 import 'package:tikky_takka/features/settings/lock_gate.dart';
 import 'package:tikky_takka/features/settings/settings_screen.dart';
+import 'package:tikky_takka/features/tracks/pad/tap_pad.dart';
 import 'package:tikky_takka/features/tracks/tracks_screen.dart';
+import 'package:tikky_takka/features/tracks/tracks_strings.dart';
 import 'package:tikky_takka/l10n/strings.dart';
 import 'package:tikky_takka/theme/theme.dart';
 
+import 'support/shell_nav.dart';
 import 'support/test_app.dart';
 
 void main() {
@@ -23,7 +27,7 @@ void main() {
 
     expect(find.byType(LockGate), findsOneWidget);
     expect(find.byType(TracksScreen), findsOneWidget);
-    expect(find.byType(NavigationBar), findsOneWidget);
+    expect(find.byType(NavPill), findsOneWidget);
     expect(find.byType(NavigationRail), findsNothing);
 
     // Seed: set "Allgemein" with a stopwatch, a timer and a counter.
@@ -37,29 +41,34 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('bottom navigation switches between the three destinations', (
+  testWidgets('the pill switches the views, "···" opens settings and history', (
     tester,
   ) async {
     final app = await TestApp.create(tester);
     await app.pumpApp(tester);
 
-    // Destinations are built lazily.
     expect(find.byType(HistoryScreen), findsNothing);
     expect(find.byType(SettingsScreen), findsNothing);
 
-    await tester.tap(find.text(Strings.navHistory));
+    await tester.tap(find.text(TracksStrings.viewPad));
+    await app.settle(tester);
+    expect(find.byType(TapPad), findsOneWidget);
+    await tester.tap(find.text(TracksStrings.viewLanes));
+    await app.settle(tester);
+    expect(find.byType(TapPad), findsNothing);
+
+    await openHistoryPage(tester);
     await app.settle(tester);
     expect(find.byType(HistoryScreen), findsOneWidget);
+    await closePage(tester);
 
-    await tester.tap(find.text(Strings.navSettings));
+    await openSettingsPage(tester);
     await app.settle(tester);
     expect(find.byType(SettingsScreen), findsOneWidget);
-
-    await tester.tap(find.text(Strings.navTracks));
+    await closePage(tester);
     await app.settle(tester);
-    // Visited destinations stay alive.
     expect(find.byType(TracksScreen), findsOneWidget);
-    expect(find.byType(HistoryScreen, skipOffstage: false), findsOneWidget);
+    expect(find.byType(SettingsScreen), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
@@ -68,20 +77,19 @@ void main() {
     await app.pumpApp(tester, surfaceSize: TestApp.desktopSize);
 
     expect(find.byType(NavigationRail), findsOneWidget);
-    expect(find.byType(NavigationBar), findsNothing);
+    expect(find.byType(NavPill), findsNothing);
     expect(find.byType(TracksScreen), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Apple platforms get Cupertino navigation', (tester) async {
+  testWidgets('Apple platforms get the same navigation', (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
     try {
       final app = await TestApp.create(tester);
       await app.pumpApp(tester);
 
-      expect(find.byType(CupertinoTabBar), findsOneWidget);
-      expect(find.byType(CupertinoNavigationBar), findsOneWidget);
-      expect(find.byType(NavigationBar), findsNothing);
+      expect(find.byType(NavPill), findsOneWidget);
+      expect(find.byType(CupertinoTabBar), findsNothing);
       expect(find.text(Strings.seedSetName), findsOneWidget);
       expect(tester.takeException(), isNull);
     } finally {
@@ -107,7 +115,8 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
 
     expect(
-      Theme.of(tester.element(find.byType(TracksScreen))).scaffoldBackgroundColor,
+      Theme.of(tester.element(find.byType(TracksScreen)))
+          .scaffoldBackgroundColor,
       ThemePresets.black.colors.background,
     );
     expect(app.settings.getJson('theme.settings')!['themeId'], 'preset.black');
@@ -136,9 +145,7 @@ void main() {
     expect(app.alarms.scheduled, isEmpty);
     expect(
       await tester.runAsync(
-        () => container
-            .read(trackCommandsProvider)
-            .getOpenSession(timer.id),
+        () => container.read(trackCommandsProvider).getOpenSession(timer.id),
       ),
       isNull,
     );

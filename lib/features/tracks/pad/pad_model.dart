@@ -40,6 +40,10 @@ enum PadButtonKind {
 
   /// "+": the full entry sheet of a protocol track.
   more,
+
+  /// "Anderes": the page with the person's other substances and a field
+  /// for a new one.
+  other,
 }
 
 /// One button of the pad. [id] is stable for as long as the thing behind
@@ -97,6 +101,13 @@ final class PadButton {
     personId: personId,
   );
 
+  factory PadButton.other(Track track, {String? personId}) => PadButton._(
+    id: 'o:${track.id}:${personId ?? '-'}',
+    kind: PadButtonKind.other,
+    track: track,
+    personId: personId,
+  );
+
   final String id;
   final PadButtonKind kind;
   final Track track;
@@ -131,7 +142,7 @@ final class PadButton {
 }
 
 /// The substance buttons of [personId] on [track] (the same top-5 logic
-/// as the protocol lane, see [topSubstanceIds]) followed by "+".
+/// as the protocol lane, see [topSubstanceIds]) followed by "Anderes".
 List<PadButton> buildSubstancePad({
   required Track track,
   required String? personId,
@@ -150,9 +161,23 @@ List<PadButton> buildSubstancePad({
   return [
     for (final id in ids)
       PadButton.substance(track, personId: personId, substanceId: id),
-    PadButton.more(track, personId: personId),
+    PadButton.other(track, personId: personId),
   ];
 }
+
+/// The substances of the page "Anderes": every substance of [substances]
+/// that is not already a button on the page "Was?" ([shownIds]), in the
+/// order of the user's list.
+List<PadButton> buildOtherPad({
+  required Track track,
+  required String? personId,
+  required List<Substance> substances,
+  required Set<String> shownIds,
+}) => [
+  for (final s in substances)
+    if (!shownIds.contains(s.id))
+      PadButton.substance(track, personId: personId, substanceId: s.id),
+];
 
 /// The buttons of the main pad, in track order:
 ///
@@ -322,6 +347,7 @@ PadLayout computePadLayout({
   required double minButtonHeight,
   required double minButtonWidth,
   required double gap,
+  int minColumns = 1,
 }) {
   if (count <= 0) {
     return PadLayout(
@@ -334,11 +360,13 @@ PadLayout computePadLayout({
   var maxColumns = ((width + gap) / (minButtonWidth + gap)).floor();
   if (maxColumns < 1) maxColumns = 1;
   if (maxColumns > count) maxColumns = count;
+  // At least [minColumns] where the width and the count allow it.
+  final fewest = minColumns.clamp(1, maxColumns);
 
   const preferredAspect = 1.5;
   PadLayout? best;
   var bestScore = -1.0;
-  for (var columns = 1; columns <= maxColumns; columns++) {
+  for (var columns = fewest; columns <= maxColumns; columns++) {
     final rows = (count + columns - 1) ~/ columns;
     final rowHeight = (height - gap * (rows - 1)) / rows;
     if (rowHeight < minButtonHeight) continue;
@@ -395,6 +423,9 @@ enum PadTapAction {
   /// Protocol: open the full entry sheet.
   openSheet,
 
+  /// Protocol: open the page "Anderes".
+  openOther,
+
   /// Nothing (a running or paused timer: pausing is done in the lanes).
   none,
 }
@@ -426,6 +457,8 @@ PadTapAction padTapAction(PadButton button, RunState state) {
       return PadTapAction.entry;
     case PadButtonKind.more:
       return PadTapAction.openSheet;
+    case PadButtonKind.other:
+      return PadTapAction.openOther;
   }
 }
 
@@ -444,7 +477,10 @@ bool _counts(PadButton button, TrackEvent e) => switch (button.kind) {
     e.type == EventType.entry &&
         e.personId == button.personId &&
         e.substanceId == button.substanceId,
-  PadButtonKind.stopwatch || PadButtonKind.timer || PadButtonKind.more => false,
+  PadButtonKind.stopwatch ||
+  PadButtonKind.timer ||
+  PadButtonKind.more ||
+  PadButtonKind.other => false,
 };
 
 /// The count on a counter / person / substance button: its ticks or
@@ -494,6 +530,8 @@ String padValue(
       ).time.digits;
     case PadButtonKind.more:
       return TracksStrings.padMoreSymbol;
+    case PadButtonKind.other:
+      return '';
   }
 }
 
@@ -513,7 +551,7 @@ String padSubText(PadButton button, OpenSession? open, int nowMs) {
         PadButtonKind.person ||
         PadButtonKind.substance:
       return padSince(padLastTapAt(button, open), nowMs);
-    case PadButtonKind.more:
+    case PadButtonKind.more || PadButtonKind.other:
       return TracksStrings.padMore;
     case PadButtonKind.stopwatch:
       final snapshot = laneSnapshot(button.track, open, nowMs);
@@ -546,7 +584,7 @@ String padSubText(PadButton button, OpenSession? open, int nowMs) {
 /// the button follows the shared ticker).
 bool padIsLive(PadButton button, OpenSession? open, int nowMs) {
   switch (button.kind) {
-    case PadButtonKind.more:
+    case PadButtonKind.more || PadButtonKind.other:
       return false;
     case PadButtonKind.counter ||
         PadButtonKind.person ||
@@ -555,4 +593,48 @@ bool padIsLive(PadButton button, OpenSession? open, int nowMs) {
     case PadButtonKind.stopwatch || PadButtonKind.timer:
       return laneSnapshot(button.track, open, nowMs).isTicking;
   }
+}
+
+/// The last entry of the person of a person button in the open session,
+/// for "Kippe · vor 8 min"; `null` for other buttons or without entry.
+TrackEvent? padLastEntry(PadButton button, OpenSession? open) =>
+    button.kind == PadButtonKind.person
+    ? lastEntryOfPerson(_events(button, open), button.personId)
+    : null;
+
+/// The user's own lockout of a substance button at [nowMs]: what is left
+/// and how much of it has passed (0..1, for the bar). `null` while none
+/// runs. Shown, never enforced.
+@immutable
+final class PadLockout {
+  const PadLockout({required this.remainingMs, required this.passed});
+
+  final int remainingMs;
+  final double passed;
+}
+
+PadLockout? padLockout(
+  PadButton button, {
+  required Iterable<LastEntryFact> facts,
+  required Map<String, int> lockouts,
+  required int nowMs,
+}) {
+  final substanceId = button.substanceId;
+  if (button.kind != PadButtonKind.substance || substanceId == null) {
+    return null;
+  }
+  final total = lockouts[substanceId];
+  if (total == null || total <= 0) return null;
+  final remaining = lockoutRemainingFor(
+    facts,
+    personId: button.personId,
+    substanceId: substanceId,
+    nowMs: nowMs,
+    lockouts: lockouts,
+  );
+  if (remaining == null || remaining <= 0) return null;
+  return PadLockout(
+    remainingMs: remaining,
+    passed: (1 - remaining / total).clamp(0, 1).toDouble(),
+  );
 }

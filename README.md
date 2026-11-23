@@ -52,16 +52,39 @@ Nach Änderungen am Datenbankschema (`lib/core/db/tables.dart`):
 dart run build_runner build --delete-conflicting-outputs
 ```
 
-## Web (auch zum Testen auf iPhone / Android)
+## Web und PWA (auch zum Testen auf iPhone / Android)
+
+Jeder Push auf `master` baut die Web-Version und stellt sie auf GitHub Pages
+(Workflow `pages.yml`): **https://crisin.github.io/tikky_takka/**
+
+Auf dem Handy installieren: Seite öffnen, dann auf dem iPhone in Safari
+„Teilen → Zum Home-Bildschirm“, auf Android in Chrome „App installieren“.
+Die installierte App läuft ohne Netz. Ein neuer Stand kommt beim übernächsten
+Start: Beim ersten Start lädt sie ihn im Hintergrund, beim zweiten ist er da.
+
+Offline-Betrieb: `web/sw.js` (Service Worker) speichert alle App-Dateien.
+`tools/web_pwa.dart` trägt nach dem Build Version und Dateiliste ein.
+CanvasKit liegt mit im Build (`--no-web-resources-cdn`), nicht auf Googles
+CDN. Flutters eigener Service Worker ist abgeschaltet
+(`web/flutter_bootstrap.js`).
+
+Lokal:
 
 ```
-flutter build web --release
-python -m http.server 5180 --bind 0.0.0.0 --directory build/web
+flutter build web --release --no-web-resources-cdn
+dart run tools/web_pwa.dart
+python tools/serve_web.py
 ```
 
 Dann im Browser `http://localhost:5180` – oder vom Handy im selben WLAN
 `http://<IP des PCs>:5180` (IP per `ipconfig`). Beim ersten Start fragt die
 Windows-Firewall nach, ob Python im privaten Netz lauschen darf: zulassen.
+Über `http://<IP>` gibt es keinen Service Worker und keine Installation (der
+Browser verlangt dafür HTTPS); dafür die Pages-Adresse nehmen.
+`tools/serve_web.py` statt `python -m http.server`: Unter Windows liefert
+Letzteres `.js` oft als `text/plain`, dann startet die App nicht. Wie auf
+Pages unter `/tikky_takka/` testen: mit `--base-href /tikky_takka/` bauen und
+`python tools/serve_web.py --base /tikky_takka/`.
 
 Die Datenbank läuft im Browser als SQLite-WebAssembly
 (`web/sqlite3.wasm`, `web/drift_worker.js`, beide eingecheckt). Nach einem
@@ -74,21 +97,130 @@ gh release download sqlite3-<version> -R simolus3/sqlite3.dart -p sqlite3.wasm -
 
 Im Web **nicht** verfügbar: Benachrichtigungen/Alarme bei geschlossener
 App, App-Sperre, Systemfarben. Daten bleiben pro Browser gespeichert
-(privater Modus oder „Websitedaten löschen“ verwirft sie).
+(privater Modus oder „Websitedaten löschen“ verwirft sie). Als installierte
+App fordert sie dauerhaften Speicher an. Im normalen Safari-Tab löscht iOS
+die Daten nach rund 7 Tagen ohne Besuch, als App vom Home-Bildschirm nicht.
 
-## Android (später)
+## Auf echten Geräten testen
+
+Kurzfassung: GitHub Actions baut die nativen Apps (`.github/workflows/apps.yml`),
+ein Mac ist nicht nötig. iOS geht über TestFlight, Android als APK. Was
+auf dem Gerät zu prüfen ist: [docs/GERAETETEST.md](docs/GERAETETEST.md).
+In der App hilft **Einstellungen → Diagnose** (Berechtigungen, Test-Alarm,
+Fehler dieser Sitzung zum Kopieren).
+
+Bei jedem Push auf `master` laufen:
+
+- **CI** (`ci.yml`): `flutter analyze` und `flutter test`.
+- **Apps** (`apps.yml`): iOS-Build ohne Signatur (kompiliert es unter
+  Xcode?) und ein Android-Release-APK als Artefakt (14 Tage).
+
+### iOS über TestFlight (einmalig einrichten)
+
+1. **Apple Developer Program** beitreten (99 €/Jahr,
+   developer.apple.com/programs). Freischaltung dauert ein bis zwei Tage.
+2. **Bundle-ID registrieren**: developer.apple.com → Certificates, IDs &
+   Profiles → Identifiers → „+“ → App IDs → App, Bundle ID (explizit)
+   `dev.tikkytakka.tikkyTakka`. Keine Capabilities nötig.
+   Die ID ist danach fest (eine andere ID ist eine andere App); wer eine
+   andere will, ändert sie vorher in `ios/Runner.xcodeproj/project.pbxproj`
+   und `BUNDLE_ID` in `apps.yml`.
+3. **App anlegen**: appstoreconnect.apple.com → Apps → „+“ → Neue App
+   (iOS, Name „Tikky Takka“, Sprache Deutsch, Bundle-ID von oben, SKU z. B.
+   `tikkytakka`).
+4. **API-Key**: App Store Connect → Benutzer und Zugriff → Integrationen →
+   App Store Connect API → Team-Schlüssel „+“, Zugriff **App Manager**.
+   Die `.p8`-Datei lässt sich nur einmal herunterladen. Notieren:
+   Issuer ID und Key ID.
+5. **Secrets im Repo setzen** (Git Bash, im Projektordner; die Werte
+   landen nur bei GitHub, nicht im Repo):
+
+   ```bash
+   gh secret set APP_STORE_CONNECT_ISSUER_ID --body "<Issuer ID>"
+   gh secret set APP_STORE_CONNECT_KEY_IDENTIFIER --body "<Key ID>"
+   gh secret set APP_STORE_CONNECT_PRIVATE_KEY < ~/Downloads/AuthKey_<Key ID>.p8
+   ```
+
+   Dazu ein eigener Schlüssel für das Verteilungszertifikat (einmal
+   erzeugen, gut aufheben, dann löschen):
+
+   ```bash
+   ssh-keygen -t rsa -b 2048 -m PEM -N "" -f ~/tikky_cert_key
+   gh secret set CERTIFICATE_PRIVATE_KEY < ~/tikky_cert_key
+   ```
+
+6. **Build starten**: GitHub → Actions → „Apps“ → „Run workflow“
+   (testflight angehakt), oder `gh workflow run apps.yml`. Der erste Lauf
+   legt Zertifikat und Provisioning-Profil selbst an. Nach dem Upload
+   braucht Apple 5–30 Minuten zur Verarbeitung.
+7. **Tester**: App Store Connect → App → TestFlight → Interne Tests →
+   Gruppe anlegen, sich selbst hinzufügen. Auf dem iPhone die App
+   **TestFlight** installieren, Einladung annehmen, installieren. Neue
+   Builds kommen dann automatisch.
+
+Hinweise:
+
+- Interne Tester (bis 100 Leute mit Zugang zum App-Store-Connect-Team)
+  brauchen keine Prüfung durch Apple. Externe Tester per Link gehen erst
+  nach einer Beta-Prüfung.
+- Die Build-Nummer ist die Laufnummer des Workflows, die Version kommt aus
+  `pubspec.yaml`. Version und Build stehen in der App unter Diagnose.
+- TestFlight sammelt Abstürze und Feedback (Screenshot machen → „Beta-
+  Feedback senden“) in App Store Connect.
+- Ein TestFlight-Build läuft 90 Tage.
+
+### Android
+
+**Schnell, ohne SDK:** das APK aus dem letzten „Apps“-Lauf laden
+(GitHub → Actions → Lauf → Artifacts), aufs Handy schicken, installieren
+(„Aus unbekannten Quellen“ erlauben). Ohne eigenen Schlüssel ist es mit
+einem Wegwerf-Schlüssel signiert: ein späteres APK mit anderem Schlüssel
+lässt sich nur nach Deinstallation installieren (Daten weg).
+
+**Eigener Upload-Schlüssel** (einmal, gut aufheben – ohne ihn keine
+Updates):
+
+```bash
+keytool -genkey -v -keystore ~/tikky-upload.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload
+```
+
+(`keytool` liegt bei Android Studio unter `jbr/bin`.) Für lokale Builds
+`android/key.properties` anlegen (steht in `.gitignore`):
+
+```
+storeFile=C:/Users/<du>/tikky-upload.jks
+storePassword=…
+keyAlias=upload
+keyPassword=…
+```
+
+Für die Builds bei GitHub:
+
+```bash
+base64 -w0 ~/tikky-upload.jks | gh secret set ANDROID_KEYSTORE_BASE64
+gh secret set ANDROID_KEYSTORE_PASSWORD
+gh secret set ANDROID_KEY_ALIAS --body upload
+gh secret set ANDROID_KEY_PASSWORD
+```
+
+**Entwickeln am Gerät** (Hot Reload):
 
 1. [Android Studio](https://developer.android.com/studio) installieren; beim
    ersten Start Android SDK, Plattform-Tools und ein Emulator-Abbild
    einrichten lassen.
 2. `flutter doctor --android-licenses` ausführen und die Lizenzen annehmen.
-3. Emulator starten oder ein Gerät mit USB-Debugging anschließen, dann
-   `flutter run` (oder `flutter run -d <Geräte-ID>`, siehe `flutter devices`).
+3. Am Handy Entwickleroptionen und USB-Debugging einschalten, anschließen,
+   dann `flutter run` (oder `flutter run -d <Geräte-ID>`, siehe
+   `flutter devices`).
 
-Die Android-Konfiguration (Berechtigungen, Benachrichtigungs-Receiver,
-Desugaring, `FlutterFragmentActivity` für die App-Sperre) ist vorbereitet,
-wurde aber noch auf keinem Gerät gebaut. Dasselbe gilt für iOS und macOS
-(dafür ist ein Mac mit Xcode nötig).
+### App-Icon
+
+Alle Icons (iOS, Android inkl. adaptiv/monochrom, macOS, Web, Windows)
+werden aus einer Zeichnung erzeugt:
+
+```bash
+flutter test tools/app_icon/render_app_icons_test.dart
+```
 
 ## Ordner
 

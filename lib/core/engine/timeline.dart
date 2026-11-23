@@ -134,7 +134,9 @@ final class Timeline {
         case EventType.lap ||
             EventType.tick ||
             EventType.entry ||
-            EventType.ack:
+            EventType.ack ||
+            EventType.extend ||
+            EventType.skip:
           break;
       }
       processed.add(e);

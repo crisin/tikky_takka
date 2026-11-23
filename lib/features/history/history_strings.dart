@@ -25,7 +25,6 @@ abstract final class HistoryStrings {
   static const filterTracksTitle = 'Spuren filtern';
   static const filterSetTitle = 'Set filtern';
 
-
   // --------------------------------------------------------------- list
   static const view = 'Ansicht';
   static const sessionActions = 'Aktionen zur Sitzung';
@@ -64,6 +63,9 @@ abstract final class HistoryStrings {
   /// "3 min nach Fälligkeit bestätigt"
   static String ackDelayed(String duration) =>
       '$duration nach Fälligkeit bestätigt';
+
+  /// "+1′" / "+10′": "um 10 min verschoben"
+  static String extendedBy(String duration) => 'um $duration verschoben';
 
   /// "Label · Detail"
   static String joined(Iterable<String> parts) =>

@@ -24,6 +24,7 @@ abstract final class TrackEditorKeys {
   static const archive = ValueKey('track-editor-archive');
   static const duplicate = ValueKey('track-editor-duplicate');
   static const move = ValueKey('track-editor-move');
+  static const stop = ValueKey('track-editor-stop');
   static Key swatch(int index) => ValueKey('track-editor-swatch-$index');
 }
 
@@ -217,6 +218,21 @@ class _TrackEditorSheetState extends ConsumerState<TrackEditorSheet> {
     final restore = await ref.read(trackUndoProvider).deleteTrack(track);
     haptics.heavy();
     return _EditorOutcome(Strings.trackDeleted, restore);
+  });
+
+  /// Ends the open run (E2: the way to stop a counter with labels, which
+  /// has no primary button); "Rückgängig" brings it back.
+  Future<void> _stopSession() => _run(() async {
+    final track = widget.track;
+    if (track == null) return null;
+    final commands = ref.read(trackCommandsProvider);
+    final before = await commands.resetTrack(track.id);
+    if (before == null) return null;
+    ref.read(hapticsProvider).heavy();
+    return _EditorOutcome(
+      Strings.sessionStopped,
+      () => commands.reopenSession(before.session.id),
+    );
   });
 
   Future<void> _move(List<TrackSet> others) async {
@@ -496,8 +512,7 @@ class _TrackEditorSheetState extends ConsumerState<TrackEditorSheet> {
                   title: Strings.optDuration,
                   currentMs: config.durationMs,
                   minMs: _second,
-                  onPicked: (ms) =>
-                      _setConfig(config.copyWith(durationMs: ms)),
+                  onPicked: (ms) => _setConfig(config.copyWith(durationMs: ms)),
                 ),
               ),
               AdaptiveSwitchTile(
@@ -539,9 +554,7 @@ class _TrackEditorSheetState extends ConsumerState<TrackEditorSheet> {
               _RoundsTile(
                 rounds: config.rounds,
                 onChanged: (rounds) => _setConfig(
-                  config.copyWith(
-                    rounds: rounds.clamp(_minRounds, _maxRounds),
-                  ),
+                  config.copyWith(rounds: rounds.clamp(_minRounds, _maxRounds)),
                 ),
                 min: _minRounds,
                 max: _maxRounds,
@@ -586,8 +599,7 @@ class _TrackEditorSheetState extends ConsumerState<TrackEditorSheet> {
                   title: Strings.optInterval,
                   currentMs: config.intervalMs,
                   minMs: _second,
-                  onPicked: (ms) =>
-                      _setConfig(config.copyWith(intervalMs: ms)),
+                  onPicked: (ms) => _setConfig(config.copyWith(intervalMs: ms)),
                 ),
               ),
               AdaptiveTile(
@@ -599,8 +611,7 @@ class _TrackEditorSheetState extends ConsumerState<TrackEditorSheet> {
                   title: Strings.optNagEvery,
                   currentMs: config.nagEveryMs,
                   minMs: 0,
-                  onPicked: (ms) =>
-                      _setConfig(config.copyWith(nagEveryMs: ms)),
+                  onPicked: (ms) => _setConfig(config.copyWith(nagEveryMs: ms)),
                 ),
               ),
             ],
@@ -616,9 +627,20 @@ class _TrackEditorSheetState extends ConsumerState<TrackEditorSheet> {
       for (final set in ref.watch(setsProvider).value ?? const <TrackSet>[])
         if (set.id != track.setId) set,
     ];
+    final running =
+        track.mode != TrackMode.protocol &&
+        ref.watch(openSessionProvider(track.id)) != null;
     return AdaptiveSection(
       header: TracksStrings.sectionManage,
       children: [
+        if (running)
+          AdaptiveTile(
+            key: TrackEditorKeys.stop,
+            title: TracksStrings.actionStopSession,
+            leading: Icon(AdaptiveIcons.stop(context)),
+            trailing: const SizedBox.shrink(),
+            onTap: _busy ? null : _stopSession,
+          ),
         AdaptiveTile(
           key: TrackEditorKeys.move,
           title: Strings.moveToSet,

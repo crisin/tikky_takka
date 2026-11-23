@@ -170,7 +170,7 @@ void main() {
         'x:tent:kim:b',
         'x:tent:kim:a',
         'x:tent:kim:c',
-        'm:tent:kim',
+        'o:tent:kim',
       ]);
       expect(buttons.first.kind, PadButtonKind.substance);
       expect(buttons.first.personId, 'kim');
@@ -187,7 +187,7 @@ void main() {
         substances: const [water, tea],
         use: const [],
       );
-      expect(_ids(buttons), ['m:tent:jacke']);
+      expect(_ids(buttons), ['o:tent:jacke']);
     });
   });
 
@@ -265,7 +265,7 @@ void main() {
         SubstanceUse(personId: 'kim', substanceId: 'cola', count: 9, lastAt: 9),
       ];
       final shown = _ids(pad(before));
-      expect(shown, ['x:tent:kim:water', 'x:tent:kim:tea', 'm:tent:kim']);
+      expect(shown, ['x:tent:kim:water', 'x:tent:kim:tea', 'o:tent:kim']);
       // A new pad would now lead with Cola ...
       expect(_ids(pad(after)).first, 'x:tent:kim:cola');
       // ... the open one does not move anything.
@@ -288,11 +288,11 @@ void main() {
         limit: null,
       );
       final merged = mergePadButtons(
-        shownIds: const ['x:tent:kim:water', 'x:tent:kim:tea', 'm:tent:kim'],
+        shownIds: const ['x:tent:kim:water', 'x:tent:kim:tea', 'o:tent:kim'],
         fresh: candidates,
         candidates: candidates,
       );
-      expect(_ids(merged), ['x:tent:kim:water', 'm:tent:kim']);
+      expect(_ids(merged), ['x:tent:kim:water', 'o:tent:kim']);
     });
   });
 
@@ -344,6 +344,24 @@ void main() {
       expect(l.columns, 3);
       expect(l.rows, 14);
       expect(l.rowHeight, 72);
+    });
+
+    test('minColumns: two columns where the width allows it, even for '
+        'few buttons', () {
+      PadLayout two(int count, double width) => computePadLayout(
+        count: count,
+        width: width,
+        height: 600,
+        minButtonHeight: 72,
+        minButtonWidth: 104,
+        gap: 8,
+        minColumns: 2,
+      );
+      expect(two(3, 351).columns, 2);
+      expect(two(3, 351).rows, 2);
+      // One button, or too narrow for two: one column.
+      expect(two(1, 351).columns, 1);
+      expect(two(3, 150).columns, 1);
     });
 
     test('a single button and no button at all', () {
@@ -411,6 +429,21 @@ void main() {
         padTapAction(PadButton.more(tent), RunState.idle),
         PadTapAction.openSheet,
       );
+      expect(
+        padTapAction(PadButton.other(tent, personId: 'kim'), RunState.idle),
+        PadTapAction.openOther,
+      );
+    });
+
+    test('"Anderes" lists every substance that is not on "Was?" yet, in '
+        'the order of the list', () {
+      final buttons = buildOtherPad(
+        track: tent,
+        personId: 'kim',
+        substances: const [water, tea],
+        shownIds: const {'water'},
+      );
+      expect(_ids(buttons), ['x:tent:kim:tea']);
     });
   });
 
@@ -526,6 +559,48 @@ void main() {
         events: log.events,
       );
       expect(padCount(PadButton.counter(birds, label: 'Reiher'), other), 0);
+    });
+  });
+
+  group('padLockout', () {
+    final button = PadButton.substance(
+      tent,
+      personId: 'kim',
+      substanceId: 'tea',
+    );
+    const lockouts = {'tea': 60 * min};
+    const facts = [LastEntryFact(personId: 'kim', substanceId: 'tea', at: 0)];
+
+    test('what is left of the own lockout and how much has passed', () {
+      final l = padLockout(
+        button,
+        facts: facts,
+        lockouts: lockouts,
+        nowMs: 15 * min,
+      );
+      expect(l, isNotNull);
+      expect(l!.remainingMs, 45 * min);
+      expect(l.passed, closeTo(0.25, 0.0001));
+    });
+
+    test('none without a lockout, after it ran out, or for someone else', () {
+      expect(
+        padLockout(button, facts: facts, lockouts: const {}, nowMs: min),
+        isNull,
+      );
+      expect(
+        padLockout(button, facts: facts, lockouts: lockouts, nowMs: 61 * min),
+        isNull,
+      );
+      expect(
+        padLockout(
+          PadButton.substance(tent, personId: 'jacke', substanceId: 'tea'),
+          facts: facts,
+          lockouts: lockouts,
+          nowMs: min,
+        ),
+        isNull,
+      );
     });
   });
 }

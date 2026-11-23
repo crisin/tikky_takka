@@ -1,10 +1,6 @@
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../adaptive/adaptive.dart';
 import '../../core/repo/settings_store.dart';
-import '../../core/services/haptics.dart';
 import 'tracks_strings.dart';
 
 /// What the tracks screen shows for a set.
@@ -64,43 +60,36 @@ final tracksViewProvider = Provider.family<TracksView, String>(
   ),
 );
 
-/// The segmented control in the tracks app bar: "Spuren", "Tippfeld",
-/// "Zeitleiste". Icons with labels on wide layouts, icons with tooltips
-/// and semantics labels on phones.
-class TracksViewSwitch extends ConsumerWidget {
-  const TracksViewSwitch({required this.setId, super.key});
+/// The word of a view in the navigation.
+String tracksViewLabel(TracksView view) => switch (view) {
+  TracksView.lanes => TracksStrings.viewLanes,
+  TracksView.pad => TracksStrings.viewPad,
+  TracksView.timeline => TracksStrings.viewTimeline,
+};
 
-  final String setId;
+/// A page of the tap pad that was asked for elsewhere: a person tile of a
+/// protocol lane opens "Was?" for that person.
+final class PadPageRequest {
+  const PadPageRequest({required this.trackId, required this.personId});
 
-  static IconData _icon(BuildContext c, TracksView view) => switch (view) {
-    TracksView.lanes =>
-      isCupertino(c) ? CupertinoIcons.list_bullet : Icons.view_agenda_outlined,
-    TracksView.pad =>
-      isCupertino(c) ? CupertinoIcons.square_grid_2x2 : Icons.grid_view_rounded,
-    TracksView.timeline =>
-      isCupertino(c) ? CupertinoIcons.time : Icons.timeline_rounded,
-  };
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final view = ref.watch(tracksViewProvider(setId));
-    return Semantics(
-      container: true,
-      label: TracksStrings.viewSwitch,
-      child: AdaptiveSegmented<TracksView>(
-        segments: const {
-          TracksView.lanes: TracksStrings.viewLanes,
-          TracksView.pad: TracksStrings.viewPad,
-          TracksView.timeline: TracksStrings.viewTimeline,
-        },
-        icons: {for (final v in TracksView.values) v: _icon(context, v)},
-        showLabels: isWide(context),
-        selected: view,
-        onChanged: (next) {
-          ref.read(hapticsProvider).selection();
-          ref.read(tracksViewsProvider.notifier).show(setId, next);
-        },
-      ),
-    );
-  }
+  final String trackId;
+  final String personId;
 }
+
+/// Holds a [PadPageRequest] until the tap pad has taken it.
+class PadPageRequests extends Notifier<PadPageRequest?> {
+  @override
+  PadPageRequest? build() => null;
+
+  /// Shows the tap pad of [setId] on the page "Was?" of [personId].
+  void open(String setId, {required String trackId, required String personId}) {
+    state = PadPageRequest(trackId: trackId, personId: personId);
+    ref.read(tracksViewsProvider.notifier).show(setId, TracksView.pad);
+  }
+
+  /// The tap pad has taken the request.
+  void clear() => state = null;
+}
+
+final padPageRequestProvider =
+    NotifierProvider<PadPageRequests, PadPageRequest?>(PadPageRequests.new);

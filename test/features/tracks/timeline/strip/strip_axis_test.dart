@@ -45,8 +45,10 @@ void main() {
   group('computeAxis', () {
     test('minutes on round local times, labelled without seconds', () {
       final axis = computeAxis(
-        startMs: _at(14, 14, 2, 30).toDouble(),
-        msPerPx: 2 * sec.toDouble(),
+        scale: TimeScale.linear(
+          startMs: _at(14, 14, 2, 30).toDouble(),
+          msPerPx: 2 * sec.toDouble(),
+        ),
         width: 900,
         minSpacingPx: 100,
       );
@@ -68,8 +70,10 @@ void main() {
 
     test('seconds when zoomed in; the 12-hour clock is honoured', () {
       final axis = computeAxis(
-        startMs: _at(14, 21, 4, 57).toDouble(),
-        msPerPx: 10,
+        scale: TimeScale.linear(
+          startMs: _at(14, 21, 4, 57).toDouble(),
+          msPerPx: 10,
+        ),
         width: 1000,
         minSpacingPx: 90,
         use24h: false,
@@ -80,8 +84,10 @@ void main() {
       expect(axis.ticks.last.label, '9:05:07 PM');
 
       final hours = computeAxis(
-        startMs: _at(14, 8).toDouble(),
-        msPerPx: 36 * sec.toDouble(),
+        scale: TimeScale.linear(
+          startMs: _at(14, 8).toDouble(),
+          msPerPx: 36 * sec.toDouble(),
+        ),
         width: 400,
         minSpacingPx: 100,
         use24h: false,
@@ -97,8 +103,10 @@ void main() {
 
     test('across midnight: a day separator with the date', () {
       final axis = computeAxis(
-        startMs: _at(14, 22, 30).toDouble(),
-        msPerPx: 18 * sec.toDouble(),
+        scale: TimeScale.linear(
+          startMs: _at(14, 22, 30).toDouble(),
+          msPerPx: 18 * sec.toDouble(),
+        ),
         width: 800,
         minSpacingPx: 100,
       );
@@ -122,8 +130,10 @@ void main() {
 
     test('no separator while the range stays inside one day', () {
       final axis = computeAxis(
-        startMs: _at(14, 9).toDouble(),
-        msPerPx: 36 * sec.toDouble(),
+        scale: TimeScale.linear(
+          startMs: _at(14, 9).toDouble(),
+          msPerPx: 36 * sec.toDouble(),
+        ),
         width: 1000,
         minSpacingPx: 100,
       );
@@ -133,8 +143,10 @@ void main() {
 
     test('whole days: every tick is a local midnight', () {
       final axis = computeAxis(
-        startMs: _at(10, 6).toDouble(),
-        msPerPx: 10 * min.toDouble(),
+        scale: TimeScale.linear(
+          startMs: _at(10, 6).toDouble(),
+          msPerPx: 10 * min.toDouble(),
+        ),
         width: 1000,
         minSpacingPx: 100,
       );
@@ -149,8 +161,10 @@ void main() {
     test('several days per tick stay put while panning', () {
       List<int> ticks(int startHour) => [
         for (final t in computeAxis(
-          startMs: _at(2, startHour).toDouble(),
-          msPerPx: 30 * min.toDouble(),
+          scale: TimeScale.linear(
+            startMs: _at(2, startHour).toDouble(),
+            msPerPx: 30 * min.toDouble(),
+          ),
           width: 1200,
           minSpacingPx: 100,
         ).ticks)
@@ -169,8 +183,10 @@ void main() {
 
     test('only ticks inside the width; nothing for an empty viewport', () {
       final axis = computeAxis(
-        startMs: _at(14, 14, 0, 1).toDouble(),
-        msPerPx: sec.toDouble(),
+        scale: TimeScale.linear(
+          startMs: _at(14, 14, 0, 1).toDouble(),
+          msPerPx: sec.toDouble(),
+        ),
         width: 300,
         minSpacingPx: 60,
       );
@@ -179,8 +195,7 @@ void main() {
       }
       expect(
         computeAxis(
-          startMs: 0,
-          msPerPx: 1000,
+          scale: TimeScale.linear(startMs: 0, msPerPx: 1000),
           width: 0,
           minSpacingPx: 60,
         ).ticks,
@@ -190,8 +205,10 @@ void main() {
 
     test('labels are the formatter\'s, so they say what the instant is', () {
       final axis = computeAxis(
-        startMs: _at(14, 13, 59).toDouble(),
-        msPerPx: 600,
+        scale: TimeScale.linear(
+          startMs: _at(14, 13, 59).toDouble(),
+          msPerPx: 600,
+        ),
         width: 600,
         minSpacingPx: 100,
       );

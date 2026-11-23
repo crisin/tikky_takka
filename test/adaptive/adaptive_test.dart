@@ -57,29 +57,48 @@ void main() {
       ),
     );
 
-    testWidgets('Material phone: NavigationBar + AppBar', (tester) async {
-      int? tapped;
-      await pumpOn(tester, TargetPlatform.android, scaffold((i) => tapped = i));
-      expect(find.byType(NavigationBar), findsOneWidget);
-      expect(find.byType(AppBar), findsOneWidget);
-      expect(find.byType(CupertinoTabBar), findsNothing);
-      await tester.tap(find.text('Zwei'));
-      expect(tapped, 1);
-    });
-
-    testWidgets('Cupertino phone: CupertinoTabBar + CupertinoNavigationBar', (
-      tester,
-    ) async {
-      int? tapped;
-      await pumpOn(tester, TargetPlatform.iOS, scaffold((i) => tapped = i));
-      expect(find.byType(CupertinoTabBar), findsOneWidget);
-      expect(find.byType(CupertinoNavigationBar), findsOneWidget);
-      expect(find.byType(NavigationBar), findsNothing);
-      expect(find.text('Titel'), findsOneWidget);
-      expect(find.text('Inhalt'), findsOneWidget);
-      await tester.tap(find.text('Zwei'));
-      expect(tapped, 1);
-    });
+    for (final platform in [TargetPlatform.android, TargetPlatform.iOS]) {
+      testWidgets('phone ($platform): the pill and the round action', (
+        tester,
+      ) async {
+        int? tapped;
+        var pressed = 0;
+        await pumpOn(
+          tester,
+          platform,
+          AdaptiveNavScaffold(
+            destinations: _destinations,
+            selectedIndex: 0,
+            onDestinationSelected: (i) => tapped = i,
+            action: AdaptiveNavAction(
+              label: 'Neu',
+              icon: Icons.add,
+              onPressed: () => pressed++,
+            ),
+            body: const AdaptivePageScaffold(
+              title: Text('Titel'),
+              body: Text('Inhalt'),
+            ),
+          ),
+        );
+        // The same look on every platform.
+        expect(find.byType(NavPill), findsOneWidget);
+        expect(find.byType(NavigationBar), findsNothing);
+        expect(find.byType(CupertinoTabBar), findsNothing);
+        expect(find.byType(NavigationRail), findsNothing);
+        expect(find.text('Titel'), findsOneWidget);
+        expect(find.text('Inhalt'), findsOneWidget);
+        await tester.tap(find.text('Zwei'));
+        expect(tapped, 1);
+        await tester.tap(find.byTooltip('Neu'));
+        expect(pressed, 1);
+        // Every entry of the pill is a full tap target.
+        expect(
+          tester.getSize(find.byKey(NavPill.entryKey(1))).height,
+          greaterThanOrEqualTo(48),
+        );
+      });
+    }
 
     testWidgets('wide: NavigationRail on every platform', (tester) async {
       for (final platform in [
@@ -94,7 +113,11 @@ void main() {
           scaffold((i) => tapped = i),
           size: const Size(1000, 700),
         );
-        expect(find.byType(NavigationRail), findsOneWidget, reason: '$platform');
+        expect(
+          find.byType(NavigationRail),
+          findsOneWidget,
+          reason: '$platform',
+        );
         expect(find.byType(NavigationBar), findsNothing);
         expect(find.byType(CupertinoTabBar), findsNothing);
         await tester.tap(find.text('Zwei'));
@@ -141,7 +164,11 @@ void main() {
           ),
         );
       }
-      expect(results[TargetPlatform.android], (false, false, Icons.add_rounded));
+      expect(results[TargetPlatform.android], (
+        false,
+        false,
+        Icons.add_rounded,
+      ));
       expect(results[TargetPlatform.iOS], (true, false, CupertinoIcons.add));
       expect(results[TargetPlatform.macOS], (true, true, CupertinoIcons.add));
       expect(results[TargetPlatform.windows], (false, true, Icons.add_rounded));
@@ -382,10 +409,8 @@ void main() {
       final result = await open<Duration>(
         tester,
         TargetPlatform.iOS,
-        (c) => showAdaptiveDurationPicker(
-          c,
-          initial: const Duration(minutes: 10),
-        ),
+        (c) =>
+            showAdaptiveDurationPicker(c, initial: const Duration(minutes: 10)),
       );
       expect(find.byType(CupertinoTimerPicker), findsOneWidget);
       await tester.tap(find.text(Strings.done));
@@ -404,7 +429,9 @@ void main() {
       expect(await result, isNull);
     });
 
-    testWidgets('date: Cupertino picker returns local midnight', (tester) async {
+    testWidgets('date: Cupertino picker returns local midnight', (
+      tester,
+    ) async {
       final result = await open<DateTime>(
         tester,
         TargetPlatform.iOS,
@@ -458,7 +485,10 @@ void main() {
       await tester.pumpAndSettle();
       expect(
         await result,
-        DateTimeRange(start: DateTime(2026, 11, 9), end: DateTime(2026, 11, 11)),
+        DateTimeRange(
+          start: DateTime(2026, 11, 9),
+          end: DateTime(2026, 11, 11),
+        ),
       );
     });
   });

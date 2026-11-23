@@ -24,7 +24,8 @@ enum TrackMode {
       this == reminder;
 
   /// Modes that can ring and therefore need OS alarms.
-  bool get hasAlarms => this == countdown || this == interval || this == reminder;
+  bool get hasAlarms =>
+      this == countdown || this == interval || this == reminder;
 }
 
 /// Type of a logged event.
@@ -38,7 +39,16 @@ enum EventType {
   tick,
   entry,
   ack,
-  stop;
+  stop,
+
+  /// More time for a ringing timer ("+1′") or a due reminder ("+10′"):
+  /// it is due `extra['ms']` of counting time after this event (or after
+  /// its current due time, when that is later). See `TrackEvent.extendMs`.
+  extend,
+
+  /// "nächste Runde" of an interval: the program jumps to the start of the
+  /// next round.
+  skip;
 
   static EventType? tryFromName(String? name) {
     for (final t in values) {

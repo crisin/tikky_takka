@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:tikky_takka/core/domain/domain.dart';
 import 'package:tikky_takka/core/engine/engine.dart';
 import 'package:tikky_takka/features/protocol/protocol_lane.dart';
+import 'package:tikky_takka/features/tracks/lane_undo.dart';
 import 'package:tikky_takka/features/tracks/lane_view.dart';
 import 'package:tikky_takka/features/tracks/track_lane.dart';
 import 'package:tikky_takka/features/tracks/tracks_strings.dart';
@@ -19,14 +20,21 @@ void main() {
     expect(h.digits(h.stopwatch), '00:00');
     expect(h.digits(h.timer), '10:00');
     expect(h.digits(h.counter), '0');
-    expect(h.subLine(h.stopwatch), Strings.statusIdle);
-    expect(h.subLine(h.counter), TracksStrings.tapToCount);
+    // A ready lane names its mode in the line below the name.
+    expect(
+      h.subLine(h.stopwatch),
+      '${Strings.modeStopwatch}${TracksStrings.separator}${Strings.statusIdle}',
+    );
+    expect(h.subLine(h.counter), endsWith(TracksStrings.tapToCount));
 
-    // Progress bar only where the mode has one.
+    // A ready lane has no fill; a running timer has one, a stopwatch never.
+    expect(find.byKey(LaneKeys.progress(h.timer.id)), findsNothing);
+    await h.tap(h.primary(h.timer));
+    await h.tap(h.primary(h.stopwatch));
     expect(find.byKey(LaneKeys.progress(h.timer.id)), findsOneWidget);
     expect(find.byKey(LaneKeys.progress(h.stopwatch.id)), findsNothing);
 
-    expect(h.tooltipOf(h.primary(h.stopwatch)), Strings.actionStart);
+    expect(h.tooltipOf(h.primary(h.stopwatch)), Strings.actionPause);
     expect(h.tooltipOf(h.primary(h.counter)), Strings.actionTick);
     expect(tester.takeException(), isNull);
   });
@@ -59,17 +67,46 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('stop ends the run and offers undo', (tester) async {
+  testWidgets('a paused lane stops with its secondary button, with undo', (
+    tester,
+  ) async {
     final h = await TracksHarness.start(tester);
     final track = h.stopwatch;
 
     await h.tap(h.primary(track));
     await h.advance(const Duration(seconds: 8));
-    await h.tap(h.secondary(track, LaneSecondaryKind.reset));
+    expect(h.secondary(track, LaneSecondaryKind.stop), findsNothing);
+    await h.tap(h.primary(track));
+    await h.tap(h.secondary(track, LaneSecondaryKind.stop));
 
     expect(await h.snapshot(track), isNull);
     expect(h.digits(track), '00:00');
-    expect(find.text(Strings.sessionStopped), findsOneWidget);
+    expect(find.text(TracksStrings.trackStopped(track.name)), findsOneWidget);
+    expect(find.text(TracksStrings.timeKept('00:08')), findsOneWidget);
+
+    await h.tap(find.text(Strings.undo));
+    final snapshot = await h.snapshot(track);
+    expect(snapshot, isNotNull);
+    expect(snapshot!.isPaused, isTrue);
+    expect(h.digits(track), '00:08');
+    expect(find.byKey(LaneUndoKeys.bar), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a long press on the primary button stops a running lane', (
+    tester,
+  ) async {
+    final h = await TracksHarness.start(tester);
+    final track = h.stopwatch;
+
+    await h.tap(h.primary(track));
+    await h.advance(const Duration(seconds: 8));
+    await tester.longPress(h.primary(track));
+    await h.settle();
+
+    expect(await h.snapshot(track), isNull);
+    expect(h.digits(track), '00:00');
+    expect(find.text(TracksStrings.trackStopped(track.name)), findsOneWidget);
 
     await h.tap(find.text(Strings.undo));
     final snapshot = await h.snapshot(track);
@@ -123,6 +160,56 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('a ringing timer shows "+1′": it rings again a minute later', (
+    tester,
+  ) async {
+    final h = await TracksHarness.start(tester);
+    final track = h.timer;
+
+    await h.tap(h.primary(track));
+    await h.advance(const Duration(minutes: 10, seconds: 20));
+    expect((await h.snapshot(track))!.isRinging, isTrue);
+    final plus = h.secondary(track, LaneSecondaryKind.plusMinute);
+    expect(
+      find.descendant(of: plus, matching: find.text(TracksStrings.plusMinute)),
+      findsOneWidget,
+    );
+
+    await h.tap(plus);
+    expect((await h.snapshot(track))!.isRunning, isTrue);
+    expect(h.digits(track), '01:00');
+    await h.advance(const Duration(minutes: 1));
+    expect((await h.snapshot(track))!.isRinging, isTrue);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a due reminder shows "+10′"; a running interval "nächste '
+      'Runde"', (tester) async {
+    final h = await TracksHarness.start(tester);
+    final reminder = await h.addTrack(
+      const ReminderConfig(intervalMs: 30 * 60 * 1000),
+      name: 'Wasser',
+    );
+    final interval = await h.addTrack(
+      const IntervalConfig(workMs: 30000, restMs: 10000, rounds: 3),
+      name: 'Dehnen',
+    );
+    await h.tap(h.primary(reminder));
+    await h.tap(h.primary(interval));
+    await h.advance(const Duration(seconds: 10));
+
+    await h.tap(h.secondary(interval, LaneSecondaryKind.nextRound));
+    expect(h.subLine(interval), contains(Strings.roundOf(2, 3)));
+    expect(h.digits(interval), '00:30');
+
+    await h.advance(const Duration(minutes: 31));
+    expect((await h.snapshot(reminder))!.isRinging, isTrue);
+    await h.tap(h.secondary(reminder, LaneSecondaryKind.snooze));
+    expect((await h.snapshot(reminder))!.isRunning, isTrue);
+    expect(h.digits(reminder), '10:00');
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('interval: round, phase and finish', (tester) async {
     final h = await TracksHarness.start(tester);
     final track = await h.addTrack(
@@ -131,7 +218,7 @@ void main() {
     );
 
     expect(h.digits(track), '00:30');
-    expect(h.subLine(track), '2 × 00:30 / 00:10');
+    expect(h.subLine(track), endsWith('2 × 00:30 / 00:10'));
 
     await h.tap(h.primary(track));
     await h.advance(const Duration(seconds: 10));
@@ -152,9 +239,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('counter: taps count, undo removes the last one', (
-    tester,
-  ) async {
+  testWidgets('counter: taps count, undo removes the last one', (tester) async {
     final h = await TracksHarness.start(tester);
     final track = h.counter;
 
@@ -179,9 +264,15 @@ void main() {
     final snapshot = (await h.snapshot(track))! as CounterSnapshot;
     expect(snapshot.count, 2);
 
-    await h.tap(h.secondary(track, LaneSecondaryKind.stop));
+    await tester.longPress(h.primary(track));
+    await h.settle();
     expect(await h.snapshot(track), isNull);
     expect(h.digits(track), '0');
+    expect(find.text(TracksStrings.ticksKept(2)), findsOneWidget);
+    // The undo bar goes away by itself.
+    await tester.pump(const Duration(seconds: 11));
+    await tester.pump();
+    expect(find.byKey(LaneUndoKeys.bar), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
@@ -311,23 +402,28 @@ void main() {
       findsOneWidget,
     );
     expect(
-      find.bySemanticsLabel('${Strings.seedCounterName}: ${Strings.actionTick}'),
+      find.bySemanticsLabel(
+        '${Strings.seedCounterName}: ${Strings.actionTick}',
+      ),
       findsOneWidget,
     );
+    expect(find.bySemanticsLabel(Strings.dragHandle), findsNWidgets(3));
+
+    // A running lane offers its secondary button and "stop" as an action.
+    await h.tap(h.primary(h.stopwatch));
     expect(
       find.bySemanticsLabel(
         '${Strings.seedStopwatchName}: ${Strings.actionLap}',
       ),
       findsOneWidget,
     );
-    expect(find.bySemanticsLabel(Strings.dragHandle), findsNWidgets(3));
+    final lane = tester.getSemantics(h.lane(h.stopwatch));
+    expect(lane.getSemanticsData().customSemanticsActionIds, isNotEmpty);
     expect(h.tracks, hasLength(3));
     handle.dispose();
   });
 
-  testWidgets('preferences: tenths, sub-line and progress bar', (
-    tester,
-  ) async {
+  testWidgets('preferences: tenths, sub-line and progress bar', (tester) async {
     final h = await TracksHarness.start(tester);
     final track = h.timer;
 
@@ -338,6 +434,7 @@ void main() {
         showProgressBar: false,
       ),
     );
+    await h.tap(h.primary(track));
     expect(h.digits(h.stopwatch), '00:00.0');
     expect(find.byKey(LaneKeys.subLine(track.id)), findsNothing);
     expect(find.byKey(LaneKeys.progress(track.id)), findsNothing);

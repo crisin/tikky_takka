@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../adaptive/adaptive.dart';
@@ -23,15 +24,22 @@ abstract final class LaneKeys {
       ValueKey('lane-label-$trackId-$label');
   static Key digits(String trackId) => ValueKey('lane-digits-$trackId');
   static Key subLine(String trackId) => ValueKey('lane-subline-$trackId');
+
+  /// The fill behind a timer, interval or reminder lane.
   static Key progress(String trackId) => ValueKey('lane-progress-$trackId');
   static Key handle(String trackId) => ValueKey('lane-handle-$trackId');
 }
 
 /// The lane of a stopwatch, countdown, interval, counter or reminder track.
 ///
+/// A lane is a surface in the colour of its track (`roles(..).tint`); a
+/// paused one keeps only the outline, a ready one a thin neutral outline
+/// and a single line, a ringing one turns into the alarm colour. Timer,
+/// interval and reminder fill the surface with the time that is left.
+///
 /// Everything shown is derived from the open session's event log and the
-/// shared "now" ticker. Only the time text follows the ticker; the frame and
-/// the buttons rebuild when the state changes.
+/// shared "now" ticker. Only the time text, the fill and the lamp follow
+/// the ticker; the surface and the buttons rebuild when the state changes.
 class TrackLane extends ConsumerWidget {
   const TrackLane({
     required this.track,
@@ -80,8 +88,128 @@ class TrackLane extends ConsumerWidget {
   }
 }
 
-Color _alertColor(TikkyTokens t, Track track) =>
-    track.mode == TrackMode.reminder ? t.colors.warning : t.colors.danger;
+/// The colours of one lane in one look.
+@immutable
+final class _LanePaint {
+  const _LanePaint({
+    required this.surface,
+    required this.outline,
+    required this.outlineWidth,
+    required this.name,
+    required this.ink,
+    required this.digits,
+    required this.lamp,
+    required this.lampLit,
+    required this.primaryBackground,
+    required this.primaryForeground,
+    required this.primaryOutline,
+    required this.secondaryBackground,
+    required this.secondaryForeground,
+    required this.secondaryOutline,
+    required this.fill,
+    required this.segmentDone,
+    required this.segmentNow,
+    required this.segmentLater,
+  });
+
+  factory _LanePaint.of(TikkyTokens t, Track track, LaneLook look) {
+    final r = t.trackRoles(track);
+    final c = t.colors;
+    switch (look) {
+      case LaneLook.ringing:
+        return _LanePaint(
+          surface: c.danger,
+          outline: null,
+          outlineWidth: 0,
+          name: c.onDanger,
+          ink: c.onDanger,
+          digits: c.onDanger,
+          lamp: c.onDanger,
+          lampLit: true,
+          primaryBackground: c.onDanger,
+          primaryForeground: c.danger,
+          primaryOutline: null,
+          secondaryBackground: null,
+          secondaryForeground: c.onDanger,
+          secondaryOutline: c.onDanger,
+          fill: r.strong,
+          segmentDone: c.onDanger,
+          segmentNow: c.onDanger,
+          segmentLater: c.onDanger,
+        );
+      case LaneLook.idle:
+        return _LanePaint(
+          surface: null,
+          outline: c.border,
+          outlineWidth: t.sizes.laneOutlineIdle,
+          name: c.text,
+          ink: c.textMuted,
+          digits: c.textMuted,
+          lamp: r.solid,
+          lampLit: false,
+          primaryBackground: null,
+          primaryForeground: r.ink,
+          primaryOutline: r.solid,
+          secondaryBackground: r.strong,
+          secondaryForeground: c.text,
+          secondaryOutline: null,
+          fill: r.strong,
+          segmentDone: r.solid,
+          segmentNow: c.text,
+          segmentLater: r.strong,
+        );
+      case LaneLook.running || LaneLook.paused || LaneLook.due:
+        final paused = look == LaneLook.paused;
+        final due = look == LaneLook.due;
+        return _LanePaint(
+          surface: paused ? null : r.tint,
+          outline: paused ? r.strong : (due ? c.warning : null),
+          outlineWidth: paused
+              ? t.sizes.laneOutlinePaused
+              : (due ? t.sizes.laneOutlineDue : 0),
+          name: r.ink,
+          ink: r.ink,
+          digits: c.text,
+          lamp: r.solid,
+          lampLit: !paused,
+          primaryBackground: r.solid,
+          primaryForeground: r.on,
+          primaryOutline: null,
+          secondaryBackground: r.strong,
+          secondaryForeground: c.text,
+          secondaryOutline: null,
+          fill: r.strong,
+          segmentDone: r.solid,
+          segmentNow: c.text,
+          segmentLater: r.strong,
+        );
+    }
+  }
+
+  /// `null` = no surface (the page shows through).
+  final Color? surface;
+  final Color? outline;
+  final double outlineWidth;
+
+  /// The name in the head line; [ink] for the mode and the sub-line.
+  final Color name;
+  final Color ink;
+  final Color digits;
+  final Color lamp;
+
+  /// A lit lamp is filled, an unlit one only outlined.
+  final bool lampLit;
+  final Color? primaryBackground;
+  final Color primaryForeground;
+  final Color? primaryOutline;
+  final Color? secondaryBackground;
+  final Color secondaryForeground;
+  final Color? secondaryOutline;
+  final Color fill;
+  final Color segmentDone;
+  final Color segmentNow;
+  final Color segmentLater;
+}
 
 class _LaneFrame extends ConsumerWidget {
   const _LaneFrame({
@@ -108,200 +236,252 @@ class _LaneFrame extends ConsumerWidget {
     final actions = ref.read(laneActionsProvider);
     final leftHanded = t.prefs.leftHanded;
     final tiles = layout == LaneLayout.tiles;
+    final look = controls.look;
+    final idle = look == LaneLook.idle && !tiles;
+    final paint = _LanePaint.of(t, track, look);
+    final stop = controls.canStop ? () => actions.stop(track) : null;
 
-    final title = _LaneTitle(track: track);
-    final time = NowSelector<LaneTime>(
-      enabled: ticking,
-      selector: (now) => model.at(now).time,
-      builder: (context, time) => _LaneTimeBlock(track: track, time: time),
+    final head = _LaneHead(
+      track: track,
+      paint: paint,
+      ticking: ticking,
+      showMode: !idle,
     );
-    final info = MergeSemantics(
-      child: Semantics(
-        value: controls.status,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            title,
-            SizedBox(height: t.space.xxs),
-            time,
-          ],
-        ),
-      ),
-    );
+    Widget timeBlock({required bool digits, required bool subLine}) =>
+        NowSelector<LaneTime>(
+          enabled: ticking,
+          selector: (now) => model.at(now).time,
+          builder: (context, time) => _LaneTimeBlock(
+            track: track,
+            time: time,
+            paint: paint,
+            showDigits: digits,
+            showSubLine: subLine,
+            idle: idle,
+          ),
+        );
 
-    final secondary = [
-      for (final s in controls.secondary)
-        _SecondaryButton(
-          key: LaneKeys.secondary(track.id, s.kind),
-          track: track,
-          action: s,
-          onPressed: s.enabled
-              ? () => actions.secondary(context, track, s.kind)
-              : null,
-        ),
-    ];
+    final secondaryAction = controls.secondary;
+    final secondary = secondaryAction == null
+        ? null
+        : _SecondaryButton(
+            key: LaneKeys.secondary(track.id, secondaryAction.kind),
+            track: track,
+            action: secondaryAction,
+            paint: paint,
+            onPressed: secondaryAction.enabled
+                ? () => actions.secondary(track, secondaryAction.kind)
+                : null,
+          );
     final primary = controls.primary == LanePrimary.none
         ? null
         : _PrimaryButton(
             key: LaneKeys.primary(track.id),
             track: track,
             action: controls.primary,
+            paint: paint,
+            idle: idle,
             onPressed: () => actions.toggle(track),
+            onLongPress: stop,
           );
     final labels = controls.hasLabels
-        ? Wrap(
-            spacing: t.space.sm,
-            runSpacing: t.space.sm,
-            alignment: leftHanded ? WrapAlignment.start : WrapAlignment.end,
-            children: [
-              for (final entry in controls.labelCounts.entries)
-                _LabelButton(
-                  key: LaneKeys.label(track.id, entry.key),
-                  track: track,
-                  label: entry.key,
-                  count: entry.value,
-                  onPressed: () => actions.tick(track, label: entry.key),
-                ),
-            ],
+        ? _LabelGrid(
+            track: track,
+            counts: controls.labelCounts,
+            onTick: (label) => actions.tick(track, label: label),
           )
         : null;
+    final segments = NowSelector<LaneSegments?>(
+      enabled: ticking,
+      selector: (now) => model.at(now).time.segments,
+      builder: (context, segments) => segments == null
+          ? const SizedBox.shrink()
+          : Padding(
+              padding: EdgeInsets.only(top: t.space.sm),
+              child: _Segments(segments: segments, paint: paint),
+            ),
+    );
 
+    final gap = SizedBox(width: t.space.sm);
     final Widget content;
-    if (tiles) {
-      // The secondary buttons wrap onto further lines when a narrow tile
-      // (large button scale, several columns) cannot hold them in one.
-      final buttonRow = [
+    if (idle) {
+      final text = Expanded(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            head,
+            SizedBox(height: t.space.xxs),
+            timeBlock(digits: false, subLine: true),
+          ],
+        ),
+      );
+      final digits = timeBlock(digits: true, subLine: false);
+      final info = [
+        text,
+        SizedBox(width: t.space.md),
+        // Its own width, at most a share of the lane: large digits shrink.
+        ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: t.sizes.laneDigitsIdleMax),
+          child: digits,
+        ),
+      ];
+      final row = [
         Expanded(
-          child: Wrap(
-            alignment: leftHanded ? WrapAlignment.end : WrapAlignment.start,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: leftHanded ? secondary.reversed.toList() : secondary,
+          child: MergeSemantics(
+            child: Semantics(
+              value: controls.status,
+              child: Row(children: leftHanded ? info.reversed.toList() : info),
+            ),
           ),
         ),
+        if (primary != null) ...[gap, primary],
+      ];
+      content = Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(children: leftHanded ? row.reversed.toList() : row),
+          if (labels != null) ...[SizedBox(height: t.space.sm), labels],
+        ],
+      );
+    } else {
+      final info = MergeSemantics(
+        child: Semantics(
+          value: controls.status,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              head,
+              SizedBox(height: t.space.xxs),
+              timeBlock(digits: true, subLine: true),
+            ],
+          ),
+        ),
+      );
+      final buttons = [
+        ?secondary,
+        if (secondary != null && primary != null) gap,
         ?primary,
       ];
-      content = ConstrainedBox(
-        constraints: BoxConstraints(minHeight: t.sizes.tileMinHeight),
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(
-            t.space.md + t.sizes.colorBar,
-            t.space.sm,
-            t.space.sm,
-            t.space.sm,
-          ),
+      if (tiles) {
+        content = ConstrainedBox(
+          constraints: BoxConstraints(minHeight: t.sizes.tileMinHeight),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Padding(
-                      padding: EdgeInsets.only(top: t.space.xs),
-                      child: info,
-                    ),
-                  ),
-                  ?dragHandle,
-                ],
-              ),
+              info,
+              segments,
               SizedBox(height: t.space.sm),
               Row(
-                children: leftHanded
-                    ? buttonRow.reversed.toList()
-                    : buttonRow,
+                mainAxisAlignment: leftHanded
+                    ? MainAxisAlignment.start
+                    : MainAxisAlignment.end,
+                children: leftHanded ? buttons.reversed.toList() : buttons,
               ),
               if (labels != null) ...[SizedBox(height: t.space.sm), labels],
             ],
           ),
-        ),
-      );
-    } else {
-      final buttons = Padding(
-        padding: EdgeInsets.symmetric(horizontal: t.space.sm),
-        child: Row(
+        );
+      } else {
+        final row = [
+          Expanded(child: info),
+          if (buttons.isNotEmpty) gap,
+          ...buttons,
+        ];
+        content = Column(
           mainAxisSize: MainAxisSize.min,
-          children: leftHanded
-              ? [?primary, ...secondary.reversed]
-              : [...secondary, ?primary],
-        ),
-      );
-      final text = Expanded(
-        child: Padding(
-          padding: EdgeInsets.symmetric(
-            vertical: t.space.sm,
-            horizontal: t.space.xs,
-          ),
-          child: info,
-        ),
-      );
-      final handle = dragHandle ?? SizedBox(width: t.space.sm);
-      content = ConstrainedBox(
-        constraints: BoxConstraints(minHeight: t.sizes.laneMinHeight),
-        child: Padding(
-          padding: EdgeInsets.only(left: t.sizes.colorBar),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: leftHanded
-                    ? [buttons, text, handle]
-                    : [handle, text, buttons],
-              ),
-              if (labels != null)
-                Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    t.space.md,
-                    0,
-                    t.space.md,
-                    t.space.md,
-                  ),
-                  child: labels,
-                ),
-            ],
-          ),
-        ),
-      );
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(children: leftHanded ? row.reversed.toList() : row),
+            segments,
+            if (labels != null) ...[SizedBox(height: t.space.sm), labels],
+          ],
+        );
+      }
     }
 
-    final alert = _alertColor(t, track);
+    // The grip sits at the leading edge (the trailing one for left-handed
+    // use, where the buttons lead).
+    final handle = dragHandle;
+    final verticalPad = idle ? t.space.sm : t.space.md;
+    final padded = Padding(
+      padding: EdgeInsetsDirectional.fromSTEB(
+        handle == null && !leftHanded ? t.space.lg : 0,
+        verticalPad,
+        handle == null && leftHanded ? t.space.lg : t.space.md,
+        verticalPad,
+      ),
+      child: Row(
+        children: [
+          if (handle != null && !leftHanded) handle,
+          Expanded(child: content),
+          if (handle != null && leftHanded) handle,
+        ],
+      ),
+    );
+
+    final showFill =
+        t.prefs.showProgressBar &&
+        (look == LaneLook.running || look == LaneLook.paused) &&
+        track.mode != TrackMode.stopwatch &&
+        track.mode != TrackMode.counter;
+    final minHeight = idle
+        ? t.sizes.laneHeightIdle
+        : (tiles ? t.sizes.tileMinHeight : t.sizes.laneHeightActive);
+    final outline = paint.outline;
+
     return Semantics(
       container: true,
       onLongPress: onEdit,
       onLongPressHint: onEdit == null ? null : TracksStrings.actionEditTrack,
+      customSemanticsActions: stop == null
+          ? null
+          : {
+              const CustomSemanticsAction(label: TracksStrings.actionStopHint):
+                  stop,
+            },
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         excludeFromSemantics: true,
         onLongPress: onEdit,
         onSecondaryTap: onEdit,
         child: Container(
-          decoration: t.surfaceDecoration(
-            color: controls.ringing ? t.colors.surfaceAlt : null,
+          decoration: BoxDecoration(
+            color: paint.surface,
+            borderRadius: t.radii.laneAll,
           ),
-          foregroundDecoration: controls.ringing
-              ? BoxDecoration(
-                  borderRadius: t.radii.mdAll,
-                  border: Border.all(
-                    color: alert,
-                    width: t.sizes.progressBar,
-                  ),
-                )
-              : null,
+          foregroundDecoration: outline == null
+              ? null
+              : BoxDecoration(
+                  borderRadius: t.radii.laneAll,
+                  border: Border.all(color: outline, width: paint.outlineWidth),
+                ),
           clipBehavior: Clip.antiAlias,
-          child: Stack(
-            children: [
-              content,
-              Positioned(
-                left: 0,
-                top: 0,
-                bottom: 0,
-                width: t.sizes.colorBar,
-                child: ColoredBox(color: t.trackColor(track)),
-              ),
-            ],
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: minHeight),
+            child: Stack(
+              alignment: AlignmentDirectional.centerStart,
+              children: [
+                if (showFill)
+                  Positioned.fill(
+                    child: NowSelector<double?>(
+                      enabled: ticking,
+                      selector: (now) => model.at(now).time.progress,
+                      builder: (context, progress) => progress == null
+                          ? const SizedBox.shrink()
+                          : _Fill(
+                              key: LaneKeys.progress(track.id),
+                              remaining: 1 - progress,
+                              color: paint.fill,
+                            ),
+                    ),
+                  ),
+                padded,
+              ],
+            ),
           ),
         ),
       ),
@@ -309,146 +489,247 @@ class _LaneFrame extends ConsumerWidget {
   }
 }
 
-/// Small muted "name · mode" line.
-class _LaneTitle extends StatelessWidget {
-  const _LaneTitle({required this.track});
+/// The surface behind the content, filled with the share of time that is
+/// left; it shrinks towards the leading edge. Redrawn from "now", never
+/// animated.
+class _Fill extends StatelessWidget {
+  const _Fill({required this.remaining, required this.color, super.key});
+
+  final double remaining;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => ExcludeSemantics(
+    child: FractionallySizedBox(
+      alignment: AlignmentDirectional.centerStart,
+      widthFactor: remaining.clamp(0, 1).toDouble(),
+      heightFactor: 1,
+      child: ColoredBox(color: color),
+    ),
+  );
+}
+
+/// Lamp, name and mode.
+class _LaneHead extends StatelessWidget {
+  const _LaneHead({
+    required this.track,
+    required this.paint,
+    required this.ticking,
+    required this.showMode,
+  });
 
   final Track track;
+  final _LanePaint paint;
+  final bool ticking;
+  final bool showMode;
 
   @override
   Widget build(BuildContext context) {
     final t = context.tikky;
     final mode = Strings.modeName(track.mode);
-    return Text.rich(
-      TextSpan(
-        children: [
-          TextSpan(
-            text: track.name,
-            style: TextStyle(color: t.colors.text),
-          ),
-          if (mode != track.name)
-            TextSpan(text: '${TracksStrings.separator}$mode'),
-        ],
-      ),
-      style: t.text.laneTitle,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-    );
-  }
-}
-
-/// Digits, progress bar and sub-line: the only part that follows the
-/// ticker.
-class _LaneTimeBlock extends StatelessWidget {
-  const _LaneTimeBlock({required this.track, required this.time});
-
-  final Track track;
-  final LaneTime time;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.tikky;
-    final prefs = t.prefs;
-    final alert = _alertColor(t, track);
-    final digitStyle = time.alert && time.blinkOn
-        ? t.text.digitsLarge.copyWith(color: alert)
-        : t.text.digitsLarge;
-    final progress = time.progress;
-    final secondaryDigits = time.secondaryDigits;
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
+    // The lamp sits in the text's leading padding, so a very narrow lane
+    // (large buttons) shortens the text instead of overflowing.
+    return Stack(
       children: [
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          alignment: AlignmentDirectional.centerStart,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              Text(
-                time.digits,
-                key: LaneKeys.digits(track.id),
-                style: digitStyle,
-                maxLines: 1,
-                softWrap: false,
-              ),
-              if (secondaryDigits != null) ...[
-                SizedBox(width: t.space.md),
-                Text(
-                  secondaryDigits,
-                  style: t.text.digitsMedium.copyWith(
-                    color: t.colors.textMuted,
-                  ),
-                  maxLines: 1,
-                  softWrap: false,
+        Padding(
+          padding: EdgeInsetsDirectional.only(start: t.sizes.lamp + t.space.sm),
+          child: Text.rich(
+            TextSpan(
+              children: [
+                TextSpan(
+                  text: track.name,
+                  style: t.text.laneName.copyWith(color: paint.name),
                 ),
+                if (showMode && mode != track.name)
+                  TextSpan(
+                    text: '  $mode',
+                    style: t.text.laneMode.copyWith(color: paint.ink),
+                  ),
               ],
-            ],
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
-        if (prefs.showProgressBar && progress != null)
-          Padding(
-            padding: EdgeInsets.only(top: t.space.xs),
-            child: _ProgressBar(
-              key: LaneKeys.progress(track.id),
-              value: progress,
-              color: time.alert ? alert : t.trackColor(track),
-            ),
+        PositionedDirectional(
+          start: 0,
+          top: 0,
+          bottom: 0,
+          child: Center(
+            child: _Lamp(color: paint.lamp, lit: paint.lampLit, pulse: ticking),
           ),
-        if (prefs.showSubLine && time.subLine.isNotEmpty)
-          Padding(
-            padding: EdgeInsets.only(top: t.space.xs),
-            child: Text(
-              time.subLine,
-              key: LaneKeys.subLine(track.id),
-              style: time.alert
-                  ? t.text.subLine.copyWith(color: alert)
-                  : t.text.subLine,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
+        ),
       ],
     );
   }
 }
 
-/// Thin flat progress bar (no animation: it is redrawn from "now").
-class _ProgressBar extends StatelessWidget {
-  const _ProgressBar({required this.value, required this.color, super.key});
+/// The lamp in the head line: lit (filled) or not (outlined). A lit lamp
+/// of a ticking lane pulses with the clock - no animation of its own, so
+/// nothing runs while "Bewegung reduzieren" is on or the lane is still.
+class _Lamp extends StatelessWidget {
+  const _Lamp({required this.color, required this.lit, required this.pulse});
 
-  final double value;
   final Color color;
+  final bool lit;
+  final bool pulse;
 
   @override
   Widget build(BuildContext context) {
     final t = context.tikky;
-    return ExcludeSemantics(
-      child: ClipRRect(
-        borderRadius: t.radii.smAll,
-        child: SizedBox(
-          height: t.sizes.progressBar,
-          child: ColoredBox(
-            color: t.colors.border,
-            child: FractionallySizedBox(
-              alignment: AlignmentDirectional.centerStart,
-              widthFactor: value.clamp(0, 1).toDouble(),
-              heightFactor: 1,
-              child: ColoredBox(color: color),
-            ),
+    final dot = ExcludeSemantics(
+      child: SizedBox.square(
+        dimension: t.sizes.lamp,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: lit ? color : null,
+            borderRadius: t.radii.pillAll,
+            border: lit
+                ? null
+                : Border.all(color: color, width: t.sizes.laneButtonOutline),
           ),
         ),
+      ),
+    );
+    final reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    if (!lit || !pulse || reduceMotion) return dot;
+    final half = t.motion.lampPulse;
+    return NowSelector<bool>(
+      selector: (now) => (now ~/ half.inMilliseconds).isEven,
+      builder: (context, bright) => AnimatedOpacity(
+        opacity: bright ? 1 : t.motion.lampDim,
+        duration: half,
+        curve: Curves.easeInOut,
+        child: dot,
       ),
     );
   }
 }
 
-/// A round, flat button with a semantics label and tooltip.
+/// Digits and sub-line: the only text that follows the ticker.
+class _LaneTimeBlock extends StatelessWidget {
+  const _LaneTimeBlock({
+    required this.track,
+    required this.time,
+    required this.paint,
+    required this.showDigits,
+    required this.showSubLine,
+    required this.idle,
+  });
+
+  final Track track;
+  final LaneTime time;
+  final _LanePaint paint;
+  final bool showDigits;
+  final bool showSubLine;
+
+  /// A ready lane: small digits on the side, the mode in the sub-line.
+  final bool idle;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tikky;
+    final prefs = t.prefs;
+    final secondaryDigits = time.secondaryDigits;
+    final digitStyle = (idle ? t.text.laneDigitsIdle : t.text.laneDigits)
+        .copyWith(color: paint.digits);
+    final digits = FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: AlignmentDirectional.centerStart,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.baseline,
+        textBaseline: TextBaseline.alphabetic,
+        children: [
+          Text(
+            time.digits,
+            key: LaneKeys.digits(track.id),
+            style: digitStyle,
+            maxLines: 1,
+            softWrap: false,
+          ),
+          if (secondaryDigits != null) ...[
+            SizedBox(width: t.space.md),
+            Text(
+              secondaryDigits,
+              style: t.text.laneDigitsIdle.copyWith(color: paint.ink),
+              maxLines: 1,
+              softWrap: false,
+            ),
+          ],
+        ],
+      ),
+    );
+    if (!showSubLine) return digits;
+
+    final mode = Strings.modeName(track.mode);
+    final subStyle = t.text.laneSub.copyWith(color: paint.ink);
+    final Widget? sub;
+    if (prefs.showSubLine && time.subLine.isNotEmpty) {
+      sub = Text(
+        idle ? '$mode${TracksStrings.separator}${time.subLine}' : time.subLine,
+        key: LaneKeys.subLine(track.id),
+        style: subStyle,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      );
+    } else if (idle && mode != track.name) {
+      sub = Text(mode, style: subStyle, maxLines: 1);
+    } else {
+      sub = null;
+    }
+    if (!showDigits) return sub ?? const SizedBox.shrink();
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [digits, ?sub],
+    );
+  }
+}
+
+/// The rounds of an interval: done, running, still to come.
+class _Segments extends StatelessWidget {
+  const _Segments({required this.segments, required this.paint});
+
+  final LaneSegments segments;
+  final _LanePaint paint;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tikky;
+    return ExcludeSemantics(
+      child: Row(
+        children: [
+          for (var i = 1; i <= segments.total; i++) ...[
+            if (i > 1) SizedBox(width: t.space.xs),
+            Expanded(
+              child: SizedBox(
+                height: t.sizes.laneSegment,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: t.radii.pillAll,
+                    color: i < segments.current
+                        ? paint.segmentDone
+                        : (i == segments.current
+                              ? paint.segmentNow
+                              : paint.segmentLater),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// A round (or, in a square design, square) flat button with a semantics
+/// label and tooltip.
 class _RoundButton extends StatelessWidget {
   const _RoundButton({
     required this.icon,
+    this.text,
     required this.tooltip,
     required this.semanticLabel,
     required this.onPressed,
@@ -456,11 +737,14 @@ class _RoundButton extends StatelessWidget {
     required this.iconSize,
     required this.background,
     required this.foreground,
-    this.outlined = false,
-    this.hitSize,
+    this.outline,
+    this.onLongPress,
+    this.longPressHint,
   });
 
-  final IconData icon;
+  /// The symbol; [text] instead, when set.
+  final IconData? icon;
+  final String? text;
   final String tooltip;
   final String semanticLabel;
   final VoidCallback? onPressed;
@@ -468,45 +752,76 @@ class _RoundButton extends StatelessWidget {
   final double iconSize;
   final Color? background;
   final Color foreground;
-  final bool outlined;
-
-  /// Side of the (square) tap target when it is larger than the circle.
-  final double? hitSize;
+  final Color? outline;
+  final VoidCallback? onLongPress;
+  final String? longPressHint;
 
   @override
   Widget build(BuildContext context) {
     final t = context.tikky;
     final enabled = onPressed != null;
-    final hit = hitSize == null || hitSize! < diameter ? diameter : hitSize!;
+    final hit = diameter < t.sizes.minTapTarget
+        ? t.sizes.minTapTarget
+        : diameter;
+    final outline = this.outline;
     return Semantics(
+      container: true,
       button: true,
       enabled: enabled,
       label: semanticLabel,
+      onTap: onPressed,
+      onLongPress: onLongPress,
+      onLongPressHint: onLongPress == null ? null : longPressHint,
       excludeSemantics: true,
       child: Tooltip(
         message: tooltip,
         excludeFromSemantics: true,
-        child: Material(
-          type: background == null
-              ? MaterialType.transparency
-              : MaterialType.canvas,
-          color: background,
-          shape: CircleBorder(
-            side: outlined ? t.hairline : BorderSide.none,
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            customBorder: const CircleBorder(),
-            splashFactory: isCupertino(context)
-                ? NoSplash.splashFactory
-                : null,
-            onTap: onPressed,
-            child: SizedBox.square(
-              dimension: hit,
-              child: Icon(
-                icon,
-                size: iconSize,
-                color: enabled ? foreground : t.colors.border,
+        child: SizedBox.square(
+          dimension: hit,
+          child: Center(
+            child: Material(
+              type: background == null
+                  ? MaterialType.transparency
+                  : MaterialType.canvas,
+              color: background,
+              shape: RoundedRectangleBorder(
+                borderRadius: t.radii.pillAll,
+                side: outline == null
+                    ? BorderSide.none
+                    : BorderSide(
+                        color: outline,
+                        width: t.sizes.laneButtonOutline,
+                      ),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                splashFactory: isCupertino(context)
+                    ? NoSplash.splashFactory
+                    : null,
+                onTap: onPressed,
+                onLongPress: onLongPress,
+                child: SizedBox.square(
+                  dimension: diameter,
+                  child: text == null
+                      ? Icon(
+                          icon,
+                          size: iconSize,
+                          color: enabled ? foreground : t.colors.textMuted,
+                        )
+                      : Center(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              text!,
+                              style: t.text.laneButton.copyWith(
+                                color: enabled
+                                    ? foreground
+                                    : t.colors.textMuted,
+                              ),
+                            ),
+                          ),
+                        ),
+                ),
               ),
             ),
           ),
@@ -520,13 +835,23 @@ class _PrimaryButton extends StatelessWidget {
   const _PrimaryButton({
     required this.track,
     required this.action,
+    required this.paint,
+    required this.idle,
     required this.onPressed,
+    required this.onLongPress,
     super.key,
   });
 
   final Track track;
   final LanePrimary action;
+  final _LanePaint paint;
+
+  /// The smaller, outlined button of a ready lane.
+  final bool idle;
   final VoidCallback onPressed;
+
+  /// Stops the run (E2); `null` while nothing runs.
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -540,36 +865,21 @@ class _PrimaryButton extends StatelessWidget {
         Strings.actionDismiss,
       ),
       LanePrimary.ack => (AdaptiveIcons.check(context), Strings.actionAck),
-      LanePrimary.tick || LanePrimary.none => (
-        AdaptiveIcons.plusOne(context),
-        Strings.actionTick,
-      ),
+      LanePrimary.tick ||
+      LanePrimary.none => (AdaptiveIcons.plusOne(context), Strings.actionTick),
     };
-    final (Color background, Color foreground, bool outlined) =
-        switch (action) {
-          LanePrimary.pause => (t.colors.surfaceAlt, t.colors.text, true),
-          LanePrimary.dismiss => (
-            t.colors.danger,
-            t.onColor(t.colors.danger),
-            false,
-          ),
-          LanePrimary.ack => (
-            t.colors.warning,
-            t.onColor(t.colors.warning),
-            false,
-          ),
-          _ => (t.colors.primary, t.colors.onPrimary, false),
-        };
     return _RoundButton(
       icon: icon,
       tooltip: label,
       semanticLabel: '${track.name}: $label',
       onPressed: onPressed,
-      diameter: t.sizes.primaryButton,
+      onLongPress: onLongPress,
+      longPressHint: TracksStrings.actionStopHint,
+      diameter: idle ? t.sizes.primaryButtonIdle : t.sizes.primaryButton,
       iconSize: t.sizes.primaryIcon,
-      background: background,
-      foreground: foreground,
-      outlined: outlined,
+      background: paint.primaryBackground,
+      foreground: paint.primaryForeground,
+      outline: paint.primaryOutline,
     );
   }
 }
@@ -578,19 +888,27 @@ class _SecondaryButton extends StatelessWidget {
   const _SecondaryButton({
     required this.track,
     required this.action,
+    required this.paint,
     required this.onPressed,
     super.key,
   });
 
   final Track track;
   final LaneSecondary action;
+  final _LanePaint paint;
   final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
     final t = context.tikky;
-    final (IconData icon, String label) = switch (action.kind) {
+    final (IconData? icon, String label) = switch (action.kind) {
       LaneSecondaryKind.lap => (AdaptiveIcons.lap(context), Strings.actionLap),
+      LaneSecondaryKind.plusMinute => (null, TracksStrings.actionPlusMinute),
+      LaneSecondaryKind.snooze => (null, TracksStrings.actionSnooze),
+      LaneSecondaryKind.nextRound => (
+        AdaptiveIcons.nextRound(context),
+        TracksStrings.actionNextRound,
+      ),
       LaneSecondaryKind.restart => (
         AdaptiveIcons.reset(context),
         Strings.actionRestart,
@@ -601,7 +919,7 @@ class _SecondaryButton extends StatelessWidget {
       ),
       LaneSecondaryKind.stop => (
         AdaptiveIcons.stop(context),
-        TracksStrings.actionStopSession,
+        TracksStrings.actionStopHint,
       ),
       LaneSecondaryKind.undo => (
         AdaptiveIcons.undo(context),
@@ -614,15 +932,68 @@ class _SecondaryButton extends StatelessWidget {
     };
     return _RoundButton(
       icon: icon,
+      // "+1′" and "+10′" are written out, as in the drafts.
+      text: switch (action.kind) {
+        LaneSecondaryKind.plusMinute => TracksStrings.plusMinute,
+        LaneSecondaryKind.snooze => TracksStrings.snooze,
+        _ => null,
+      },
       tooltip: label,
       semanticLabel: '${track.name}: $label',
       onPressed: onPressed,
       diameter: t.sizes.secondaryButton,
-      hitSize: t.sizes.minTapTarget,
       iconSize: t.sizes.secondaryIcon,
-      background: null,
-      foreground: t.colors.textMuted,
+      background: paint.secondaryBackground,
+      foreground: paint.secondaryForeground,
+      outline: paint.secondaryOutline,
     );
+  }
+}
+
+/// The quick-label buttons of a counter, up to three in a row.
+class _LabelGrid extends StatelessWidget {
+  const _LabelGrid({
+    required this.track,
+    required this.counts,
+    required this.onTick,
+  });
+
+  static const int _perRow = 3;
+
+  final Track track;
+  final Map<String, int> counts;
+  final ValueChanged<String> onTick;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tikky;
+    final entries = counts.entries.toList();
+    final rows = <Widget>[];
+    for (var start = 0; start < entries.length; start += _perRow) {
+      final row = entries.skip(start).take(_perRow).toList();
+      if (rows.isNotEmpty) rows.add(SizedBox(height: t.space.sm));
+      rows.add(
+        Row(
+          children: [
+            for (var i = 0; i < _perRow; i++) ...[
+              if (i > 0) SizedBox(width: t.space.sm),
+              Expanded(
+                child: i < row.length
+                    ? _LabelButton(
+                        key: LaneKeys.label(track.id, row[i].key),
+                        track: track,
+                        label: row[i].key,
+                        count: row[i].value,
+                        onPressed: () => onTick(row[i].key),
+                      )
+                    : const SizedBox.shrink(),
+              ),
+            ],
+          ],
+        ),
+      );
+    }
+    return Column(mainAxisSize: MainAxisSize.min, children: rows);
   }
 }
 
@@ -644,46 +1015,43 @@ class _LabelButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tikky;
+    final roles = t.trackRoles(track);
     return Semantics(
       button: true,
       label: '${track.name}: ${TracksStrings.tickLabel(label)}',
       value: Strings.countValue(count),
       excludeSemantics: true,
       child: Material(
-        color: t.colors.surfaceAlt,
-        shape: RoundedRectangleBorder(
-          borderRadius: t.radii.smAll,
-          side: t.hairline,
-        ),
+        color: roles.strong,
+        shape: RoundedRectangleBorder(borderRadius: t.radii.smallAll),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           splashFactory: isCupertino(context) ? NoSplash.splashFactory : null,
           onTap: onPressed,
           child: ConstrainedBox(
-            constraints: BoxConstraints(
-              minHeight: t.sizes.minTapTarget,
-              minWidth: t.sizes.primaryButton,
-            ),
+            constraints: BoxConstraints(minHeight: t.sizes.minTapTarget),
             child: Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: t.space.md,
-                vertical: t.space.sm,
-              ),
+              padding: EdgeInsets.symmetric(horizontal: t.space.sm),
               child: Row(
-                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Flexible(
                     child: Text(
                       label,
-                      style: t.text.label,
+                      style: t.text.laneLabel,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   SizedBox(width: t.space.sm),
-                  Text(
-                    Strings.countValue(count),
-                    style: t.text.digitsSmall.copyWith(color: t.colors.text),
+                  Flexible(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        Strings.countValue(count),
+                        style: t.text.laneLabelCount.copyWith(color: roles.ink),
+                      ),
+                    ),
                   ),
                 ],
               ),

@@ -76,6 +76,7 @@ class HistoryRepository {
   Future<List<HistorySession>> getSetActivity(
     String setId, {
     int? sinceMs,
+    int? untilMs,
   }) async {
     final tracks = {
       for (final r in await (_db.select(
@@ -97,6 +98,11 @@ class HistoryRepository {
             ? s.endedAt.isNull()
             : s.endedAt.isNull() | s.endedAt.isBiggerOrEqualValue(sinceMs),
       )
+      ..where(
+        (s) => untilMs == null
+            ? const Constant(true)
+            : s.startedAt.isSmallerThanValue(untilMs),
+      )
       ..orderBy([(s) => OrderingTerm.asc(s.startedAt)]);
     final rows = await query.get();
     final events = await _store.eventsOfSessions(rows.map((r) => r.id));
@@ -109,14 +115,16 @@ class HistoryRepository {
 
   /// Like [getSetActivity], re-emitting whenever the underlying data
   /// changes. [sinceMs] is asked again for every load, so a moving range
-  /// ("the last 24 hours") stays current.
+  /// ("the last 24 hours") stays current. With [untilMs] only sessions
+  /// that started before it.
   Stream<List<HistorySession>> watchSetActivity(
     String setId, {
     int? Function()? sinceMs,
+    int? untilMs,
   }) => watchTables(
     _db,
     [_db.sessions, _db.events, _db.tracks, _db.trackSets],
-    () => getSetActivity(setId, sinceMs: sinceMs?.call()),
+    () => getSetActivity(setId, sinceMs: sinceMs?.call(), untilMs: untilMs),
   );
 
   /// One session with its events (open sessions included), or `null`.

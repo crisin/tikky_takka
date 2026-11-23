@@ -75,12 +75,14 @@ void main() {
       await service.cancelForTrack('timer');
       await service.cancelAll();
       expect(backend.log, isEmpty);
-      expect(await service.permissionStatus(), same(
-        AlarmPermissionStatus.unsupported,
-      ));
-      expect(await service.requestPermissions(), same(
-        AlarmPermissionStatus.unsupported,
-      ));
+      expect(
+        await service.permissionStatus(),
+        same(AlarmPermissionStatus.unsupported),
+      );
+      expect(
+        await service.requestPermissions(),
+        same(AlarmPermissionStatus.unsupported),
+      );
       expect(errors, isEmpty);
     });
 
@@ -94,10 +96,9 @@ void main() {
   group('scheduleForTrack', () {
     test('hands the plan to the OS under the ids of the track', () async {
       await service.scheduleForTrack(tabata, _alarms(tabata, nowMs: 1000));
-      expect(
-        backend.pending.keys,
-        [for (var i = 0; i < 5; i++) AlarmIds.forSlot('tabata', i)],
-      );
+      expect(backend.pending.keys, [
+        for (var i = 0; i < 5; i++) AlarmIds.forSlot('tabata', i),
+      ]);
       expect(backend.pending.values.map((s) => s.kind), [
         AlarmKind.intervalRest,
         AlarmKind.intervalWork,
@@ -223,7 +224,10 @@ void main() {
       backend.failing.add(AlarmIds.forSlot('tabata', 1));
       await service.scheduleForTrack(tabata, _alarms(tabata, nowMs: 1000));
       expect(backend.pending, hasLength(4));
-      expect(backend.pending.keys, isNot(contains(AlarmIds.forSlot('tabata', 1))));
+      expect(
+        backend.pending.keys,
+        isNot(contains(AlarmIds.forSlot('tabata', 1))),
+      );
       expect(errors, hasLength(1));
 
       // The next replacement cancels only what was really handed out.
@@ -272,31 +276,64 @@ void main() {
     });
   });
 
+  group('test alarm (diagnostics)', () {
+    test(
+      'rings once after the delay and outlives cancelAll until due',
+      () async {
+        await service.scheduleTestAlarm(const Duration(seconds: 10));
+        final spec = backend.pending.values.single;
+        expect(spec.fireAtMs, 1000 + 10 * sec);
+        expect(spec.title, contains(AlarmStrings.testAlarmName));
+
+        // The app reschedules everything when it goes to the background.
+        await service.cancelAll();
+        expect(backend.pending.values.single.fireAtMs, 1000 + 10 * sec);
+
+        // Once due, a sweep removes it for good.
+        clock.advanceMs(11 * sec);
+        await service.cancelAll();
+        expect(backend.pending, isEmpty);
+      },
+    );
+
+    test('taps on it are not reported as track actions', () async {
+      await service.init();
+      final seen = <AlarmAction>[];
+      final subscription = service.actions.listen(seen.add);
+      backend.tap(payload: AlarmPayload.encode(AlarmService.testTrackId));
+      await pumpEventQueue();
+      expect(seen, isEmpty);
+      await subscription.cancel();
+    });
+  });
+
   group('pending budget (iOS)', () {
     final drink2 = _track(
       'drink2',
       const ReminderConfig(intervalMs: 20 * min, nagEveryMs: min),
     );
 
-    test('later tracks get what is left and catch up when room is freed',
-        () async {
-      backend.maxPending = 20;
-      await service.scheduleForTrack(drink, _alarms(drink, nowMs: 1000));
-      await service.scheduleForTrack(drink2, _alarms(drink2, nowMs: 1000));
-      List<NotificationSpec> of(String id) => [
-        for (final spec in backend.pending.values)
-          if (spec.trackId == id) spec,
-      ];
-      expect(of('drink'), hasLength(16));
-      // The earliest alarms of the second track fit, the late nags do not.
-      expect(of('drink2'), hasLength(4));
-      expect(of('drink2').first.kind, AlarmKind.reminderDue);
-      expect(backend.pending.length, lessThanOrEqualTo(20));
+    test(
+      'later tracks get what is left and catch up when room is freed',
+      () async {
+        backend.maxPending = 20;
+        await service.scheduleForTrack(drink, _alarms(drink, nowMs: 1000));
+        await service.scheduleForTrack(drink2, _alarms(drink2, nowMs: 1000));
+        List<NotificationSpec> of(String id) => [
+          for (final spec in backend.pending.values)
+            if (spec.trackId == id) spec,
+        ];
+        expect(of('drink'), hasLength(16));
+        // The earliest alarms of the second track fit, the late nags do not.
+        expect(of('drink2'), hasLength(4));
+        expect(of('drink2').first.kind, AlarmKind.reminderDue);
+        expect(backend.pending.length, lessThanOrEqualTo(20));
 
-      await service.cancelForTrack('drink');
-      expect(of('drink'), isEmpty);
-      expect(of('drink2'), hasLength(16));
-    });
+        await service.cancelForTrack('drink');
+        expect(of('drink'), isEmpty);
+        expect(of('drink2'), hasLength(16));
+      },
+    );
 
     test('nothing at all when the budget is used up', () async {
       backend.maxPending = 16;
@@ -307,7 +344,10 @@ void main() {
         isEmpty,
       );
       // Re-planning the big track with less frees room for the small one.
-      await service.scheduleForTrack(drink, _alarms(drink, nowMs: 1000).take(3).toList());
+      await service.scheduleForTrack(
+        drink,
+        _alarms(drink, nowMs: 1000).take(3).toList(),
+      );
       expect(
         backend.pending.values.where((s) => s.trackId == 'timer'),
         hasLength(1),
@@ -344,7 +384,10 @@ void main() {
 
       final status = await service.requestPermissions();
       expect(status.allGranted, isTrue);
-      expect(backend.log.take(2), ['requestNotifications', 'requestExactAlarms']);
+      expect(backend.log.take(2), [
+        'requestNotifications',
+        'requestExactAlarms',
+      ]);
       // Scheduled again, now exact.
       expect(backend.count('schedule:'), 1);
       expect(backend.exactById.values, [true]);
@@ -430,29 +473,31 @@ void main() {
       await subscription.cancel();
     });
 
-    test('the tap that launched the app waits for the first listener',
-        () async {
-      backend.launch = (
-        payload: AlarmPayload.encode('drink'),
-        actionId: AlarmActionIds.acknowledge,
-      );
-      await service.init();
-      await pumpEventQueue();
+    test(
+      'the tap that launched the app waits for the first listener',
+      () async {
+        backend.launch = (
+          payload: AlarmPayload.encode('drink'),
+          actionId: AlarmActionIds.acknowledge,
+        );
+        await service.init();
+        await pumpEventQueue();
 
-      final seen = <AlarmAction>[];
-      final subscription = service.actions.listen(seen.add);
-      await pumpEventQueue();
-      expect(seen.single.trackId, 'drink');
-      expect(seen.single.type, AlarmActionType.acknowledge);
+        final seen = <AlarmAction>[];
+        final subscription = service.actions.listen(seen.add);
+        await pumpEventQueue();
+        expect(seen.single.trackId, 'drink');
+        expect(seen.single.type, AlarmActionType.acknowledge);
 
-      // Delivered once only.
-      await subscription.cancel();
-      final again = <AlarmAction>[];
-      final second = service.actions.listen(again.add);
-      await pumpEventQueue();
-      expect(again, isEmpty);
-      await second.cancel();
-    });
+        // Delivered once only.
+        await subscription.cancel();
+        final again = <AlarmAction>[];
+        final second = service.actions.listen(again.add);
+        await pumpEventQueue();
+        expect(again, isEmpty);
+        await second.cancel();
+      },
+    );
 
     test('a failing launch lookup does not break init', () async {
       backend.launchError = StateError('not ready');

@@ -18,6 +18,7 @@ class EventLog {
     String? amount,
     String? note,
     int? seq,
+    JsonMap extra = const {},
   }) {
     final event = TrackEvent(
       id: 'e${_seq.toString().padLeft(3, '0')}',
@@ -31,6 +32,7 @@ class EventLog {
       substanceId: substanceId,
       amount: amount,
       note: note,
+      extra: extra,
     );
     _seq++;
     events.add(event);
@@ -44,6 +46,9 @@ class EventLog {
   void tick(int at, {String? label}) => add(EventType.tick, at, label: label);
   void ack(int at) => add(EventType.ack, at);
   void stop(int at) => add(EventType.stop, at);
+  void extend(int at, int ms) =>
+      add(EventType.extend, at, extra: {TrackEvent.extendKey: ms});
+  void skip(int at) => add(EventType.skip, at);
   void entry(int at, {String? person, String? substance, String? amount}) =>
       add(
         EventType.entry,

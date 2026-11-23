@@ -106,6 +106,8 @@ abstract final class Strings {
     EventType.entry => 'Eintrag',
     EventType.ack => 'Bestätigt',
     EventType.stop => 'Stopp',
+    EventType.extend => 'Später',
+    EventType.skip => 'Nächste Runde',
   };
 
   // ------------------------------------------------------------ seed data
@@ -284,7 +286,6 @@ abstract final class Strings {
   // ------------------------------------------------------------- protocol
   static const protocolEmpty = 'Noch kein Eintrag';
   static const protocolNewEntry = 'Neuer Eintrag';
-  static const protocolEditEntry = 'Eintrag bearbeiten';
   static const protocolWho = 'Wer';
   static const protocolWhat = 'Was';
   static const protocolAmount = 'Menge';
@@ -389,7 +390,8 @@ abstract final class Strings {
   static const prefDigitScale = 'Größe der Ziffern';
   static const prefButtonScale = 'Größe der Knöpfe';
   static const prefShowTenths = 'Zehntelsekunden anzeigen';
-  static const prefShowProgress = 'Fortschrittsbalken anzeigen';
+  static const prefShowProgress = 'Fortschritt in der Spur zeigen';
+  static const prefShowEntryCounts = 'Anzahl auf den Erfassen-Feldern zeigen';
   static const prefShowSubLine = 'Zusatzzeile anzeigen';
   static const prefLeftHanded = 'Linkshänder-Layout';
   static const prefLeftHandedHint = 'Hauptknopf auf der linken Seite.';

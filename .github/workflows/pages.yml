@@ -1,0 +1,60 @@
+# Web build as an installable PWA on GitHub Pages:
+# https://crisin.github.io/tikky_takka/
+#
+# On every push to master (and by hand). CanvasKit is bundled instead of
+# loaded from Google's CDN, and tools/web_pwa.dart fills in the offline
+# service worker (web/sw.js). Installed copies update on their next start.
+name: Pages
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deploy at a time; a running deploy is not cancelled.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  FLUTTER_VERSION: 3.47.9
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Build
+        # Shown on the diagnostics page in the app.
+        run: >-
+          flutter build web --release
+          --base-href /${{ github.event.repository.name }}/
+          --no-web-resources-cdn
+          --dart-define=BUILD_NUMBER=${{ github.run_number }}
+          --dart-define=GIT_SHA=${{ github.sha }}
+      - run: dart run tools/web_pwa.dart build/web
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

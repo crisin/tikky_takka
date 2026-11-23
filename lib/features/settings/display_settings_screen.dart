@@ -16,6 +16,7 @@ const List<String> laneAppearanceKeys = [
   UiPrefsKeys.showTenths,
   UiPrefsKeys.showProgressBar,
   UiPrefsKeys.showSubLine,
+  UiPrefsKeys.showEntryCounts,
   UiPrefsKeys.leftHanded,
 ];
 

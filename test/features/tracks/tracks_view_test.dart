@@ -1,4 +1,4 @@
-import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -20,17 +20,15 @@ import 'package:tikky_takka/theme/theme.dart';
 import '../../support/test_app.dart';
 import 'tracks_harness.dart';
 
-/// A segment of the view switch, by its tooltip (the navigation bar has a
-/// "Spuren" tooltip of its own).
+/// A view in the navigation: the pill on a phone, the rail when wide.
 Finder _segment(String label) => find.descendant(
-  of: find.byType(TracksViewSwitch),
-  matching: find.byTooltip(label),
+  of: find.byWidgetPredicate((w) => w is NavPill || w is NavigationRail),
+  matching: find.text(label),
 );
 
-/// A segment of the mode switch of the timeline ("Streifen", "Liste",
-/// "Zusammenfassung").
-Finder _timelineMode(String label) => find.descendant(
-  of: find.byKey(TimelineKeys.mode),
+/// A segment of the level switch of the timeline ("Jetzt", "Abend").
+Finder _timelineLevel(String label) => find.descendant(
+  of: find.byKey(TimelineKeys.level),
   matching: find.text(label),
 );
 
@@ -43,18 +41,17 @@ void main() {
     expect(TracksView.fromName(null), TracksView.lanes);
   });
 
-  testWidgets('the switch in the app bar shows lanes, tap pad and timeline; '
-      'the other app bar controls stay', (tester) async {
+  testWidgets('the pill shows lanes, tap pad and timeline; the head and '
+      'the plus stay', (tester) async {
     final h = await TracksHarness.start(tester);
 
-    // Default: the lanes. On a phone the switch shows icons with tooltips.
-    expect(find.byType(TracksViewSwitch), findsOneWidget);
+    // Default: the lanes. On a phone the views are words in the pill.
+    expect(find.byType(NavPill), findsOneWidget);
     expect(find.byKey(TracksScreenKeys.list), findsOneWidget);
     expect(find.byKey(PadKeys.pad), findsNothing);
     expect(_segment(TracksStrings.viewLanes), findsOneWidget);
     expect(_segment(TracksStrings.viewPad), findsOneWidget);
     expect(_segment(TracksStrings.viewTimeline), findsOneWidget);
-    expect(find.text(TracksStrings.viewPad), findsNothing);
 
     await h.tap(_segment(TracksStrings.viewPad));
     expect(find.byKey(PadKeys.pad), findsOneWidget);
@@ -85,29 +82,39 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('wide layouts show icons with labels', (tester) async {
+  testWidgets('wide layouts show the views on the rail', (tester) async {
     final h = await TracksHarness.start(
       tester,
       surfaceSize: TestApp.desktopSize,
     );
-    final inSwitch = find.byType(TracksViewSwitch);
+    expect(find.byType(NavPill), findsNothing);
+    final rail = find.byType(NavigationRail);
     for (final label in [
       TracksStrings.viewLanes,
       TracksStrings.viewPad,
       TracksStrings.viewTimeline,
     ]) {
       expect(
-        find.descendant(of: inSwitch, matching: find.text(label)),
+        find.descendant(of: rail, matching: find.text(label)),
         findsOneWidget,
       );
     }
+    // "Neue Spur" leads the rail, the settings close it.
     expect(
-      find.descendant(of: inSwitch, matching: find.byType(Icon)),
-      findsNWidgets(3),
+      find.descendant(
+        of: rail,
+        matching: find.byKey(TracksScreenKeys.addTrack),
+      ),
+      findsOneWidget,
     );
-    await h.tap(
-      find.descendant(of: inSwitch, matching: find.text(TracksStrings.viewPad)),
+    expect(
+      find.descendant(
+        of: rail,
+        matching: find.byKey(TracksScreenKeys.settings),
+      ),
+      findsOneWidget,
     );
+    await h.tap(_segment(TracksStrings.viewPad));
     expect(find.byKey(PadKeys.pad), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
@@ -233,36 +240,32 @@ void main() {
     expect(tester.getSize(counter).height, greaterThanOrEqualTo(72 * 1.5));
     await h.tap(counter);
     // The set's 12-hour clock, in the undo bar ...
-    final stamp = Fmt.time(h.app.clock.nowMs(), use24h: false, seconds: true);
-    expect(
-      tester.widget<InlineUndoBar>(find.byKey(PadKeys.undoBar)).message,
-      '${Strings.seedCounterName} · $stamp',
-    );
+    final stamp = Fmt.time(h.app.clock.nowMs(), use24h: false);
+    final bar = tester.widget<InlineUndoBar>(find.byKey(PadKeys.undoBar));
+    expect(bar.message, Strings.seedCounterName);
+    expect(bar.detail, TracksStrings.padWhen(stamp, TracksStrings.padNow));
 
     // ... and in the timeline.
     await h.tap(_segment(TracksStrings.viewTimeline));
-    final timeline = tester.element(find.byKey(TimelineKeys.strip));
+    final timeline = tester.element(find.byKey(TimelineKeys.view));
     expect(timeline.tikky.theme.id, ThemePresets.blackId);
-    // The strip is the default mode; the times as text are in the list.
-    await h.tap(_timelineMode(TracksStrings.modeTimeline));
-    expect(find.text(stamp), findsOneWidget);
+    // "Jetzt" is the default; the times as text are in the evening's list.
+    await h.tap(_timelineLevel(TracksStrings.levelEvening));
+    await h.tap(find.byKey(TimelineKeys.compact));
+    expect(
+      find.text(Fmt.time(h.app.clock.nowMs(), use24h: false, seconds: true)),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Cupertino platforms: the switch, the pad and the timeline', (
+  testWidgets('Cupertino platforms: the pill, the pad and the timeline', (
     tester,
   ) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
     try {
       final h = await TracksHarness.start(tester);
-      expect(find.byType(CupertinoNavigationBar), findsOneWidget);
-      expect(
-        find.descendant(
-          of: find.byType(TracksViewSwitch),
-          matching: find.byType(CupertinoSlidingSegmentedControl<TracksView>),
-        ),
-        findsOneWidget,
-      );
+      expect(find.byType(NavPill), findsOneWidget);
 
       await h.tap(_segment(TracksStrings.viewPad));
       expect(find.byKey(PadKeys.pad), findsOneWidget);
@@ -275,8 +278,9 @@ void main() {
       expect(await h.snapshot(h.stopwatch), isNull);
 
       await h.tap(_segment(TracksStrings.viewTimeline));
-      // The strip is the default mode; this walks through the list.
-      await h.tap(_timelineMode(TracksStrings.modeTimeline));
+      // "Jetzt" is the default; this walks through the evening's list.
+      await h.tap(_timelineLevel(TracksStrings.levelEvening));
+      await h.tap(find.byKey(TimelineKeys.compact));
       expect(find.byKey(TimelineKeys.list), findsOneWidget);
       expect(find.text('Tipp 1'), findsOneWidget);
       await h.tap(find.text('Tipp 1'));

@@ -2,8 +2,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../core/domain/track.dart';
+import 'bundled_fonts.dart';
 import 'theme_presets.dart';
 import 'tikky_theme.dart';
+import 'track_roles.dart';
 import 'ui_prefs.dart';
 
 /// Spacing scale (logical pixels), already adjusted for the density
@@ -25,6 +27,9 @@ final class TikkySpacing {
 
   /// Standard horizontal page padding.
   double get page => 16 * _factor;
+
+  /// Horizontal page padding of the lane list and the tap pad.
+  double get pageLanes => 12 * _factor;
 }
 
 /// Sizes of recurring elements (logical pixels), already adjusted for the
@@ -54,6 +59,21 @@ final class TikkySizes {
   /// Minimum height of a lane row.
   double get laneMinHeight => 84 * _density;
 
+  /// Height of a lane that shows its surface (running, paused, ringing,
+  /// due) and of one that is ready (outline only).
+  double get laneHeightActive => 101 * _density;
+  double get laneHeightIdle => 66 * _density;
+
+  /// Diameter of the lamp in the head line of a lane.
+  double get lamp => 8;
+
+  /// Height of the bottom pill and diameter of the plus button beside it.
+  double get navPill => 56;
+
+  /// Below this window height (a phone held sideways) the head of the
+  /// tracks screen is compact: a smaller title, no count below it.
+  double get compactHeight => 560;
+
   /// Minimum width of a lane tile / grid column on wide layouts.
   double get tileMinWidth => 300;
 
@@ -61,10 +81,13 @@ final class TikkySizes {
   double get tileMinHeight => 148 * _density;
 
   /// Diameter of the round primary button of a lane.
-  double get primaryButton => 56 * _prefs.buttonScale;
+  double get primaryButton => 60 * _prefs.buttonScale;
 
-  /// Size of the small secondary icon buttons of a lane.
-  double get secondaryButton => 40 * _prefs.buttonScale;
+  /// The primary button of a ready lane (outline only).
+  double get primaryButtonIdle => 48 * _prefs.buttonScale;
+
+  /// Diameter of the secondary button of a lane.
+  double get secondaryButton => 48 * _prefs.buttonScale;
 
   /// Extra large tap target (protocol entry sheet, usable while impaired).
   double get bigTapTarget => 64 * _prefs.buttonScale;
@@ -81,6 +104,54 @@ final class TikkySizes {
   /// Fixed height of the undo bar at the top of the tap pad.
   double get undoBarHeight => 56;
 
+  /// Thickness of the time bar at the lower edge of an undo bar.
+  double get undoTimeBar => 3;
+
+  /// Outline of a ready lane, a paused one and a due one.
+  double get laneOutlineIdle => 1;
+  double get laneOutlinePaused => 1.5;
+  double get laneOutlineDue => 2;
+
+  /// Outline of the primary button of a ready lane, of the lamp of a
+  /// paused / ready lane and of a secondary button on a ringing lane.
+  double get laneButtonOutline => 1.5;
+
+  /// The widest the time of a ready lane gets before it shrinks.
+  double get laneDigitsIdleMax => 120;
+
+  /// Height of a round segment of an interval lane.
+  double get laneSegment => 8;
+
+  /// Height of a person tile in a protocol lane, diameter of its initial,
+  /// and the width below which the tiles go one per row.
+  double get personTile => 60 * _prefs.buttonScale;
+  double get personAvatar => 32;
+  double get personTileMinWidth => 140;
+
+  /// The initial of a person on the tap pad and in the head of its page.
+  double get padAvatar => 40;
+
+  /// Height of a field on the page "Anderes" of the tap pad.
+  double get padOtherField => 88 * _prefs.buttonScale;
+
+  /// The bar under "Abstand: noch ..." on a field of the tap pad.
+  double get padLockoutBar => 4;
+
+  /// Outline of a field of the tap pad that was just tapped.
+  double get padHitOutline => 2;
+
+  /// Outline of a ready field and of "Anderes" on the tap pad.
+  double get padOutline => 1.5;
+
+  /// Dash and gap of the outline of "Anderes".
+  double get padDash => 6;
+
+  /// Height of a folded row of the entry sheet (Wer, Was, Notiz).
+  double get sheetRow => 56;
+
+  /// Width of a step button of the time in the entry sheet (-5, +1, ...).
+  double get timeStep => 52;
+
   double get iconSm => 20;
   double get iconMd => 24;
   double get iconLg => 28;
@@ -93,10 +164,14 @@ final class TikkySizes {
   double get secondaryIcon => 20 * _prefs.buttonScale;
 
   /// Font size of the large time / count of a lane.
-  double get digitsLarge => 44 * _prefs.digitScale;
+  double get digitsLarge => 32 * _prefs.digitScale;
 
-  /// Font size of secondary figures (lap time, per-label counts).
-  double get digitsMedium => 24 * _prefs.digitScale;
+  /// Font size of the time on the focus page.
+  double get digitsFocus => 56 * _prefs.digitScale;
+
+  /// Font size of secondary figures (lap time, per-label counts, the time
+  /// of a ready lane and on pad buttons).
+  double get digitsMedium => 22 * _prefs.digitScale;
 
   /// Font size of small figures inside sub-lines and lists.
   double get digitsSmall => 17 * _prefs.digitScale;
@@ -124,6 +199,34 @@ final class TikkyTextStyles {
     required this.digitsSmall,
     required this.laneTitle,
     required this.subLine,
+    required this.laneName,
+    required this.laneMode,
+    required this.laneSub,
+    required this.laneDigits,
+    required this.laneDigitsIdle,
+    required this.laneLabelCount,
+    required this.laneLabel,
+    required this.labelStrong,
+    required this.padName,
+    required this.padNameLarge,
+    required this.padCount,
+    required this.padHint,
+    required this.padDigits,
+    required this.padInitial,
+    required this.sheetTitle,
+    required this.chip,
+    required this.rowValue,
+    required this.laneButton,
+    required this.stripName,
+    required this.stripThing,
+    required this.stripDigits,
+    required this.stripWord,
+    required this.eveningChip,
+    required this.cardDigits,
+    required this.cardNote,
+    required this.navLabel,
+    required this.pageTitle,
+    required this.pageTitleCompact,
     required this.title,
     required this.headline,
     required this.body,
@@ -147,6 +250,71 @@ final class TikkyTextStyles {
 
   /// Muted sub-line of a lane (lap info, status).
   final TextStyle subLine;
+
+  /// Head line of a lane: the name, the mode next to it, the line under
+  /// the digits. Coloured by the lane (`roles(..).ink`).
+  final TextStyle laneName;
+  final TextStyle laneMode;
+  final TextStyle laneSub;
+
+  /// The time / count of an active lane and of a ready one.
+  final TextStyle laneDigits;
+  final TextStyle laneDigitsIdle;
+
+  /// The count on a label button of a counter, and its label.
+  final TextStyle laneLabelCount;
+  final TextStyle laneLabel;
+
+  /// A pill button, the first line of an undo bar.
+  final TextStyle labelStrong;
+
+  /// The name on a field of the tap pad; larger on the page "Was?".
+  final TextStyle padName;
+  final TextStyle padNameLarge;
+
+  /// "×3" on a field of the tap pad, and its small line. Coloured by the
+  /// field (`roles(..).ink`).
+  final TextStyle padCount;
+  final TextStyle padHint;
+
+  /// The time on a field of a stopwatch or timer.
+  final TextStyle padDigits;
+
+  /// The initial of a person on the tap pad.
+  final TextStyle padInitial;
+
+  /// The title of the entry sheet ("Wasser · Krille").
+  final TextStyle sheetTitle;
+
+  /// A choice chip of a sheet ("Jetzt", "0,5 l").
+  final TextStyle chip;
+
+  /// The value of a folded row of a sheet ("Wer  Krille").
+  final TextStyle rowValue;
+
+  /// Text on a round button of a lane ("+1′", "+10′").
+  final TextStyle laneButton;
+
+  /// The strip: the name of a lane, the name of a thing, a live value
+  /// next to a name, and the word below a marker.
+  final TextStyle stripName;
+  final TextStyle stripThing;
+  final TextStyle stripDigits;
+  final TextStyle stripWord;
+
+  /// An entry chip of the evening.
+  final TextStyle eveningChip;
+
+  /// A person card above the strip: the time since, and the line below.
+  final TextStyle cardDigits;
+  final TextStyle cardNote;
+
+  /// An entry of the navigation pill.
+  final TextStyle navLabel;
+
+  /// The large title at the top of the tracks screen (the set's name).
+  final TextStyle pageTitle;
+  final TextStyle pageTitleCompact;
 
   /// Screen and sheet titles.
   final TextStyle title;
@@ -173,24 +341,38 @@ final class TikkyStripTokens {
 
   final double _density;
 
-  /// Height of the lane of a track.
-  double get lane => 52 * _density;
+  /// The line above every lane with its name (and its live value).
+  double get label => 16 * _density;
 
-  /// Height of a sub-lane (a person of a protocol, a label of a counter).
-  double get subLane => 44 * _density;
+  /// Height of the lane of a track: its name, then a compact bar.
+  double get lane => 32 * _density;
+
+  /// Height of the lane of a thing (a substance of a person, a label of a
+  /// counter): its name, then the line with the markers.
+  double get subLane => 40 * _density;
+
+  /// The name line of an open person, and of a folded one with all its
+  /// things on one line and the word below every marker.
+  double get personHead => 20 * _density;
+  double get personFolded => 68 * _density;
+
+  /// The word below a marker of a folded person.
+  double get word => 16;
 
   /// Height of the time axis above the lanes.
   double get axis => 30;
 
-  /// Thickness of a session bar in a lane / in a sub-lane.
-  double get bar => 22 * _density;
-  double get subBar => 14 * _density;
+  /// Thickness of a session bar in a lane / the line of a thing.
+  double get bar => 12 * _density;
+  double get subBar => 2;
 
-  /// Diameter of an event marker.
-  double get marker => 13;
+  /// Diameter of the marker of an entry, and of an event of a track.
+  double get marker => 16;
+  double get trackMarker => 10;
 
-  /// How far around a marker a tap or the pointer still counts.
-  double get hitSlop => 14;
+  /// How far around a marker a tap or the pointer still counts: a tap
+  /// area of 48 x 48.
+  double get hitSlop => 24;
 
   /// Markers closer than this (centre to centre) become a cluster.
   double get markerGap => 18;
@@ -205,18 +387,75 @@ final class TikkyStripTokens {
   double get labelMinWidth => 24;
   double get labelMaxWidth => 140;
 
+  /// The time between two markers is written from this much room on.
+  double get gapText => 56;
+
+  /// Height of the band in the warning colour while a lockout runs.
+  double get warnBand => 22;
+
   /// Padding around an axis label when choosing the tick spacing.
   double get tickPadding => 28;
 
-  /// Width of the fixed track names: wide, and on a phone.
-  double get gutter => 184;
-  double get gutterNarrow => 124;
+  /// Space at the left of a name; a thing's name is indented further.
+  double get nameInset => 12;
+  double get subIndent => 16;
 
-  /// Below this width of the whole strip the narrow gutter is used.
-  double get narrowBreakpoint => 560;
+  /// The colour dot before the name of a track or a person, and the
+  /// space after it.
+  double get nameDot => 8;
+  double get nameGap => 6;
 
-  /// Indent of the name of a sub-lane.
-  double get subIndent => 14;
+  /// The initial of a person on a card above the strip; below this
+  /// height of the timeline the cards are left out.
+  double get cardAvatar => 28;
+  double get cardsMinHeight => 320;
+
+  // "Abend" (Pult 3.2): the time runs downwards.
+
+  /// The column with the hours, a bar of a track, the space between two
+  /// and the least width of the column of the tracks.
+  double get eveningAxis => 42;
+  double get eveningTrackBar => 8;
+  double get eveningTrackGap => 4;
+  double get eveningTracks => 46;
+
+  /// An entry chip: its height, its distance from the edge of the column,
+  /// and how close two may come before the second takes the other place.
+  double get eveningChip => 20;
+  double get eveningChipInset => 18;
+  double get eveningSlotGap => 22;
+
+  /// The closest scale (then the evening scrolls), the least width of a
+  /// person's column, the height of the line with a chain.
+  double get eveningMinPxPerHour => 60;
+  double get eveningMinColumn => 120;
+  double get eveningChain => 36;
+
+  /// The line of a chain and its dots; the initial in a column head.
+  double get eveningChainLine => 2;
+  double get eveningChainDot => 8;
+  double get eveningAvatar => 24;
+
+  /// Below this height the evening scrolls as a whole.
+  double get eveningMinHeight => 320;
+
+  // "Woche" and "Monat" (Pult 3.3, 3.4).
+
+  /// A row of the week (a full tap target), the column with the day and
+  /// the one with the count, the gap between rows.
+  double get weekRow => 48;
+  double get weekLabel => 44;
+  double get weekCount => 40;
+  double get weekGap => 6;
+
+  /// An entry in a row of the week; the bar of a thing in the totals.
+  double get weekTick => 2;
+  double get weekTickHeight => 22;
+  double get weekSumBar => 14;
+
+  /// A day of the month (a full tap target) and the gap between days.
+  double get monthCell => 48;
+  double get monthGap => 6;
 
   /// Width of the "now" line and of a lap tick.
   double get nowLine => 1.5;
@@ -232,14 +471,25 @@ final class TikkyStripTokens {
   double get barOpacity => 0.42;
   double get pauseOpacity => 0.14;
   double get phaseAltOpacity => 0.24;
-  double get subBarOpacity => 0.22;
+  double get subBarOpacity => 0.5;
   double get bandOpacity => 0.18;
 
   /// Opacity of the vertical gridlines.
   double get gridOpacity => 0.6;
 
   /// Where the "now" line sits while it is followed (share of the width).
-  double get followAnchor => 0.82;
+  double get followAnchor => 0.85;
+
+  /// A stretch without any event of at least [foldMinGapMs] is drawn
+  /// [fold] pixels wide; never the last [foldKeepRecentMs] before "now";
+  /// [foldPadMs] stay open next to the events on both sides.
+  double get fold => 24;
+  int get foldMinGapMs => 20 * 60 * 1000;
+  int get foldKeepRecentMs => 10 * 60 * 1000;
+  int get foldPadMs => 2 * 60 * 1000;
+
+  /// Distance of the hatch lines of a fold.
+  double get foldHatchSpacing => 6;
 
   /// Free room on both sides of "Alles zeigen" (share of the range).
   double get fitPadding => 0.06;
@@ -277,6 +527,29 @@ final class TikkyRadii {
 
   /// Rounded top corners (bottom sheets).
   BorderRadius get sheetTop => BorderRadius.vertical(top: Radius.circular(lg));
+
+  // Radii by role ("Pult"). With the default base of 12 these are the
+  // drawn 20 / 22 / 14 / 28; a theme with square corners keeps them square.
+
+  /// A lane.
+  double get lane => _base * 20 / 12;
+
+  /// A pad button, a card.
+  double get pad => _base * 22 / 12;
+
+  /// Label buttons, tiles inside a lane, input fields.
+  double get small => _base * 14 / 12;
+
+  /// The top corners of a sheet.
+  double get sheet => _base * 28 / 12;
+
+  /// Pills and round buttons; square when the theme has no rounding.
+  double get pill => _base <= 0 ? 0 : 999;
+
+  BorderRadius get laneAll => BorderRadius.circular(lane);
+  BorderRadius get padAll => BorderRadius.circular(pad);
+  BorderRadius get smallAll => BorderRadius.circular(small);
+  BorderRadius get pillAll => BorderRadius.circular(pill);
 }
 
 /// Animation timings.
@@ -291,6 +564,10 @@ final class TikkyMotion {
 
   /// Blink period of a ringing lane.
   Duration get ringBlink => const Duration(milliseconds: 600);
+
+  /// Half a period of the lamp of a running lane, and how far it dims.
+  Duration get lampPulse => const Duration(seconds: 1);
+  double get lampDim => 0.35;
 
   /// How long the "Rückgängig" snackbar stays.
   Duration get undoWindow => const Duration(seconds: 5);
@@ -376,6 +653,18 @@ class TikkyTokens extends ThemeExtension<TikkyTokens> {
   /// Colour for a palette index (wraps around).
   Color paletteColor(int index) => theme.paletteColor(index);
 
+  final Map<int, TrackRoles> _roles = {};
+
+  /// The five roles of a track colour in this theme (surface, fill, text,
+  /// ...). Text in a track colour is always `roles(c).ink`, never `c`.
+  TrackRoles roles(Color color) => _roles.putIfAbsent(
+    color.toARGB32(),
+    () => trackRolesFor(color, background: colors.background, isDark: isDark),
+  );
+
+  /// The roles of the colour of [track].
+  TrackRoles trackRoles(Track track) => roles(trackColor(track));
+
   /// Readable content colour (text or inverse) on top of [background].
   Color onColor(Color background) => background.computeLuminance() > 0.5
       ? const Color(0xFF000000)
@@ -398,6 +687,9 @@ class TikkyTokens extends ThemeExtension<TikkyTokens> {
             ? Border.all(color: colors.border, width: sizes.hairline)
             : null,
       );
+
+  /// Letter spacing of the lane digits, as a share of their size.
+  static const double _laneDigitTracking = -0.05;
 
   /// Font family for regular text; `null` = platform default.
   String? get fontFamily => TikkyFonts.family(theme.fontFamily, platform);
@@ -445,7 +737,85 @@ class TikkyTokens extends ThemeExtension<TikkyTokens> {
       fontFeatures: digit.tabular ? const [FontFeature.tabularFigures()] : null,
     );
 
+    // The lanes show their digits in Martian Mono (bundled), unless the
+    // theme asks for the platform's monospace font.
+    final laneFamily = digit.monospace ? digitFamily : BundledFonts.martianMono;
+    final laneFallback = digit.monospace
+        ? digitFallback
+        : TikkyFonts.fallback(TikkyFonts.mono);
+    TextStyle laneDigits(double size, double lineHeight, Color color) =>
+        TextStyle(
+          fontFamily: laneFamily,
+          fontFamilyFallback: laneFallback.isEmpty ? null : laneFallback,
+          fontSize: size,
+          fontWeight: FontWeight.w500,
+          color: color,
+          height: lineHeight,
+          letterSpacing: size * _laneDigitTracking,
+          fontFeatures: digit.tabular
+              ? const [FontFeature.tabularFigures()]
+              : null,
+        );
+
     return TikkyTextStyles._(
+      laneName: base(14, FontWeight.w600, colors.text, height: 17 / 14),
+      laneMode: base(14, FontWeight.w400, colors.text, height: 17 / 14),
+      laneSub: base(13, FontWeight.w400, colors.textMuted, height: 16 / 13),
+      laneDigits: laneDigits(sizes.digitsLarge, 38 / 32, colors.text),
+      laneDigitsIdle: laneDigits(sizes.digitsMedium, 26 / 22, colors.textMuted),
+      laneLabelCount: laneDigits(15, 1.2, colors.text),
+      laneLabel: base(15, FontWeight.w600, colors.text, height: 1.2),
+      labelStrong: base(15, FontWeight.w600, colors.text, height: 1.2),
+      padName: base(
+        22,
+        FontWeight.w700,
+        colors.text,
+        height: 1.2,
+        letterSpacing: 22 * -0.01,
+      ),
+      padNameLarge: base(
+        28,
+        FontWeight.w700,
+        colors.text,
+        height: 1.2,
+        letterSpacing: 28 * -0.01,
+      ),
+      padCount: laneDigits(18 * prefs.digitScale, 1.2, colors.text),
+      padHint: base(14, FontWeight.w400, colors.text, height: 1.25),
+      padDigits: laneDigits(sizes.digitsMedium, 26 / 22, colors.text),
+      padInitial: base(18, FontWeight.w700, colors.text, height: 1),
+      sheetTitle: base(
+        20,
+        FontWeight.w700,
+        colors.text,
+        height: 1.2,
+        letterSpacing: 20 * -0.01,
+      ),
+      chip: base(14, FontWeight.w600, colors.text, height: 1.2),
+      rowValue: base(16, FontWeight.w600, colors.text, height: 1.25),
+      laneButton: base(14, FontWeight.w700, colors.text, height: 1),
+      stripName: base(13, FontWeight.w600, colors.text, height: 16 / 13),
+      stripThing: base(12, FontWeight.w500, colors.textMuted, height: 16 / 12),
+      stripDigits: laneDigits(11, 16 / 11, colors.text),
+      stripWord: base(11, FontWeight.w400, colors.textMuted, height: 15 / 11),
+      eveningChip: base(12, FontWeight.w600, colors.text, height: 20 / 12),
+      cardDigits: laneDigits(20 * prefs.digitScale, 24 / 20, colors.text),
+      cardNote: base(12, FontWeight.w400, colors.textMuted, height: 15 / 12),
+      navLabel: base(15, FontWeight.w600, colors.text, height: 1.2),
+      pageTitle: base(
+        30,
+        FontWeight.w700,
+        colors.text,
+        height: 34 / 30,
+        letterSpacing: 30 * -0.02,
+      ),
+      pageTitleCompact: base(
+        24,
+        FontWeight.w700,
+        colors.text,
+        height: 28 / 24,
+        letterSpacing: 24 * -0.02,
+      ),
       digitsLarge: digits(sizes.digitsLarge, colors.text),
       digitsMedium: digits(sizes.digitsMedium, colors.text),
       digitsSmall: digits(sizes.digitsSmall, colors.textMuted),

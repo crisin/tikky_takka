@@ -20,6 +20,17 @@ abstract final class SettingsKeys {
   /// (`ui.timelineMode.<setId>` -> `TimelineMode.name`).
   static const timelineModePrefix = 'ui.timelineMode.';
 
+  /// Prefix of the level of the timeline per set
+  /// (`ui.timelineLevel.<setId>` -> `TimelineLevel.name`), and of the
+  /// "Kompakt" switch of the evening (`ui.timelineCompact.<setId>` ->
+  /// `"true"` / `"false"`). Without them the old mode is read.
+  static const timelineLevelPrefix = 'ui.timelineLevel.';
+  static const timelineCompactPrefix = 'ui.timelineCompact.';
+
+  /// Prefix of the open persons of the strip per set
+  /// (`ui.stripOpen.<setId>` -> lane ids, one per line).
+  static const stripOpenPrefix = 'ui.stripOpen.';
+
   /// `UiPrefs` as a JSON object.
   static const uiPrefs = 'ui.prefs';
 

@@ -16,7 +16,8 @@ void main() {
   testWidgets('an idle protocol lane invites the first entry', (tester) async {
     final f = await ProtocolFixture.pump(tester);
 
-    expect(find.text('Zelt · ${Strings.modeProtocol}'), findsOneWidget);
+    expect(find.text('Zelt'), findsOneWidget);
+    expect(find.text(Strings.modeProtocol), findsOneWidget);
     expect(find.text(Strings.protocolEmpty), findsOneWidget);
     expect(find.text(ProtocolStrings.tapToAdd), findsOneWidget);
     expect(find.byKey(const ValueKey('protocol-add')), findsOneWidget);
@@ -63,15 +64,18 @@ void main() {
     expect(find.text('Tee · 1 Tasse'), findsOneWidget);
     // Tee has no lockout: exactly one lockout line in total.
     expect(find.textContaining('frühestens wieder in'), findsOneWidget);
-    expect(
-      find.text('Zelt · ${Strings.modeProtocol} · 2 Einträge'),
-      findsOneWidget,
-    );
+    expect(find.text(ProtocolStrings.entryCount(2)), findsOneWidget);
 
-    // The most recent person comes first.
+    // The most recent person comes first (left of or above the other).
+    final samAt = tester.getTopLeft(
+      find.byKey(ValueKey('person-card-${sam.id}')),
+    );
+    final alexAt = tester.getTopLeft(
+      find.byKey(ValueKey('person-card-${alex.id}')),
+    );
     expect(
-      tester.getTopLeft(find.text('Sam · vor 30 min')).dy,
-      lessThan(tester.getTopLeft(find.text('Alex · vor 1 h 42 min')).dy),
+      samAt.dy < alexAt.dy || (samAt.dy == alexAt.dy && samAt.dx < alexAt.dx),
+      isTrue,
     );
 
     // Once the lockout is over its line disappears.

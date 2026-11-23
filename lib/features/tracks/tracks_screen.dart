@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,9 +11,12 @@ import '../../core/services/haptics.dart';
 import '../../l10n/strings.dart';
 import '../../theme/theme.dart';
 import '../alarms/alarms.dart';
+import '../history/history_screen.dart';
 import '../protocol/protocol_entry_sheet.dart';
 import '../protocol/protocol_lane.dart';
+import '../settings/settings_screen.dart';
 import 'lane_actions.dart';
+import 'lane_undo.dart';
 import 'now_selector.dart';
 import 'pad/pad_actions.dart';
 import 'pad/pad_model.dart';
@@ -29,16 +33,40 @@ import 'tracks_view.dart';
 abstract final class TracksScreenKeys {
   static const addTrack = ValueKey('tracks-add-track');
   static const toggleAll = ValueKey('tracks-toggle-all');
+  static const more = ValueKey('tracks-more');
+  static const settings = ValueKey('tracks-settings');
   static const emptyAddTrack = ValueKey('tracks-empty-add-track');
   static const list = ValueKey('tracks-list');
   static const grid = ValueKey('tracks-grid');
 }
 
-/// The "Spuren" destination: the lanes of the active set.
+/// Opens the settings as a page of their own.
+Future<void> openSettings(BuildContext context) =>
+    pushAdaptivePage<void>(context, builder: (_) => const SettingsScreen());
+
+/// Opens the history as a page of its own (until the timeline takes it
+/// over).
+Future<void> openHistory(BuildContext context) =>
+    pushAdaptivePage<void>(context, builder: (_) => const HistoryScreen());
+
+/// The icon of a view on the navigation rail.
+IconData tracksViewIcon(BuildContext c, TracksView view) => switch (view) {
+  TracksView.lanes =>
+    isCupertino(c) ? CupertinoIcons.list_bullet : Icons.view_agenda_outlined,
+  TracksView.pad =>
+    isCupertino(c) ? CupertinoIcons.square_grid_2x2 : Icons.grid_view_rounded,
+  TracksView.timeline =>
+    isCupertino(c) ? CupertinoIcons.time : Icons.timeline_rounded,
+};
+
+/// The app's main screen: the active set in one of three views.
 ///
-/// * App bar: set switcher (create / rename / delete / reorder sets), the
-///   view switch ("Spuren", "Tippfeld", "Zeitleiste" - remembered per
-///   set), "Alle starten / pausieren", add track.
+/// * Head: the set's name (a tap opens "Sets und Szene"), how many tracks
+///   it has and how many run, "Alle pausieren / starten" and "···"
+///   (settings, history).
+/// * Navigation: the three views "Spuren", "Tippfeld", "Zeitleiste"
+///   (remembered per set) and "Neue Spur" - as a pill at the bottom of a
+///   phone, as a rail on wide layouts.
 /// * Body, by view:
 ///   * lanes: one lane per track, as rows or tiles, in several columns on
 ///     wide screens; drag the grip to reorder, long-press (or right-click)
@@ -50,7 +78,7 @@ abstract final class TracksScreenKeys {
 ///   ten buttons, Backspace takes the last action back, Escape leaves a
 ///   person's buttons.
 /// * The set's theme and UI preference overrides apply to everything below
-///   [SetThemeScope].
+///   [SetThemeScope], the navigation included.
 class TracksScreen extends ConsumerWidget {
   const TracksScreen({super.key});
 
@@ -62,23 +90,56 @@ class TracksScreen extends ConsumerWidget {
       child: RingMonitor(
         child: TracksShortcuts(
           child: Builder(
-            builder: (context) => AdaptivePageScaffold(
-              title: const SetSwitcherButton(),
-              actions: [
-                if (set != null) ...[
-                  TracksViewSwitch(setId: set.id),
-                  _ToggleAllButton(setId: set.id),
-                  AdaptiveIconButton(
-                    key: TracksScreenKeys.addTrack,
-                    icon: AdaptiveIcons.add(context),
-                    semanticLabel: Strings.addTrack,
-                    onPressed: () =>
-                        showTrackEditorSheet(context, setId: set.id),
+            builder: (context) {
+              final view = set == null
+                  ? TracksView.lanes
+                  : ref.watch(tracksViewProvider(set.id));
+              return AdaptiveNavScaffold(
+                destinations: [
+                  for (final v in TracksView.values)
+                    AdaptiveDestination(
+                      label: tracksViewLabel(v),
+                      icon: tracksViewIcon(context, v),
+                      selectedIcon: tracksViewIcon(context, v),
+                    ),
+                ],
+                selectedIndex: view.index,
+                onDestinationSelected: (index) {
+                  if (set == null) return;
+                  ref.read(hapticsProvider).selection();
+                  ref
+                      .read(tracksViewsProvider.notifier)
+                      .show(set.id, TracksView.values[index]);
+                },
+                action: set == null
+                    ? null
+                    : AdaptiveNavAction(
+                        key: TracksScreenKeys.addTrack,
+                        label: Strings.addTrack,
+                        icon: AdaptiveIcons.add(context),
+                        onPressed: () =>
+                            showTrackEditorSheet(context, setId: set.id),
+                      ),
+                railActions: [
+                  AdaptiveNavAction(
+                    key: TracksScreenKeys.settings,
+                    label: Strings.navSettings,
+                    icon: AdaptiveIcons.settings(context),
+                    onPressed: () => openSettings(context),
                   ),
                 ],
-              ],
-              body: _body(context, ref, sets, set),
-            ),
+                body: SafeArea(
+                  bottom: false,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _TracksHeader(set: set),
+                      Expanded(child: _body(context, ref, sets, set)),
+                    ],
+                  ),
+                ),
+              );
+            },
           ),
         ),
       ),
@@ -154,6 +215,73 @@ class TracksScreen extends ConsumerWidget {
   );
 }
 
+//// The head of the tracks screen: the set (title, count) and two round
+/// buttons, "Alle pausieren / starten" and "···".
+class _TracksHeader extends StatelessWidget {
+  const _TracksHeader({required this.set});
+
+  final TrackSet? set;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tikky;
+    final set = this.set;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        t.space.page,
+        t.space.sm,
+        t.space.page,
+        t.space.sm,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          const Expanded(child: SetSwitcherButton()),
+          SizedBox(width: t.space.md),
+          if (set != null) ...[
+            _ToggleAllButton(setId: set.id),
+            SizedBox(width: t.space.sm),
+          ],
+          HeaderRoundButton(
+            key: TracksScreenKeys.more,
+            icon: AdaptiveIcons.moreHorizontal(context),
+            label: TracksStrings.moreMenu,
+            onPressed: () => _openMore(context),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+enum _More { settings, history }
+
+/// "···": settings and the history.
+Future<void> _openMore(BuildContext context) async {
+  final choice = await showAdaptiveActionSheet<_More>(
+    context,
+    actions: [
+      AdaptiveSheetAction(
+        value: _More.settings,
+        label: Strings.navSettings,
+        icon: AdaptiveIcons.settings(context),
+      ),
+      AdaptiveSheetAction(
+        value: _More.history,
+        label: Strings.navHistory,
+        icon: AdaptiveIcons.history(context),
+      ),
+    ],
+  );
+  if (choice == null || !context.mounted) return;
+  switch (choice) {
+    case _More.settings:
+      await openSettings(context);
+    case _More.history:
+      await openHistory(context);
+  }
+}
+
 /// "Alle pausieren" while something runs in the set, otherwise "Alle
 /// starten". Hidden when the set has nothing that can be started.
 class _ToggleAllButton extends ConsumerWidget {
@@ -174,12 +302,12 @@ class _ToggleAllButton extends ConsumerWidget {
       // A running timer can stop running by itself (it starts ringing).
       enabled: anyOpen,
       selector: (now) => LaneActions.anyRunning(tracks, sessions, now),
-      builder: (context, running) => AdaptiveIconButton(
+      builder: (context, running) => HeaderRoundButton(
         key: TracksScreenKeys.toggleAll,
         icon: running
             ? AdaptiveIcons.pause(context)
             : AdaptiveIcons.play(context),
-        semanticLabel: running ? Strings.pauseAll : Strings.startAll,
+        label: running ? Strings.pauseAll : Strings.startAll,
         onPressed: () =>
             ref.read(laneActionsProvider).toggleAll(context, setId),
       ),
@@ -255,8 +383,7 @@ class _TrackLanesState extends ConsumerState<TrackLanes> {
     final tracks = widget.tracks;
     if (pending == null) return tracks;
     final byId = {for (final t in tracks) t.id: t};
-    if (pending.length != tracks.length ||
-        !pending.every(byId.containsKey)) {
+    if (pending.length != tracks.length || !pending.every(byId.containsKey)) {
       return tracks;
     }
     return [for (final id in pending) byId[id]!];
@@ -296,11 +423,11 @@ class _TrackLanesState extends ConsumerState<TrackLanes> {
     final t = context.tikky;
     final layout = t.prefs.layout;
     final tracks = _ordered;
-    return LayoutBuilder(
+    final lanes = LayoutBuilder(
       builder: (context, constraints) {
         final columns = laneColumns(
           layout: layout,
-          width: constraints.maxWidth - 2 * t.space.page,
+          width: constraints.maxWidth - 2 * t.space.pageLanes,
           tileMinWidth: t.sizes.tileMinWidth,
           wide: isWide(context),
         );
@@ -309,13 +436,34 @@ class _TrackLanesState extends ConsumerState<TrackLanes> {
             : _grid(context, tracks, layout, columns);
       },
     );
+    // "Rückgängig" after a stop sits above the lanes, never over them.
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: EdgeInsets.fromLTRB(
+            t.space.pageLanes,
+            t.space.sm,
+            t.space.pageLanes,
+            0,
+          ),
+          child: const LaneUndoBar(),
+        ),
+        Expanded(child: lanes),
+      ],
+    );
   }
 
   Widget _list(BuildContext context, List<Track> tracks, LaneLayout layout) {
     final t = context.tikky;
     return ReorderableListView.builder(
       key: TracksScreenKeys.list,
-      padding: EdgeInsets.all(t.space.page),
+      padding: EdgeInsets.fromLTRB(
+        t.space.pageLanes,
+        t.space.xs,
+        t.space.pageLanes,
+        t.space.pageLanes,
+      ),
       buildDefaultDragHandles: false,
       itemCount: tracks.length,
       onReorderItem: _move,
@@ -351,7 +499,12 @@ class _TrackLanesState extends ConsumerState<TrackLanes> {
     final theme = Theme.of(context);
     return ListView.builder(
       key: TracksScreenKeys.grid,
-      padding: EdgeInsets.all(t.space.page),
+      padding: EdgeInsets.fromLTRB(
+        t.space.pageLanes,
+        t.space.xs,
+        t.space.pageLanes,
+        t.space.pageLanes,
+      ),
       itemCount: rowCount,
       itemBuilder: (context, rowIndex) {
         final start = rowIndex * columns;
@@ -421,7 +574,7 @@ class _GridCell extends StatelessWidget {
         decoration: candidates.isEmpty
             ? const BoxDecoration()
             : BoxDecoration(
-                borderRadius: t.radii.mdAll,
+                borderRadius: t.radii.laneAll,
                 border: Border.all(
                   color: t.colors.primary,
                   width: t.sizes.progressBar,
@@ -458,7 +611,10 @@ class _DragFeedback extends StatelessWidget {
       color: t.colors.surface,
       shape: RoundedRectangleBorder(
         borderRadius: t.radii.smAll,
-        side: BorderSide(color: t.trackColor(track), width: t.sizes.progressBar),
+        side: BorderSide(
+          color: t.trackColor(track),
+          width: t.sizes.progressBar,
+        ),
       ),
       child: Padding(
         padding: EdgeInsets.symmetric(

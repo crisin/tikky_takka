@@ -18,6 +18,12 @@ abstract final class TracksStrings {
   static const emptySetTitle = 'Dieses Set ist noch leer';
   static const createSet = 'Set anlegen';
   static String setTrackCount(int n) => n == 1 ? '1 Spur' : '$n Spuren';
+
+  /// "5 Spuren · 4 aktiv" under the set's name.
+  static String setSummary(int tracks, int active) => active == 0
+      ? setTrackCount(tracks)
+      : '${setTrackCount(tracks)}$separator$active aktiv';
+  static const moreMenu = 'Mehr: Einstellungen, Verlauf';
   static String deleteSetQuestion(String name) => '„$name“ löschen?';
   static const deleteSetBody =
       'Alle Spuren dieses Sets und ihr Verlauf werden gelöscht.';
@@ -58,7 +64,22 @@ abstract final class TracksStrings {
   /// Text of a label button: "Hund".
   static String labelCount(String label, int count) => '$label  $count';
   static const actionAckEarly = 'Jetzt schon erledigt';
+
+  /// The secondary buttons "+1′", "+10′" and "nächste Runde": the text on
+  /// the button and what a screen reader says.
+  static const plusMinute = '+1′';
+  static const actionPlusMinute = 'eine Minute dazu';
+  static const snooze = '+10′';
+  static const actionSnooze = 'in 10 Minuten wieder';
+  static const actionNextRound = 'nächste Runde';
   static const actionStopSession = 'Sitzung beenden';
+  static const actionStopHint = 'Stoppen und sichern';
+
+  /// The undo bar after a lane was stopped.
+  static String trackStopped(String name) => '$name gestoppt';
+  static String ticksKept(int n) =>
+      n == 1 ? '1 Tipp gesichert' : '$n Tipps gesichert';
+  static String timeKept(String time) => '$time gesichert';
   static const actionEditTrack = 'Spur bearbeiten';
   static const sessionRestored = 'Sitzung läuft wieder';
   static const lapRecorded = 'Runde gespeichert';
@@ -117,7 +138,46 @@ abstract final class TracksStrings {
   static const viewTimeline = 'Zeitleiste';
 
   // ------------------------------------------------------------- tap pad
-  static const padUndoIdle = 'Die letzte Erfassung erscheint hier.';
+  static const padReady = 'Bereit';
+  static const padUndoIdle = 'Die letzte Erfassung steht hier, mit Rückgängig.';
+  static const padWhatTitle = 'Was hattest du?';
+  static const padWhatHint = 'Ein Tipp trägt ein, mit der Uhrzeit von jetzt.';
+  static const padOtherTitle = 'Was anderes?';
+  static const padOtherHint = 'Auch hier: ein Tipp trägt ein.';
+  static const padCaptured = 'eingetragen';
+  static const padEdit = 'Ändern';
+  static const padEditSemantics = 'Diesen Eintrag ändern: Zeit, Menge, Notiz';
+  static const padNow = 'jetzt';
+  static const padBack = 'Zurück';
+  static const padOtherSemantics = 'Etwas anderes eintragen';
+  static const padNewLabel = 'Steht nicht da? Neu anlegen';
+  static const padNewHint = 'Name';
+  static const padNewSave = 'Eintragen';
+  static const padNewNote =
+      'Farbe und eigener Abstand lassen sich später einstellen.';
+
+  /// "×3" on a field.
+  static String padCount(int n) => '×$n';
+
+  /// "23:41 · jetzt", "23:36 · vor 5 min" under the last action.
+  static String padWhen(String time, String relative) => '$time · $relative';
+
+  /// "Kippe · vor 8 min" on a person field.
+  static String padPersonLast(String substance, String ago) =>
+      '$substance · $ago';
+
+  /// Semantics of a capture field: "Bier, 3 Mal, Abstand: noch 34 min".
+  static String padSubstanceSemantics(
+    String name, {
+    int? count,
+    String? lockout,
+    bool captured = false,
+  }) => [
+    name,
+    if (count != null) '$count Mal',
+    if (captured) 'gerade eingetragen',
+    ?lockout,
+  ].join(', ');
   static const padUndone = 'Zurückgenommen';
   static const padTapToStart = 'Tippen zum Starten';
   static const padTapForLap = 'Tippen für eine Runde';
@@ -125,6 +185,7 @@ abstract final class TracksStrings {
   static const padTapToDismiss = 'Fertig · tippen zum Ausschalten';
   static const padTapToAck = 'Fällig · tippen für erledigt';
   static const padMore = 'Anderes';
+  static const padMoreEntry = 'Eintrag';
   static const padMoreSymbol = '+';
   static const padBackToPad = 'Zurück zum Tippfeld';
 
@@ -149,7 +210,7 @@ abstract final class TracksStrings {
   static String padLapSince(int lap, String ago) => 'Runde $lap · $ago';
 
   /// A lockout the user set, on a substance button of the pad.
-  static String padLockout(String duration) => 'frühestens wieder in $duration';
+  static String padLockout(String duration) => 'Abstand: noch $duration';
 
   /// Semantics of a pad button: "Vögel: Reiher, 3".
   static String padButtonSemantics(String track, String title, String value) =>
@@ -183,8 +244,6 @@ abstract final class TracksStrings {
       'In diesem Zeitraum gibt es keine Einträge.';
   static const timelineAllHidden =
       'Alle Einträge sind ausgeblendet. Ändere die Filter oben.';
-  static const stripNothingRunning = 'Gerade läuft kein Timer.';
-  static const stripLabel = 'Laufende Timer';
 
   /// "12 min später" (oldest first) / "12 min früher" (newest first).
   static String gapLater(String duration) => '$duration später';
@@ -208,16 +267,109 @@ abstract final class TracksStrings {
   static const timelineResumed = 'Fortgesetzt';
   static const timelineStopped = 'Beendet';
 
+  /// "+1′" / "+10′": "1 min später"
+  static String timelineExtended(String duration) => '$duration später';
+  static const timelineSkipped = 'Nächste Runde';
+
   /// Semantics of a timeline row: "14:02:11, Vögel, Reiher · 3".
   static String timelineRowSemantics(String time, String track, String text) =>
       '$time, $track, $text';
 
   // --------------------------------------------------------------- strip
-  static const stripZoomIn = 'Vergrößern';
-  static const stripZoomOut = 'Verkleinern';
+  // ------------------------------------------------- levels and evening
+  static const levelSwitch = 'Zeitraum';
+  static const levelNow = 'Jetzt';
+  static const levelEvening = 'Abend';
+  static const levelWeek = 'Woche';
+  static const levelMonth = 'Monat';
+  static const weekPrevious = 'Woche davor';
+  static const weekNext = 'Nächste Woche';
+  static const monthPrevious = 'Monat davor';
+  static const monthNext = 'Nächster Monat';
+
+  /// "KW 46"
+  static String weekNumber(int n) => 'KW $n';
+
+  /// "Diese Woche · 39 Einträge"
+  static String weekTotal(int n) => 'Diese Woche · ${stripCluster(n)}';
+
+  /// A day without an entry.
+  static const noCount = '–';
+
+  /// Read for a row of the week or a day of the month: "Di 10.11.: 4
+  /// Einträge".
+  static String daySemantics(String day, String date, int n) =>
+      '$day $date: ${stripCluster(n)}';
+
+  /// What the month counts.
+  static const monthAll = 'Alles';
+  static const monthWhat = 'Was zählen';
+
+  /// "Bier · bis heute"
+  static String monthCaption(String thing, {required bool current}) =>
+      current ? '$thing · bis heute' : thing;
+
+  /// Below the figures of the month: "Mal Bier", "Einträge".
+  static String monthCountLabel(String? thing) =>
+      thing == null ? 'Einträge' : 'Mal $thing';
+  static const monthDays = 'Tage mit Eintrag';
+  static const monthPause = 'längste Pause';
+
+  /// "4 Tage", "1 Tag"
+  static String days(int n) => n == 1 ? '1 Tag' : '$n Tage';
+  static const eveningPrevious = 'Abend davor';
+  static const eveningNext = 'Nächster Abend';
+  static const eveningCompact = 'Kompakt';
+  static const eveningCompactSemantics = 'Kompakt: ohne Maßstab, als Liste';
+  static const eveningTracks = 'Spuren';
+  static const eveningNow = 'jetzt';
+  static const eveningEmpty = 'An diesem Abend ist nichts eingetragen.';
+
+  /// "Abend · seit 20:50"
+  static String eveningSince(String time) => 'Abend · seit $time';
+  static const eveningPlain = 'Abend';
+
+  /// "Abstand bis 00:15": the lockout the user set on the chosen thing.
+  static String eveningLockoutUntil(String time) => 'Abstand bis $time';
+
+  /// Read for a chip: "Krille, Bier, 21:20".
+  static String eveningChipSemantics(
+    String person,
+    String thing,
+    String time,
+  ) => '$person, $thing, $time';
+
+  /// Read for the line of a chain: "Abstände Bier, Krille".
+  static String eveningChainSemantics(String thing, String person) =>
+      'Abstände $thing, $person';
+
+  static const stripAll = 'Alles';
   static const stripFit = 'Alles zeigen';
   static const stripNow = 'Jetzt';
+  static const stripToNow = 'Zu jetzt springen';
   static const stripControls = 'Ausschnitt der Streifenansicht';
+
+  /// Next to the name of a person in the strip.
+  static const stripPersonOpen = 'aufgeklappt';
+  static String stripPersonFolded(int n) =>
+      '${stripCluster(n)} · antippen klappt auf';
+
+  /// Read for the name of a person in the strip.
+  static String stripPersonSemantics(String name, {required bool open}) =>
+      open ? '$name, aufgeklappt' : '$name, zugeklappt';
+  static const stripPersonFold = 'zuklappen';
+  static const stripPersonUnfold = 'aufklappen';
+
+  /// A person card above the strip: "26:14 seit Bier", "Abstand: noch
+  /// 34 min", "Mate vor 21 min".
+  static String cardSince(String thing) => 'seit $thing';
+  static String cardLockout(String rest) => 'Abstand: noch $rest';
+  static String cardOther(String thing, String ago) => '$thing vor $ago';
+
+  /// Read for a person card: "Krille: 26:14 seit Bier. Abstand: noch
+  /// 34 min".
+  static String cardSemantics(String name, String since, String? note) =>
+      note == null ? '$name: $since' : '$name: $since. $note';
   static const stripSessionTitle = 'Sitzung';
   static const stripRunning = 'läuft';
 

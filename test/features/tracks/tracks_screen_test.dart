@@ -4,9 +4,11 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:tikky_takka/adaptive/adaptive.dart';
 import 'package:tikky_takka/core/domain/domain.dart';
 import 'package:tikky_takka/core/engine/engine.dart';
 import 'package:tikky_takka/core/repo/repo.dart';
+import 'package:tikky_takka/features/protocol/protocol_scene_sheet.dart';
 import 'package:tikky_takka/features/tracks/set_switcher.dart';
 import 'package:tikky_takka/features/tracks/track_editor_sheet.dart';
 import 'package:tikky_takka/features/tracks/track_lane.dart';
@@ -15,6 +17,7 @@ import 'package:tikky_takka/features/tracks/tracks_strings.dart';
 import 'package:tikky_takka/l10n/strings.dart';
 import 'package:tikky_takka/theme/theme.dart';
 
+import '../../support/shell_nav.dart';
 import '../../support/test_app.dart';
 import 'tracks_harness.dart';
 
@@ -95,7 +98,14 @@ void main() {
 
       await h.tap(find.byType(SetSwitcherButton));
       expect(find.text(TracksStrings.setsTitle), findsOneWidget);
-      expect(find.text(TracksStrings.setTrackCount(3)), findsOneWidget);
+      // The count is in the head and in the set's row of the sheet.
+      expect(
+        find.descendant(
+          of: find.byType(BottomSheet),
+          matching: find.text(TracksStrings.setTrackCount(3)),
+        ),
+        findsOneWidget,
+      );
 
       await h.tap(find.text(Strings.newSet));
       await tester.enterText(find.byType(TextField), 'Training');
@@ -111,6 +121,33 @@ void main() {
       await h.tap(find.text(Strings.seedSetName));
       expect(h.activeSet.name, Strings.seedSetName);
       expect(find.byType(TrackLane), findsNWidgets(3));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('the head counts the tracks and how many run', (
+      tester,
+    ) async {
+      final h = await TracksHarness.start(tester);
+      expect(find.text(TracksStrings.setSummary(3, 0)), findsOneWidget);
+      await h.tap(h.primary(h.stopwatch));
+      expect(find.text(TracksStrings.setSummary(3, 1)), findsOneWidget);
+      expect(find.text('3 Spuren · 1 aktiv'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('"Sets und Szene" shows the scene only for a set that logs', (
+      tester,
+    ) async {
+      final h = await TracksHarness.start(tester);
+      await h.tap(find.byType(SetSwitcherButton));
+      expect(find.byType(SceneEditor), findsNothing);
+      await h.tap(find.byKey(SetSheetKeys.done));
+      expect(find.text(TracksStrings.setsTitle), findsNothing);
+
+      await h.addTrack(const ProtocolConfig(), name: 'Zelt');
+      await h.tap(find.byType(SetSwitcherButton));
+      expect(find.byType(SceneEditor), findsOneWidget);
+      expect(find.byKey(const ValueKey('scene-add-person')), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 
@@ -491,9 +528,7 @@ void main() {
       );
       expect(find.byKey(TracksScreenKeys.grid), findsOneWidget);
 
-      final from = tester.getCenter(
-        find.byKey(LaneKeys.handle(h.counter.id)),
-      );
+      final from = tester.getCenter(find.byKey(LaneKeys.handle(h.counter.id)));
       final to = tester.getCenter(h.lane(h.stopwatch));
       final gesture = await tester.startGesture(from);
       await tester.pump(const Duration(milliseconds: 50));
@@ -604,9 +639,7 @@ void main() {
         () => sets.updateSet(
           set.copyWith(
             themeId: () => ThemePresets.blackId,
-            uiPrefsOverride: () => {
-              UiPrefsKeys.layout: LaneLayout.tiles.name,
-            },
+            uiPrefsOverride: () => {UiPrefsKeys.layout: LaneLayout.tiles.name},
           ),
         ),
       );
@@ -623,7 +656,7 @@ void main() {
       debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
       try {
         final h = await TracksHarness.start(tester);
-        expect(find.byType(CupertinoNavigationBar), findsOneWidget);
+        expect(find.byType(NavPill), findsOneWidget);
         expect(find.byType(TrackLane), findsNWidgets(3));
 
         await h.tap(h.primary(h.stopwatch));
@@ -687,8 +720,8 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('shortcuts rest while a sheet is open or another '
-        'destination is shown', (tester) async {
+    testWidgets('shortcuts rest while a sheet is open or a page covers '
+        'the screen', (tester) async {
       final h = await TracksHarness.start(
         tester,
         surfaceSize: TestApp.desktopSize,
@@ -702,18 +735,13 @@ void main() {
       expect(await h.snapshot(h.stopwatch), isNull);
       await h.tap(find.text(Strings.cancel));
 
-      await h.tap(find.text(Strings.navHistory));
+      await h.tap(find.byKey(TracksScreenKeys.settings));
       await tester.sendKeyEvent(LogicalKeyboardKey.digit1);
       await h.settle();
       expect(await h.snapshot(h.stopwatch), isNull);
 
-      // The history filter bar has a "Spuren" chip of its own.
-      await h.tap(
-        find.descendant(
-          of: find.byType(NavigationRail),
-          matching: find.text(Strings.navTracks),
-        ),
-      );
+      await closePage(tester);
+      await h.settle();
       await tester.sendKeyEvent(LogicalKeyboardKey.digit1);
       await h.settle();
       expect((await h.snapshot(h.stopwatch))!.isRunning, isTrue);

@@ -28,8 +28,7 @@ OpenSession _open(Track track, EventLog log, {TrackConfig? config}) =>
     );
 
 List<LaneSecondaryKind> _enabled(LaneControls controls) => [
-  for (final s in controls.secondary)
-    if (s.enabled) s.kind,
+  if (controls.secondary case final s? when s.enabled) s.kind,
 ];
 
 void main() {
@@ -43,6 +42,8 @@ void main() {
       expect(view.time.progress, isNull);
       expect(view.controls.primary, LanePrimary.start);
       expect(_enabled(view.controls), isEmpty);
+      expect(view.controls.look, LaneLook.idle);
+      expect(view.controls.canStop, isFalse);
       expect(view.ticking, isFalse);
     });
 
@@ -56,10 +57,9 @@ void main() {
       expect(view.time.digits, '02:03');
       expect(view.time.subLine, Strings.statusRunning);
       expect(view.controls.primary, LanePrimary.pause);
-      expect(_enabled(view.controls), [
-        LaneSecondaryKind.lap,
-        LaneSecondaryKind.reset,
-      ]);
+      expect(_enabled(view.controls), [LaneSecondaryKind.lap]);
+      expect(view.controls.look, LaneLook.running);
+      expect(view.controls.canStop, isTrue);
       expect(view.ticking, isTrue);
     });
 
@@ -86,7 +86,8 @@ void main() {
       expect(view.time.digits, '00:10');
       expect(view.time.subLine, Strings.statusPaused);
       expect(view.controls.primary, LanePrimary.resume);
-      expect(_enabled(view.controls), [LaneSecondaryKind.reset]);
+      expect(_enabled(view.controls), [LaneSecondaryKind.stop]);
+      expect(view.controls.look, LaneLook.paused);
       expect(view.ticking, isFalse);
     });
 
@@ -137,10 +138,7 @@ void main() {
       expect(view.time.progress, 0.25);
       expect(view.time.alert, isFalse);
       expect(view.controls.primary, LanePrimary.pause);
-      expect(_enabled(view.controls), [
-        LaneSecondaryKind.restart,
-        LaneSecondaryKind.reset,
-      ]);
+      expect(_enabled(view.controls), [LaneSecondaryKind.restart]);
     });
 
     test('finished: ringing, overtime, dismiss', () {
@@ -157,7 +155,9 @@ void main() {
       expect(view.time.alert, isTrue);
       expect(view.time.progress, 1);
       expect(view.time.subLine, startsWith(Strings.statusRinging));
-      expect(_enabled(view.controls), [LaneSecondaryKind.restart]);
+      // "+1′": rings again in a minute.
+      expect(_enabled(view.controls), [LaneSecondaryKind.plusMinute]);
+      expect(view.controls.look, LaneLook.ringing);
       expect(view.ticking, isTrue);
     });
 
@@ -216,7 +216,21 @@ void main() {
       expect(view.time.digits, '00:05');
       expect(view.time.subLine, contains(Strings.roundOf(1, 3)));
       expect(view.time.subLine, contains(Strings.phaseRest));
-      expect(view.time.progress, closeTo(35 / 110, 0.001));
+      // The fill follows the phase: 5 of 10 seconds of rest are gone.
+      expect(view.time.progress, closeTo(0.5, 0.001));
+      expect(view.time.segments, const LaneSegments(current: 1, total: 3));
+      expect(_enabled(view.controls), [LaneSecondaryKind.nextRound]);
+
+      // Not in the last round: that would end the programme.
+      final last = buildLaneView(
+        track: track,
+        open: _open(track, log),
+        nowMs: 85 * sec,
+      );
+      expect(
+        last.controls.secondary,
+        const LaneSecondary(LaneSecondaryKind.nextRound, enabled: false),
+      );
     });
 
     test('finished: ringing and done', () {
@@ -230,6 +244,7 @@ void main() {
       expect(view.controls.primary, LanePrimary.dismiss);
       expect(view.time.subLine, Strings.phaseDone);
       expect(view.time.digits, '00:00');
+      expect(view.time.segments, const LaneSegments(current: 4, total: 3));
     });
   });
 
@@ -259,10 +274,8 @@ void main() {
       expect(view.time.digits, '3');
       expect(view.time.secondaryDigits, '00:15');
       expect(view.time.subLine, Strings.totalTime('01:15'));
-      expect(_enabled(view.controls), [
-        LaneSecondaryKind.undo,
-        LaneSecondaryKind.stop,
-      ]);
+      expect(_enabled(view.controls), [LaneSecondaryKind.undo]);
+      expect(view.controls.canStop, isTrue);
       expect(view.ticking, isTrue);
     });
 
@@ -306,10 +319,7 @@ void main() {
       expect(view.time.digits, '20:00');
       expect(view.time.progress, closeTo(1 / 3, 0.001));
       expect(view.controls.primary, LanePrimary.pause);
-      expect(_enabled(view.controls), [
-        LaneSecondaryKind.ackEarly,
-        LaneSecondaryKind.reset,
-      ]);
+      expect(_enabled(view.controls), [LaneSecondaryKind.ackEarly]);
     });
 
     test('due: ringing until acknowledged', () {
@@ -322,6 +332,8 @@ void main() {
       expect(view.controls.ringing, isTrue);
       expect(view.controls.primary, LanePrimary.ack);
       expect(view.controls.status, Strings.statusDue);
+      expect(view.controls.look, LaneLook.due);
+      expect(_enabled(view.controls), [LaneSecondaryKind.snooze]);
       expect(view.time.digits, '+02:00');
       expect(view.time.alert, isTrue);
     });
@@ -378,21 +390,27 @@ void main() {
         ..start(0)
         ..tick(0);
       expect(
-        LaneActions.anyRunning([stopwatch, counter], {
-          'b': _open(counter, counting),
-        }, 5 * sec),
+        LaneActions.anyRunning(
+          [stopwatch, counter],
+          {'b': _open(counter, counting)},
+          5 * sec,
+        ),
         isFalse,
       );
       expect(
-        LaneActions.anyRunning([stopwatch], {
-          'a': _open(stopwatch, paused),
-        }, 5 * sec),
+        LaneActions.anyRunning(
+          [stopwatch],
+          {'a': _open(stopwatch, paused)},
+          5 * sec,
+        ),
         isFalse,
       );
       expect(
-        LaneActions.anyRunning([stopwatch], {
-          'a': _open(stopwatch, running),
-        }, 5 * sec),
+        LaneActions.anyRunning(
+          [stopwatch],
+          {'a': _open(stopwatch, running)},
+          5 * sec,
+        ),
         isTrue,
       );
     });
@@ -441,9 +459,7 @@ void main() {
       // The OS notification rang at 1 min; no burst when the app sees it.
       expect(tracker.update(sessions, 5 * min), isEmpty);
       expect(tracker.update(sessions, 5 * min + sec), isEmpty);
-      expect(tracker.update(sessions, 5 * min + ringRepeatEveryMs), [
-        track.id,
-      ]);
+      expect(tracker.update(sessions, 5 * min + ringRepeatEveryMs), [track.id]);
     });
 
     test('after a trip to the background (clear) what finished meanwhile '

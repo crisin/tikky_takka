@@ -93,15 +93,17 @@ CountdownSnapshot deriveCountdown(
     if (t.isRunning) dueAt = t.endAt + remaining;
     if (cycles > 0) lastFinishedAt = t.wallAtActive(cycles * duration);
   } else {
-    finished = elapsed >= duration;
+    // "+1′" moves the end: from the later of the end and the tap.
+    final target = extendedTarget(t, duration);
+    finished = elapsed >= target;
     if (finished) {
       remaining = 0;
-      overtime = elapsed - duration;
+      overtime = elapsed - target;
       cycles = 1;
-      lastFinishedAt = t.wallAtActive(duration);
+      lastFinishedAt = t.wallAtActive(target);
       if (state == RunState.running) state = RunState.ringing;
     } else {
-      remaining = duration - elapsed;
+      remaining = target - elapsed;
       if (t.isRunning) dueAt = t.endAt + remaining;
     }
   }
@@ -136,7 +138,19 @@ IntervalSnapshot deriveInterval(
   final rest = config.restMs < 0 ? 0 : config.restMs;
   final total = rounds * work + (rounds - 1) * rest;
   final cycle = work + rest;
-  final elapsed = t.activeMs;
+  // "nächste Runde" jumps ahead: the counting time plus what was skipped.
+  var skipped = 0;
+  int? skippedToEndAt;
+  for (final e in t.events) {
+    if (e.type != EventType.skip || cycle <= 0) continue;
+    final at = t.activeMsAt(e.at) + skipped;
+    if (at >= total) continue;
+    final next = (at ~/ cycle + 1) * cycle;
+    final to = next < total ? next : total;
+    skipped += to - at;
+    if (to >= total) skippedToEndAt = e.at;
+  }
+  final elapsed = t.activeMs + skipped;
 
   var state = t.baseState;
   var round = 1;
@@ -154,7 +168,7 @@ IntervalSnapshot deriveInterval(
       phase = IntervalPhase.done;
       phaseDuration = 0;
       phaseElapsed = 0;
-      finishAt = t.wallAtActive(total);
+      finishAt = skippedToEndAt ?? t.wallAtActive(total - skipped);
       if (state == RunState.running) state = RunState.ringing;
     } else {
       // total > elapsed >= 0 implies cycle > 0.
@@ -279,7 +293,15 @@ ReminderSnapshot deriveReminder(
   final acks = <AckInfo>[];
   var anchorActive = 0;
   var anchorAt = t.startAt!;
+  // When it is due, in counting time; "+10′" moves it, an ack resets it.
+  var target = interval;
   for (final e in t.events) {
+    if (e.type == EventType.extend) {
+      if (e.extendMs <= 0) continue;
+      final at = t.activeMsAt(e.at);
+      target = (target > at ? target : at) + e.extendMs;
+      continue;
+    }
     if (e.type != EventType.ack) continue;
     final active = t.activeMsAt(e.at);
     final waited = active - anchorActive;
@@ -294,12 +316,13 @@ ReminderSnapshot deriveReminder(
     );
     anchorActive = active;
     anchorAt = e.at;
+    target = active + interval;
   }
 
   final elapsed = t.activeMs;
   final since = elapsed - anchorActive;
-  final due = since >= interval;
-  final overdue = due ? since - interval : 0;
+  final due = elapsed >= target;
+  final overdue = due ? elapsed - target : 0;
   var state = t.baseState;
   if (due && state == RunState.running) state = RunState.ringing;
 
@@ -315,10 +338,10 @@ ReminderSnapshot deriveReminder(
     nagEveryMs: nag,
     anchorAt: anchorAt,
     sinceAnchorMs: since,
-    remainingMs: due ? 0 : interval - since,
+    remainingMs: due ? 0 : target - elapsed,
     due: due,
     overdueMs: overdue,
-    dueAt: t.wallAtActive(anchorActive + interval),
+    dueAt: t.wallAtActive(target),
     nagCount: due && nag > 0 ? overdue ~/ nag : 0,
     nextNagAt: due && nag > 0 && t.isRunning
         ? t.endAt + (nag - overdue % nag)
@@ -487,4 +510,17 @@ ProtocolSnapshot deriveProtocol(
     entries: List.unmodifiable(entries),
     persons: List.unmodifiable(persons),
   );
+}
+
+/// The counting time at which a countdown of [durationMs] ends, after the
+/// `extend` events ("+1′") of [t]: each one adds its time to the later of
+/// the end so far and the moment it was tapped.
+int extendedTarget(Timeline t, int durationMs) {
+  var target = durationMs;
+  for (final e in t.events) {
+    if (e.type != EventType.extend || e.extendMs <= 0) continue;
+    final at = t.activeMsAt(e.at);
+    target = (target > at ? target : at) + e.extendMs;
+  }
+  return target;
 }

@@ -64,15 +64,14 @@ void main() {
     // Tapping again takes it out; the others move up.
     await f.tap(find.byKey(_substance(tea)));
     expect((await f.storedSet()).sceneSubstanceIds, [water.id, gbl.id]);
-    expect(find.text(ProtocolStrings.sceneOrdered(1, 'Wasser')), findsOneWidget);
+    expect(
+      find.text(ProtocolStrings.sceneOrdered(1, 'Wasser')),
+      findsOneWidget,
+    );
     expect(find.text('Tee'), findsOneWidget);
 
     // Large toggles.
-    final big = tester
-        .element(find.byKey(_done))
-        .tikky
-        .sizes
-        .bigTapTarget;
+    final big = tester.element(find.byKey(_done)).tikky.sizes.bigTapTarget;
     expect(
       tester.getSize(find.byKey(_person(kim))).height,
       greaterThanOrEqualTo(big),
@@ -88,10 +87,6 @@ void main() {
     expect(find.byKey(ProtocolFixture.card(kim)), findsOneWidget);
     expect(find.byKey(ProtocolFixture.card(jacke)), findsOneWidget);
     expect(find.byKey(ProtocolFixture.card(uli)), findsNothing);
-    await f.tap(find.byKey(ProtocolFixture.card(kim)));
-    expect(find.byKey(ProtocolFixture.button(water)), findsOneWidget);
-    expect(find.byKey(ProtocolFixture.button(gbl)), findsOneWidget);
-    expect(find.byKey(ProtocolFixture.button(tea)), findsNothing);
     // Setting up a scene writes no entry.
     expect(await f.entries(), isEmpty);
     expect(tester.takeException(), isNull);
@@ -103,8 +98,6 @@ void main() {
     final jacke = await f.person('Jacke');
     await f.scene(persons: [jacke]);
 
-    // A single-person scene shows the buttons; the name leads to step 1.
-    await f.tap(find.byKey(const ValueKey('capture-back')));
     await f.tap(find.byKey(_edit));
     expect(
       tester.widget<ProtocolChoice>(find.byKey(_person(jacke))).selected,

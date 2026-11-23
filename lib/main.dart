@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,12 +11,16 @@ import 'app_wiring.dart';
 import 'core/db/app_database.dart';
 import 'core/repo/settings_store.dart';
 import 'core/services/alarms/alarms.dart';
+import 'core/services/diagnostics_log.dart';
 import 'core/services/lock_service.dart';
 import 'core/services/lock_service_impl.dart';
 import 'core/services/screen_security.dart';
+import 'theme/bundled_fonts.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  _recordErrors(DiagnosticsLog.instance);
+  registerFontLicenses();
   // Draw behind the system bars (Android); a no-op elsewhere.
   unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
 
@@ -32,6 +37,20 @@ Future<void> main() async {
       child: const TikkyApp(),
     ),
   );
+}
+
+/// Uncaught errors also go to the diagnostics page in the settings (on a
+/// phone there is no console to read them from).
+void _recordErrors(DiagnosticsLog log) {
+  final presentError = FlutterError.onError;
+  FlutterError.onError = (details) {
+    log.record('Flutter', details.exceptionAsString(), details.stack);
+    presentError?.call(details);
+  };
+  PlatformDispatcher.instance.onError = (error, stack) {
+    log.record('Unbehandelt', error, stack);
+    return false;
+  };
 }
 
 /// The real service implementations and the feature wiring.
@@ -53,7 +72,9 @@ Future<void> main() async {
 /// with the no-op / recording services (see test/support/test_app.dart).
 List<Override> productionOverrides() => [
   ...featureWiringOverrides(),
-  alarmServiceProvider.overrideWithValue(createAlarmService()),
+  alarmServiceProvider.overrideWithValue(
+    createAlarmService(onError: DiagnosticsLog.instance.handlerFor('Alarme')),
+  ),
   lockServiceProvider.overrideWithValue(LocalAuthLockService()),
   screenSecurityProvider.overrideWithValue(const PlatformScreenSecurity()),
 ];

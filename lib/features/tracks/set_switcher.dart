@@ -20,14 +20,16 @@ final archivedTracksProvider = StreamProvider.autoDispose
       (ref, setId) => ref
           .watch(trackRepositoryProvider)
           .watchTracks(setId, includeArchived: true)
-          .map((tracks) => [
-                for (final t in tracks)
-                  if (t.archived) t,
-              ]),
+          .map(
+            (tracks) => [
+              for (final t in tracks)
+                if (t.archived) t,
+            ],
+          ),
     );
 
-/// The app bar title of the tracks screen: the active set's name; a tap
-/// opens the set sheet (switch, create, rename, delete, reorder).
+/// The title of the tracks screen: the active set's name, large, with how
+/// many tracks it has and how many run; a tap opens "Sets und Szene".
 class SetSwitcherButton extends ConsumerWidget {
   const SetSwitcherButton({super.key});
 
@@ -36,40 +38,69 @@ class SetSwitcherButton extends ConsumerWidget {
     final t = context.tikky;
     final set = ref.watch(activeSetProvider);
     final name = set?.name ?? Strings.tracksTitle;
+    final tracks = set == null
+        ? null
+        : ref.watch(tracksInSetProvider(set.id)).value;
+    final sessions = ref.watch(openSessionsProvider).value;
+    final compact = MediaQuery.sizeOf(context).height < t.sizes.compactHeight;
+    final summary = tracks == null || compact
+        ? null
+        : TracksStrings.setSummary(
+            tracks.length,
+            [
+              for (final track in tracks)
+                if (sessions?.containsKey(track.id) ?? false) track,
+            ].length,
+          );
     return Semantics(
       button: true,
       label: Strings.switchSet,
-      value: name,
+      value: summary == null ? name : '$name, $summary',
+      excludeSemantics: true,
       child: Tooltip(
         message: Strings.switchSet,
         excludeFromSemantics: true,
         child: Material(
           type: MaterialType.transparency,
           child: InkWell(
-            borderRadius: t.radii.smAll,
+            borderRadius: t.radii.smallAll,
             splashFactory: isCupertino(context) ? NoSplash.splashFactory : null,
             onTap: () => showSetSheet(context),
-            child: Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: t.space.sm,
-                vertical: t.space.sm,
-              ),
-              child: Row(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: t.sizes.minTapTarget),
+              child: Column(
                 mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Flexible(
-                    child: Text(
-                      name,
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          name,
+                          style: compact
+                              ? t.text.pageTitleCompact
+                              : t.text.pageTitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      SizedBox(width: t.space.xs),
+                      Icon(
+                        AdaptiveIcons.chevronDown(context),
+                        size: t.sizes.iconSm,
+                        color: t.colors.text,
+                      ),
+                    ],
+                  ),
+                  if (summary != null)
+                    Text(
+                      summary,
+                      style: t.text.caption,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-                  SizedBox(width: t.space.xs),
-                  Icon(
-                    AdaptiveIcons.chevronDown(context),
-                    size: t.sizes.iconSm,
-                    color: t.colors.textMuted,
-                  ),
                 ],
               ),
             ),
@@ -96,7 +127,14 @@ Future<TrackSet?> createSetFlow(BuildContext context, WidgetRef ref) async {
   return set;
 }
 
-/// Opens the set sheet. Snackbars ("Rückgängig" after deleting a set) are
+/// Keys of "Sets und Szene" (for tests).
+abstract final class SetSheetKeys {
+  static const newSet = ValueKey('set-sheet-new');
+  static const done = ValueKey('set-sheet-done');
+}
+
+/// Opens "Sets und Szene": the sets (switch, create, rename, delete,
+/// reorder) and, below, the scene of the active set. Snackbars ("Rückgängig" after deleting a set) are
 /// shown on [context] once the sheet is closed.
 Future<void> showSetSheet(BuildContext context) async {
   final outcome = await showAdaptiveSheet<_SetSheetOutcome>(
@@ -237,8 +275,7 @@ class _SetSheetState extends ConsumerState<_SetSheet> {
       context,
       title: TracksStrings.restoreTrackTitle,
       actions: [
-        for (final t in archived)
-          AdaptiveSheetAction(value: t, label: t.name),
+        for (final t in archived) AdaptiveSheetAction(value: t, label: t.name),
       ],
     );
     if (track == null) return;
@@ -254,8 +291,37 @@ class _SetSheetState extends ConsumerState<_SetSheet> {
     final active = ref.watch(activeSetProvider);
     final archived = active == null
         ? const <Track>[]
-        : ref.watch(archivedTracksProvider(active.id)).value ??
-              const <Track>[];
+        : ref.watch(archivedTracksProvider(active.id)).value ?? const <Track>[];
+    // The scene only matters for a set that logs something.
+    final activeTracks = active == null
+        ? const <Track>[]
+        : ref.watch(tracksInSetProvider(active.id)).value ?? const <Track>[];
+    final showScene =
+        active != null &&
+        (activeTracks.any((track) => track.mode == TrackMode.protocol) ||
+            active.scenePersonIds.isNotEmpty ||
+            active.sceneSubstanceIds.isNotEmpty);
+    final rows = ReorderableListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      buildDefaultDragHandles: false,
+      itemCount: sets.length,
+      onReorderItem: (from, to) => _reorder(sets, from, to),
+      proxyDecorator: (child, _, _) =>
+          Material(color: t.colors.surfaceAlt, child: child),
+      itemBuilder: (context, index) {
+        final set = sets[index];
+        return _SetRow(
+          key: ValueKey('set-${set.id}'),
+          set: set,
+          index: index,
+          first: index == 0,
+          selected: set.id == active?.id,
+          onTap: () => _select(set),
+          onOptions: () => _options(set),
+        );
+      },
+    );
     return Center(
       heightFactor: 1,
       child: ConstrainedBox(
@@ -269,46 +335,79 @@ class _SetSheetState extends ConsumerState<_SetSheet> {
                 t.space.page,
                 0,
                 t.space.page,
-                t.space.sm,
+                t.space.md,
               ),
-              child: Semantics(
-                header: true,
-                child: Text(TracksStrings.setsTitle, style: t.text.title),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Semantics(
+                      header: true,
+                      child: Text(TracksStrings.setsTitle, style: t.text.title),
+                    ),
+                  ),
+                  PillButton(
+                    key: SetSheetKeys.newSet,
+                    label: Strings.newSet,
+                    icon: AdaptiveIcons.add(context),
+                    outlined: true,
+                    onPressed: _create,
+                  ),
+                ],
               ),
             ),
             Flexible(
-              child: ReorderableListView.builder(
-                shrinkWrap: true,
-                buildDefaultDragHandles: false,
-                itemCount: sets.length,
-                onReorderItem: (from, to) => _reorder(sets, from, to),
-                proxyDecorator: (child, _, _) =>
-                    Material(color: t.colors.surfaceAlt, child: child),
-                itemBuilder: (context, index) {
-                  final set = sets[index];
-                  return _SetRow(
-                    key: ValueKey('set-${set.id}'),
-                    set: set,
-                    index: index,
-                    selected: set.id == active?.id,
-                    onTap: () => _select(set),
-                    onOptions: () => _options(set),
-                  );
-                },
+              child: SingleChildScrollView(
+                padding: EdgeInsets.symmetric(horizontal: t.space.page),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // The sets as one group of rows.
+                    Container(
+                      decoration: BoxDecoration(
+                        color: t.colors.background,
+                        borderRadius: t.radii.smallAll,
+                        border: t.sizes.hairline > 0
+                            ? Border.all(
+                                color: t.colors.border,
+                                width: t.sizes.hairline,
+                              )
+                            : null,
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: rows,
+                    ),
+                    if (archived.isNotEmpty)
+                      AdaptiveTile(
+                        leading: Icon(AdaptiveIcons.archive(context)),
+                        title: TracksStrings.archivedTracks(archived.length),
+                        onTap: () => _restoreArchived(archived),
+                      ),
+                    if (showScene) ...[
+                      SizedBox(height: t.space.xl),
+                      SceneEditor(
+                        key: ValueKey('set-sheet-scene-${active.id}'),
+                        setId: active.id,
+                      ),
+                    ],
+                  ],
+                ),
               ),
             ),
-            if (archived.isNotEmpty)
-              AdaptiveTile(
-                leading: Icon(AdaptiveIcons.archive(context)),
-                title: TracksStrings.archivedTracks(archived.length),
-                onTap: () => _restoreArchived(archived),
-              ),
             Padding(
-              padding: EdgeInsets.all(t.space.page),
-              child: AdaptiveFilledButton(
-                label: Strings.newSet,
-                icon: AdaptiveIcons.add(context),
-                onPressed: _create,
+              padding: EdgeInsets.fromLTRB(
+                t.space.page,
+                t.space.sm,
+                t.space.page,
+                t.space.lg,
+              ),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: t.sizes.bigTapTarget),
+                child: AdaptiveFilledButton(
+                  key: SetSheetKeys.done,
+                  label: Strings.done,
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
               ),
             ),
           ],
@@ -318,10 +417,13 @@ class _SetSheetState extends ConsumerState<_SetSheet> {
   }
 }
 
+/// One set: name, how many tracks (and how many run), its design, a tick
+/// for the active one and "Mehr".
 class _SetRow extends ConsumerWidget {
   const _SetRow({
     required this.set,
     required this.index,
+    required this.first,
     required this.selected,
     required this.onTap,
     required this.onOptions,
@@ -330,6 +432,7 @@ class _SetRow extends ConsumerWidget {
 
   final TrackSet set;
   final int index;
+  final bool first;
   final bool selected;
   final VoidCallback onTap;
   final VoidCallback onOptions;
@@ -337,43 +440,85 @@ class _SetRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = context.tikky;
-    final count = ref.watch(tracksInSetProvider(set.id)).value?.length;
+    final tracks = ref.watch(tracksInSetProvider(set.id)).value;
+    final sessions = ref.watch(openSessionsProvider).value;
+    final theme = ref.watch(themeForSetProvider(set.id));
+    final summary = tracks == null
+        ? null
+        : TracksStrings.setSummary(
+            tracks.length,
+            [
+              for (final track in tracks)
+                if (sessions?.containsKey(track.id) ?? false) track,
+            ].length,
+          );
     return Material(
-      type: MaterialType.transparency,
-      child: ListTile(
-        selected: selected,
-        selectedColor: t.colors.text,
-        contentPadding: EdgeInsets.only(left: t.space.sm, right: t.space.sm),
-        leading: ReorderableDragStartListener(
-          index: index,
-          child: const LaneDragHandle(),
-        ),
-        title: Text(
-          set.name,
-          style: selected ? t.text.headline : t.text.body,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        subtitle: count == null
-            ? null
-            : Text(TracksStrings.setTrackCount(count)),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (selected)
-              Icon(
-                AdaptiveIcons.check(context),
-                color: t.colors.text,
-                semanticLabel: TracksStrings.setSelected(set.name),
-              ),
-            AdaptiveIconButton(
-              icon: AdaptiveIcons.more(context),
-              semanticLabel: '${TracksStrings.setOptions}: ${set.name}',
-              onPressed: onOptions,
-            ),
-          ],
-        ),
+      color: t.colors.background,
+      shape: first ? null : Border(top: t.hairline),
+      child: InkWell(
         onTap: onTap,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: t.sizes.bigTapTarget),
+          child: Row(
+            children: [
+              ReorderableDragStartListener(
+                index: index,
+                child: const LaneDragHandle(),
+              ),
+              Expanded(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: t.space.sm),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        set.name,
+                        style: t.text.headline,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (summary != null)
+                        Text(
+                          summary,
+                          style: t.text.caption,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              SizedBox(width: t.space.sm),
+              // The design of the set, as a small outlined label.
+              Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: t.space.sm,
+                  vertical: t.space.xxs,
+                ),
+                decoration: BoxDecoration(
+                  borderRadius: t.radii.pillAll,
+                  border: Border.fromBorderSide(t.hairline),
+                ),
+                child: Text(theme.name, style: t.text.caption, maxLines: 1),
+              ),
+              if (selected)
+                Padding(
+                  padding: EdgeInsets.only(left: t.space.sm),
+                  child: Icon(
+                    AdaptiveIcons.check(context),
+                    color: t.colors.text,
+                    semanticLabel: TracksStrings.setSelected(set.name),
+                  ),
+                ),
+              AdaptiveIconButton(
+                icon: AdaptiveIcons.more(context),
+                semanticLabel: '${TracksStrings.setOptions}: ${set.name}',
+                onPressed: onOptions,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

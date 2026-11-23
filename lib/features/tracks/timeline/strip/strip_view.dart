@@ -15,10 +15,12 @@ import '../../../../core/services/haptics.dart';
 import '../../../../l10n/formatters.dart';
 import '../../../../theme/theme.dart';
 import '../../../protocol/protocol_widgets.dart';
+import '../../lane_view.dart';
+import '../../now_selector.dart';
 import '../../tracks_strings.dart';
-import '../timeline_logic.dart';
 import 'strip_detail.dart';
 import 'strip_model.dart';
+import 'strip_open.dart';
 import 'strip_painter.dart';
 import 'strip_viewport.dart';
 
@@ -27,19 +29,19 @@ abstract final class StripKeys {
   static const view = ValueKey('strip-view');
   static const lanes = ValueKey('strip-lanes');
   static const axis = ValueKey('strip-axis');
-  static const gutter = ValueKey('strip-gutter');
   static const controls = ValueKey('strip-controls');
-  static const zoomIn = ValueKey('strip-zoom-in');
-  static const zoomOut = ValueKey('strip-zoom-out');
   static const fit = ValueKey('strip-fit');
   static const now = ValueKey('strip-now');
   static const tooltip = ValueKey('strip-tooltip');
 
-  /// The name of a lane in the gutter; [rowId] is `StripRowData.id`.
+  /// The name line of a lane; [rowId] is `StripRowData.id`.
   static Key lane(String rowId) => ValueKey('strip-lane-$rowId');
 
-  /// The timer of a lane in the gutter.
+  /// The timer of a thing next to its name.
   static Key timer(String rowId) => ValueKey('strip-timer-$rowId');
+
+  /// The live value of a track next to its name.
+  static Key value(String rowId) => ValueKey('strip-value-$rowId');
 }
 
 /// The timer of a substance lane: time since its last entry, in the
@@ -69,10 +71,9 @@ class _LaneTimer extends StatelessWidget {
           excludeSemantics: true,
           child: Text(
             Fmt.clock(elapsed),
-            style: t.text.digitsSmall.copyWith(
-              color: locked ? t.colors.warning : t.colors.text,
-              fontWeight: FontWeight.w600,
-            ),
+            style: locked
+                ? t.text.stripDigits.copyWith(color: t.colors.warningText)
+                : t.text.stripDigits,
             maxLines: 1,
           ),
         );
@@ -96,15 +97,18 @@ class _NowPulse extends ChangeNotifier {
   }
 }
 
-/// "Streifen": the timeline of a set as a strip. Time runs from left to
-/// right, every track has its lane, the names stay put on the left.
+/// "Jetzt" of the timeline (Pult 3.1): the set as a strip. Time runs from
+/// left to right; every lane has a line with its name above it.
 ///
+/// * The persons of a protocol come first, each with a line per thing
+///   (a tap on the name folds it onto one line, remembered per set), then
+///   the other tracks, compact.
 /// * Sessions are bars in the track's colour (paused stretches hatched,
 ///   running ones grow up to the "now" line), events are markers on them;
 ///   markers that would overlap become a pill with their number.
 /// * Drag to pan, pinch or Ctrl + wheel to zoom, the wheel scrolls along
-///   the time. Buttons: closer, further, "Alles zeigen", "Jetzt" (jumps
-///   to the "now" line and follows it until the user pans).
+///   the time. Buttons: "Alles", "Jetzt" (jumps to the "now" line and
+///   follows it until the user pans).
 /// * A tap on a marker opens what happened with "Bearbeiten" and
 ///   "Löschen"; a tap on a bar the figures of the session.
 ///
@@ -113,7 +117,6 @@ class _NowPulse extends ChangeNotifier {
 class StripView extends ConsumerStatefulWidget {
   const StripView({
     required this.setId,
-    required this.scope,
     required this.tracks,
     required this.sessions,
     required this.sinceMs,
@@ -124,15 +127,14 @@ class StripView extends ConsumerStatefulWidget {
   });
 
   final String setId;
-  final TimelineScope scope;
 
   /// Ordered, non-archived tracks of the set.
   final List<Track> tracks;
 
-  /// What `HistoryRepository.watchSetActivity` delivered for [scope].
+  /// What `HistoryRepository.watchSetActivity` delivered.
   final List<HistorySession> sessions;
 
-  /// Start of [scope]; `null` = the open sessions.
+  /// Start of the range; `null` = the open sessions.
   final int? sinceMs;
   final bool showLifecycle;
   final Set<String> hiddenTracks;
@@ -154,6 +156,10 @@ class StripViewState extends ConsumerState<StripView> {
 
   NowTicker? _ticker;
   StripData _data = StripData.empty;
+
+  /// The data and the minute the folds were computed for.
+  StripData? _foldedData;
+  int _foldedMinute = -1;
   StripStyle? _style;
   bool _needsFit = true;
   bool _lanesOverflow = false;
@@ -183,7 +189,8 @@ class StripViewState extends ConsumerState<StripView> {
   @override
   void didUpdateWidget(StripView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.setId != widget.setId || oldWidget.scope != widget.scope) {
+    if (oldWidget.setId != widget.setId ||
+        oldWidget.sinceMs != widget.sinceMs) {
       _needsFit = true;
     }
   }
@@ -213,6 +220,7 @@ class StripViewState extends ConsumerState<StripView> {
     final ticker = _ticker;
     if (ticker == null || !mounted) return;
     final now = ticker.value;
+    _updateFolds(now);
     // While following this moves the view (and repaints through it).
     _viewport.setNow(now);
     _pulse.tick(now, _viewport.msPerPx);
@@ -242,12 +250,31 @@ class StripViewState extends ConsumerState<StripView> {
 
   int get _now => ref.read(nowTickerProvider).value;
 
+  /// The stretches without events are drawn narrow. Only the fold up to
+  /// "now" grows with time: once a minute is enough.
+  void _updateFolds(int nowMs, {bool notify = true}) {
+    final minute = nowMs ~/ Duration.millisecondsPerMinute;
+    if (identical(_foldedData, _data) && minute == _foldedMinute) return;
+    _foldedData = _data;
+    _foldedMinute = minute;
+    final s = context.tikky.strip;
+    _viewport.setFolds(
+      computeFolds(
+        stripKeepTimes(_data),
+        nowMs: minute * Duration.millisecondsPerMinute,
+        minGapMs: s.foldMinGapMs,
+        keepRecentMs: s.foldKeepRecentMs,
+        padMs: s.foldPadMs,
+      ),
+      notify: notify,
+    );
+  }
+
   StripLayout _layout() {
     final style = _style ?? StripStyle.of(context);
     return layoutStrip(
       data: _data,
-      startMs: _viewport.startMs,
-      msPerPx: _viewport.msPerPx,
+      scale: _viewport.scale,
       width: _viewport.width,
       nowMs: _now,
       metrics: style.metrics,
@@ -259,9 +286,18 @@ class StripViewState extends ConsumerState<StripView> {
 
   // ------------------------------------------------------------ actions
 
-  void _zoomButton(double factor) {
+  void _togglePerson(String laneId) {
     ref.read(hapticsProvider).selection();
-    _viewport.zoomBy(factor);
+    ref
+        .read(stripOpenProvider.notifier)
+        .toggle(
+          widget.setId,
+          laneId,
+          shownIds: [
+            for (final row in _data.rows)
+              if (row.isPerson) row.id,
+          ],
+        );
   }
 
   void _fit() {
@@ -472,6 +508,7 @@ class StripViewState extends ConsumerState<StripView> {
     showLifecycle: widget.showLifecycle,
     hiddenTrackIds: widget.hiddenTracks,
     expandCounterLabels: expand,
+    openPersons: ref.read(stripOpenProvider)[widget.setId],
   );
 
   Widget _interactive({required Widget child, required bool lanes}) => Listener(
@@ -489,59 +526,133 @@ class StripViewState extends ConsumerState<StripView> {
     ),
   );
 
-  Widget _gutterRow(
+  /// The line above a lane: the colour dot and the name; a thing with the
+  /// time since its last entry, a track with its live value, a person with
+  /// whether it is open (a tap folds or opens it).
+  Widget _nameLine(
     TikkyTokens t,
-    StripRowData row,
-    double height,
-    NowTicker ticker,
-  ) {
+    StripRowData row, {
+    required double top,
+    required double height,
+    required double width,
+    required NowTicker ticker,
+    required Map<String, OpenSession> open,
+  }) {
+    final s = t.strip;
+    final left = s.nameInset + row.indent * s.subIndent;
     final color = row.dotArgb == null
         ? t.trackColor(row.track)
         : Color(row.dotArgb!);
-    final indent = row.indent > 0 ? row.indent : (row.isSub ? 1 : 0);
-    final title = Text(
+    final name = Text(
       row.title,
-      style: row.isSub
-          ? t.text.caption.copyWith(color: t.colors.text)
-          : t.text.label,
+      style: row.kind == StripRowKind.thing
+          ? t.text.stripThing
+          : t.text.stripName,
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
     );
-    final from = row.timerFrom;
-    return SizedBox(
-      key: StripKeys.lane(row.id),
-      height: height,
-      child: Padding(
-        padding: EdgeInsets.only(
-          left: t.space.sm + indent * t.strip.subIndent,
-          right: t.space.xs,
+    final gap = SizedBox(width: s.nameGap);
+
+    if (row.isPerson) {
+      final isOpen = !row.folded;
+      final line = Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ColorDot(color: color, size: s.nameDot),
+          gap,
+          Flexible(child: name),
+          gap,
+          Flexible(
+            child: Text(
+              isOpen
+                  ? TracksStrings.stripPersonOpen
+                  : TracksStrings.stripPersonFolded(row.events.length),
+              style: t.text.stripWord,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      );
+      // A tap target of full height around the short name line.
+      final target = t.sizes.minTapTarget;
+      return Positioned(
+        key: StripKeys.lane(row.id),
+        left: 0,
+        top: top + height / 2 - target / 2,
+        height: target,
+        child: Semantics(
+          button: true,
+          label: TracksStrings.stripPersonSemantics(row.title, open: isOpen),
+          onTapHint: isOpen
+              ? TracksStrings.stripPersonFold
+              : TracksStrings.stripPersonUnfold,
+          excludeSemantics: true,
+          onTap: () => _togglePerson(row.id),
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => _togglePerson(row.id),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: width),
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: left),
+                child: Center(widthFactor: 1, child: line),
+              ),
+            ),
+          ),
         ),
+      );
+    }
+
+    Widget? extra;
+    final from = row.timerFrom;
+    if (from != null) {
+      extra = _LaneTimer(
+        key: StripKeys.timer(row.id),
+        ticker: ticker,
+        from: from,
+        lockoutUntil: row.lockoutUntil,
+      );
+    } else if (row.kind == StripRowKind.track &&
+        row.track.mode != TrackMode.protocol) {
+      final session = open[row.track.id];
+      if (session != null) {
+        final prefs = t.prefs;
+        extra = NowSelector<String>(
+          key: StripKeys.value(row.id),
+          selector: (now) => buildLaneView(
+            track: row.track,
+            open: session,
+            nowMs: now,
+            prefs: prefs,
+          ).time.digits,
+          builder: (context, digits) =>
+              Text(digits, style: t.text.stripDigits, maxLines: 1),
+        );
+      }
+    }
+    return Positioned(
+      key: StripKeys.lane(row.id),
+      left: left,
+      right: s.nameInset,
+      top: top,
+      height: height,
+      child: IgnorePointer(
         child: Semantics(
           label: row.isSub
               ? TracksStrings.stripSubLane(row.track.name, row.title)
               : row.title,
-          excludeSemantics: from == null,
+          excludeSemantics: extra == null,
           child: Row(
             children: [
-              ColorDot(color: color),
-              SizedBox(width: t.space.xs),
-              Expanded(
-                child: from == null
-                    ? title
-                    : Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          ExcludeSemantics(child: title),
-                          _LaneTimer(
-                            key: StripKeys.timer(row.id),
-                            ticker: ticker,
-                            from: from,
-                            lockoutUntil: row.lockoutUntil,
-                          ),
-                        ],
-                      ),
+              if (row.kind != StripRowKind.thing) ...[
+                ColorDot(color: color, size: s.nameDot),
+                gap,
+              ],
+              Flexible(
+                child: extra == null ? name : ExcludeSemantics(child: name),
               ),
+              if (extra != null) ...[gap, extra],
             ],
           ),
         ),
@@ -549,65 +660,39 @@ class StripViewState extends ConsumerState<StripView> {
     );
   }
 
-  /// Closer, further, "Alles zeigen", "Jetzt". On a phone the last two
-  /// are icons as well (their names are the tooltips), so the bar fits.
-  Widget _controls(TikkyTokens t, {required bool narrow}) => Semantics(
+  /// "Alles" and "Jetzt" at the bottom right.
+  Widget _controls(TikkyTokens t) => Semantics(
     container: true,
     label: TracksStrings.stripControls,
-    child: DecoratedBox(
+    child: Row(
       key: StripKeys.controls,
-      decoration: t.surfaceDecoration(),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        reverse: true,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            AdaptiveIconButton(
-              key: StripKeys.zoomOut,
-              icon: Icons.remove_rounded,
-              semanticLabel: TracksStrings.stripZoomOut,
-              onPressed: () => _zoomButton(1 / t.strip.zoomStep),
-            ),
-            AdaptiveIconButton(
-              key: StripKeys.zoomIn,
-              icon: Icons.add_rounded,
-              semanticLabel: TracksStrings.stripZoomIn,
-              onPressed: () => _zoomButton(t.strip.zoomStep),
-            ),
-            KeyedSubtree(
-              key: StripKeys.fit,
-              child: narrow
-                  ? AdaptiveIconButton(
-                      icon: Icons.fit_screen_outlined,
-                      semanticLabel: TracksStrings.stripFit,
-                      onPressed: _fit,
-                    )
-                  : AdaptiveTextButton(
-                      label: TracksStrings.stripFit,
-                      onPressed: _fit,
-                    ),
-            ),
-            // Following already: nothing to jump to.
-            ValueListenableBuilder<bool>(
-              valueListenable: _following,
-              builder: (context, following, _) => KeyedSubtree(
-                key: StripKeys.now,
-                child: narrow
-                    ? AdaptiveIconButton(
-                        icon: Icons.keyboard_tab_rounded,
-                        semanticLabel: TracksStrings.stripNow,
-                        onPressed: following ? null : _jumpToNow,
-                      )
-                    : AdaptiveTextButton(
-                        label: TracksStrings.stripNow,
-                        onPressed: following ? null : _jumpToNow,
-                      ),
-              ),
-            ),
-          ],
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Very large text on a narrow phone: the words give way.
+        Flexible(
+          child: PillButton(
+            key: StripKeys.fit,
+            label: TracksStrings.stripAll,
+            semanticLabel: TracksStrings.stripFit,
+            outlined: true,
+            onPressed: _fit,
+          ),
         ),
-      ),
+        SizedBox(width: t.space.sm),
+        // Following already: nothing to jump to.
+        Flexible(
+          child: ValueListenableBuilder<bool>(
+            valueListenable: _following,
+            builder: (context, following, _) => PillButton(
+              key: StripKeys.now,
+              label: TracksStrings.stripNow,
+              semanticLabel: TracksStrings.stripToNow,
+              outlined: true,
+              onPressed: following ? null : _jumpToNow,
+            ),
+          ),
+        ),
+      ],
     ),
   );
 
@@ -658,16 +743,21 @@ class StripViewState extends ConsumerState<StripView> {
     final ticker = ref.watch(nowTickerProvider);
     // Offstage (another destination is shown): no ticks, no frames.
     _subscribe(TickerMode.valuesOf(context).enabled ? ticker : null);
-    // Names and colours of persons and substances may change.
+    // Names and colours of persons and substances may change, and which
+    // persons are open.
     ref
       ..watch(personsByIdProvider)
-      ..watch(substancesByIdProvider);
+      ..watch(substancesByIdProvider)
+      ..watch(stripOpenProvider.select((m) => m[widget.setId]));
+    final open =
+        ref.watch(openSessionsProvider).value ?? const <String, OpenSession>{};
     _viewport
       ..minSpanMs = s.minSpanMs
       ..fitMinSpanMs = s.fitMinSpanMs
       ..maxSpanFloorMs = s.maxSpanFloorMs
       ..followAnchor = s.followAnchor
-      ..fitPadding = s.fitPadding;
+      ..fitPadding = s.fitPadding
+      ..foldPx = s.fold;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -691,10 +781,9 @@ class StripViewState extends ConsumerState<StripView> {
           );
         }
 
-        final narrow = constraints.maxWidth < s.narrowBreakpoint;
-        final gutter = narrow ? s.gutterNarrow : s.gutter;
-        final width = math.max(0.0, constraints.maxWidth - gutter);
+        final width = math.max(0.0, constraints.maxWidth);
         final extent = stripExtent(data)!;
+        _updateFolds(ticker.value, notify: false);
         _viewport
           ..setNow(ticker.value, notify: false)
           ..setExtent(extent.start, extent.end, live: data.live, notify: false)
@@ -716,8 +805,7 @@ class StripViewState extends ConsumerState<StripView> {
         final paintHeight = math.max(lanesHeight, content + reserve);
         final layout = layoutStrip(
           data: data,
-          startMs: _viewport.startMs,
-          msPerPx: _viewport.msPerPx,
+          scale: _viewport.scale,
           width: width,
           nowMs: ticker.value,
           metrics: style.metrics,
@@ -725,96 +813,61 @@ class StripViewState extends ConsumerState<StripView> {
 
         final axis = SizedBox(
           height: axisHeight,
-          child: Row(
-            children: [
-              SizedBox(
-                width: gutter,
-                height: axisHeight,
-                child: ExcludeSemantics(
-                  child: CustomPaint(
-                    painter: StripCornerPainter(
-                      viewport: _viewport,
-                      style: style,
-                    ),
-                  ),
+          child: _interactive(
+            lanes: false,
+            child: ExcludeSemantics(
+              child: CustomPaint(
+                key: StripKeys.axis,
+                size: Size.infinite,
+                painter: StripAxisPainter(
+                  viewport: _viewport,
+                  now: ticker,
+                  style: style,
+                  repaint: _repaint,
                 ),
               ),
-              Expanded(
-                child: _interactive(
-                  lanes: false,
-                  child: ExcludeSemantics(
-                    child: CustomPaint(
-                      key: StripKeys.axis,
-                      size: Size.infinite,
-                      painter: StripAxisPainter(
-                        viewport: _viewport,
-                        now: ticker,
-                        style: style,
-                        repaint: _repaint,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
         );
 
         final lanes = SingleChildScrollView(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(
-                key: StripKeys.gutter,
-                width: gutter,
-                height: paintHeight,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(border: Border(right: t.hairline)),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      for (var i = 0; i < data.rows.length; i++)
-                        _gutterRow(
-                          t,
-                          data.rows[i],
-                          layout.rowHeights[i],
-                          ticker,
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-              Expanded(
-                child: SizedBox(
-                  height: paintHeight,
-                  child: Stack(
-                    clipBehavior: Clip.hardEdge,
-                    children: [
-                      Positioned.fill(
-                        child: _interactive(
-                          lanes: true,
-                          child: CustomPaint(
-                            key: StripKeys.lanes,
-                            painter: StripLanesPainter(
-                              data: data,
-                              viewport: _viewport,
-                              now: ticker,
-                              style: style,
-                              semanticsEpoch: _semanticsEpoch,
-                              onEvent: _openEvent,
-                              onCluster: _openCluster,
-                              repaint: _repaint,
-                            ),
-                            child: const SizedBox.expand(),
-                          ),
-                        ),
+          child: SizedBox(
+            height: paintHeight,
+            child: Stack(
+              clipBehavior: Clip.hardEdge,
+              children: [
+                Positioned.fill(
+                  child: _interactive(
+                    lanes: true,
+                    child: CustomPaint(
+                      key: StripKeys.lanes,
+                      painter: StripLanesPainter(
+                        data: data,
+                        viewport: _viewport,
+                        now: ticker,
+                        style: style,
+                        semanticsEpoch: _semanticsEpoch,
+                        onEvent: _openEvent,
+                        onCluster: _openCluster,
+                        repaint: _repaint,
                       ),
-                      _tooltip(t, Size(width, paintHeight)),
-                    ],
+                      child: const SizedBox.expand(),
+                    ),
                   ),
                 ),
-              ),
-            ],
+                for (var i = 0; i < data.rows.length; i++)
+                  _nameLine(
+                    t,
+                    data.rows[i],
+                    top: layout.rowTops[i],
+                    height: style.metrics.labelHeight,
+                    width: width,
+                    ticker: ticker,
+                    open: open,
+                  ),
+                _tooltip(t, Size(width, paintHeight)),
+              ],
+            ),
           ),
         );
 
@@ -845,7 +898,7 @@ class StripViewState extends ConsumerState<StripView> {
                   bottom: t.space.sm,
                   child: Align(
                     alignment: Alignment.bottomRight,
-                    child: _controls(t, narrow: narrow),
+                    child: _controls(t),
                   ),
                 ),
               ],

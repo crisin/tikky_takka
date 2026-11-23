@@ -11,8 +11,51 @@ import 'tracks_strings.dart';
 /// What the round primary button of a lane does right now.
 enum LanePrimary { start, pause, resume, dismiss, ack, tick, none }
 
-/// The small secondary buttons of a lane.
-enum LaneSecondaryKind { lap, restart, reset, undo, stop, ackEarly }
+/// The secondary button of a lane (at most one at a time).
+///
+/// [plusMinute]: "+1′" of a ringing timer; [snooze]: "+10′" of a due
+/// reminder; [nextRound]: "nächste Runde" of a running interval.
+enum LaneSecondaryKind {
+  lap,
+  restart,
+  reset,
+  undo,
+  stop,
+  ackEarly,
+  plusMinute,
+  snooze,
+  nextRound,
+}
+
+/// How a lane looks: its surface, outline and lamp.
+///
+/// * [running]: surface in the track colour, lamp lit;
+/// * [paused]: outline in the track colour, lamp hollow;
+/// * [ringing]: a countdown / interval that rings, surface in the alarm
+///   colour;
+/// * [due]: a reminder that is due, surface plus a warning outline;
+/// * [idle]: ready to start, a thin neutral outline, one line.
+enum LaneLook { running, paused, ringing, due, idle }
+
+/// The rounds of an interval lane as a row of segments.
+@immutable
+final class LaneSegments {
+  const LaneSegments({required this.current, required this.total});
+
+  /// 1-based number of the running round; `total + 1` when finished.
+  final int current;
+  final int total;
+
+  @override
+  bool operator ==(Object other) =>
+      other is LaneSegments && other.current == current && other.total == total;
+
+  @override
+  int get hashCode => Object.hash(current, total);
+
+  @override
+  String toString() => 'LaneSegments($current / $total)';
+}
 
 @immutable
 final class LaneSecondary {
@@ -42,6 +85,7 @@ final class LaneTime {
     required this.subLine,
     this.secondaryDigits,
     this.progress,
+    this.segments,
     this.alert = false,
     this.blinkOn = false,
   });
@@ -55,8 +99,12 @@ final class LaneTime {
   /// Muted status line.
   final String subLine;
 
-  /// 0..1 for the thin progress bar; `null` when the mode has none.
+  /// 0..1 share of the current run that has elapsed; the lane is filled
+  /// with the rest. `null` when the mode has none.
   final double? progress;
+
+  /// The rounds of an interval; `null` for every other lane.
+  final LaneSegments? segments;
 
   /// The lane is ringing / due.
   final bool alert;
@@ -71,32 +119,49 @@ final class LaneTime {
       other.secondaryDigits == secondaryDigits &&
       other.subLine == subLine &&
       other.progress == progress &&
+      other.segments == segments &&
       other.alert == alert &&
       other.blinkOn == blinkOn;
 
   @override
-  int get hashCode =>
-      Object.hash(digits, secondaryDigits, subLine, progress, alert, blinkOn);
+  int get hashCode => Object.hash(
+    digits,
+    secondaryDigits,
+    subLine,
+    progress,
+    segments,
+    alert,
+    blinkOn,
+  );
 
   @override
   String toString() => 'LaneTime($digits, $secondaryDigits, $subLine)';
 }
 
-/// The part of a lane that only changes with its state: buttons and the
-/// ringing frame.
+/// The part of a lane that only changes with its state: buttons, surface
+/// and outline.
 @immutable
 final class LaneControls {
   const LaneControls({
     required this.state,
+    required this.look,
     required this.primary,
-    required this.secondary,
+    this.secondary,
+    this.canStop = false,
     this.labelCounts = const {},
     this.status = '',
   });
 
   final RunState state;
+  final LaneLook look;
   final LanePrimary primary;
-  final List<LaneSecondary> secondary;
+
+  /// The one secondary button; `null` = none (a ready lane).
+  final LaneSecondary? secondary;
+
+  /// A run is open and can be stopped: long press on the primary button,
+  /// the "Stopp" button of a paused lane, the screen reader action.
+  final bool canStop;
 
   /// Counter with quick labels: label -> count, in configured order. Empty
   /// for every other lane.
@@ -112,17 +177,21 @@ final class LaneControls {
   bool operator ==(Object other) =>
       other is LaneControls &&
       other.state == state &&
+      other.look == look &&
       other.primary == primary &&
       other.status == status &&
-      listEquals(other.secondary, secondary) &&
+      other.canStop == canStop &&
+      other.secondary == secondary &&
       mapEquals(other.labelCounts, labelCounts);
 
   @override
   int get hashCode => Object.hash(
     state,
+    look,
     primary,
     status,
-    Object.hashAll(secondary),
+    canStop,
+    secondary,
     Object.hashAll(labelCounts.keys),
     Object.hashAll(labelCounts.values),
   );
@@ -185,8 +254,9 @@ LaneView buildLaneView({
       LaneTime(digits: '${snapshot.entryCount}', subLine: ''),
       LaneControls(
         state: snapshot.state,
+        look: _look(snapshot),
         primary: LanePrimary.none,
-        secondary: const [],
+        canStop: snapshot.isOpen,
       ),
     ),
   };
@@ -199,6 +269,26 @@ String _status(TrackSnapshot s, {bool due = false}) => switch (s.state) {
   RunState.paused => Strings.statusPaused,
   RunState.ringing => due ? Strings.statusDue : Strings.statusRinging,
   RunState.stopped => Strings.statusStopped,
+};
+
+LaneLook _look(TrackSnapshot s, {bool due = false}) => switch (s.state) {
+  RunState.idle || RunState.stopped => LaneLook.idle,
+  RunState.running => LaneLook.running,
+  RunState.paused => LaneLook.paused,
+  RunState.ringing => due ? LaneLook.due : LaneLook.ringing,
+};
+
+/// The "Stopp" button of a paused lane.
+const _stopWhenPaused = LaneSecondary(LaneSecondaryKind.stop, enabled: true);
+
+/// "neu starten" while open, "Stopp" while paused.
+LaneSecondary? _restartOrStop(TrackSnapshot s) => switch (s.state) {
+  RunState.running || RunState.ringing => const LaneSecondary(
+    LaneSecondaryKind.restart,
+    enabled: true,
+  ),
+  RunState.paused => _stopWhenPaused,
+  RunState.idle || RunState.stopped => null,
 };
 
 String _join(Iterable<String?> parts) => [
@@ -236,10 +326,7 @@ LanePrimary _startPause(TrackSnapshot s, {required LanePrimary onRinging}) =>
       Strings.lastLap(Fmt.clock(s.laps.last.durationMs)),
     ]);
   } else {
-    subLine = _join([
-      _status(s),
-      if (exclusive) TracksStrings.exclusiveTag,
-    ]);
+    subLine = _join([_status(s), if (exclusive) TracksStrings.exclusiveTag]);
   }
   return (
     LaneTime(
@@ -248,12 +335,18 @@ LanePrimary _startPause(TrackSnapshot s, {required LanePrimary onRinging}) =>
     ),
     LaneControls(
       state: s.state,
+      look: _look(s),
       status: _status(s),
       primary: _startPause(s, onRinging: LanePrimary.pause),
-      secondary: [
-        LaneSecondary(LaneSecondaryKind.lap, enabled: s.isRunning),
-        LaneSecondary(LaneSecondaryKind.reset, enabled: s.isOpen),
-      ],
+      canStop: s.isOpen,
+      secondary: switch (s.state) {
+        RunState.running || RunState.ringing => const LaneSecondary(
+          LaneSecondaryKind.lap,
+          enabled: true,
+        ),
+        RunState.paused => _stopWhenPaused,
+        RunState.idle || RunState.stopped => null,
+      },
     ),
   );
 }
@@ -306,15 +399,14 @@ LanePrimary _startPause(TrackSnapshot s, {required LanePrimary onRinging}) =>
     ),
     LaneControls(
       state: s.state,
+      look: _look(s),
       status: _status(s),
       primary: _startPause(s, onRinging: LanePrimary.dismiss),
-      secondary: [
-        LaneSecondary(LaneSecondaryKind.restart, enabled: s.isOpen),
-        LaneSecondary(
-          LaneSecondaryKind.reset,
-          enabled: s.isOpen && !s.isRinging,
-        ),
-      ],
+      canStop: s.isOpen,
+      // Ringing: "+1′" (rings again in a minute); otherwise as usual.
+      secondary: s.isRinging && s.finished
+          ? const LaneSecondary(LaneSecondaryKind.plusMinute, enabled: true)
+          : _restartOrStop(s),
     ),
   );
 }
@@ -354,21 +446,28 @@ LanePrimary _startPause(TrackSnapshot s, {required LanePrimary onRinging}) =>
           ? Fmt.clock(0)
           : Fmt.remaining(s.phaseRemainingMs, tenths: prefs.showTenths),
       subLine: subLine,
-      progress: _quantize(s.progress),
+      // The fill follows the digits: the share of the current phase.
+      progress: s.finished ? 1 : _quantize(s.phaseProgress),
+      segments: s.isIdle || s.rounds < 2
+          ? null
+          : LaneSegments(
+              current: s.finished ? s.rounds + 1 : s.round,
+              total: s.rounds,
+            ),
       alert: s.isRinging,
       blinkOn: blinkOn,
     ),
     LaneControls(
       state: s.state,
+      look: _look(s),
       status: s.finished ? Strings.phaseDone : _status(s),
       primary: _startPause(s, onRinging: LanePrimary.dismiss),
-      secondary: [
-        LaneSecondary(LaneSecondaryKind.restart, enabled: s.isOpen),
-        LaneSecondary(
-          LaneSecondaryKind.reset,
-          enabled: s.isOpen && !s.isRinging,
-        ),
-      ],
+      canStop: s.isOpen,
+      // Running: "nächste Runde" (not in the last round); ringing at the
+      // end: "neu starten".
+      secondary: s.isRunning
+          ? LaneSecondary(LaneSecondaryKind.nextRound, enabled: s.canSkip)
+          : _restartOrStop(s),
     ),
   );
 }
@@ -395,12 +494,13 @@ LanePrimary _startPause(TrackSnapshot s, {required LanePrimary onRinging}) =>
     ),
     LaneControls(
       state: s.state,
+      look: _look(s),
       status: _status(s),
       primary: labels.isEmpty ? LanePrimary.tick : LanePrimary.none,
-      secondary: [
-        LaneSecondary(LaneSecondaryKind.undo, enabled: s.canUndo),
-        LaneSecondary(LaneSecondaryKind.stop, enabled: s.isOpen),
-      ],
+      canStop: s.isOpen,
+      secondary: s.isOpen
+          ? LaneSecondary(LaneSecondaryKind.undo, enabled: s.canUndo)
+          : null,
       labelCounts: {for (final l in labels) l: s.labelCounts[l] ?? 0},
     ),
   );
@@ -448,15 +548,23 @@ LanePrimary _startPause(TrackSnapshot s, {required LanePrimary onRinging}) =>
     ),
     LaneControls(
       state: s.state,
+      look: _look(s, due: true),
       status: _status(s, due: true),
       primary: _startPause(s, onRinging: LanePrimary.ack),
-      secondary: [
-        LaneSecondary(
+      canStop: s.isOpen,
+      secondary: switch (s.state) {
+        RunState.running => const LaneSecondary(
           LaneSecondaryKind.ackEarly,
-          enabled: s.isOpen && !s.isRinging,
+          enabled: true,
         ),
-        LaneSecondary(LaneSecondaryKind.reset, enabled: s.isOpen),
-      ],
+        RunState.paused => _stopWhenPaused,
+        // The primary button acknowledges; "+10′" puts it off.
+        RunState.ringing => const LaneSecondary(
+          LaneSecondaryKind.snooze,
+          enabled: true,
+        ),
+        RunState.idle || RunState.stopped => null,
+      },
     ),
   );
 }

@@ -11,29 +11,14 @@ import 'core/now_ticker.dart';
 import 'core/repo/providers.dart';
 import 'core/services/alarms/alarm_service.dart';
 import 'core/services/keep_awake.dart';
-import 'features/history/history_screen.dart';
 import 'features/settings/lock_gate.dart';
-import 'features/settings/settings_screen.dart';
 import 'features/tracks/tracks_screen.dart';
 import 'l10n/strings.dart';
 import 'theme/theme.dart';
 
-/// The three top-level destinations, in navigation order.
-enum ShellDestination { tracks, history, settings }
-
-/// The selected top-level destination. Any feature may switch it, e.g.
-/// `ref.read(shellDestinationProvider.notifier).go(ShellDestination.tracks)`.
-class ShellDestinationController extends Notifier<ShellDestination> {
-  @override
-  ShellDestination build() => ShellDestination.tracks;
-
-  void go(ShellDestination destination) => state = destination;
-}
-
-final shellDestinationProvider =
-    NotifierProvider<ShellDestinationController, ShellDestination>(
-      ShellDestinationController.new,
-    );
+/// The app's navigator: notification taps bring the tracks screen back to
+/// the front from wherever the user is.
+final appNavigatorKey = GlobalKey<NavigatorState>();
 
 /// Routes notification taps and action buttons from the [AlarmService] to
 /// the track commands. Kept alive by the app shell.
@@ -54,9 +39,7 @@ final alarmActionRouterProvider = Provider<void>((ref) {
         if (track != null) {
           await ref.read(activeSetIdProvider.notifier).select(track.setId);
         }
-        ref
-            .read(shellDestinationProvider.notifier)
-            .go(ShellDestination.tracks);
+        appNavigatorKey.currentState?.popUntil((route) => route.isFirst);
     }
   });
   ref.onDispose(subscription.cancel);
@@ -92,9 +75,7 @@ class _TikkyAppState extends ConsumerState<TikkyApp>
   void didChangePlatformBrightness() {
     ref
         .read(platformBrightnessProvider.notifier)
-        .set(
-          WidgetsBinding.instance.platformDispatcher.platformBrightness,
-        );
+        .set(WidgetsBinding.instance.platformDispatcher.platformBrightness);
   }
 
   @override
@@ -131,6 +112,7 @@ class _TikkyAppState extends ConsumerState<TikkyApp>
     final tokens = themeData.extension<TikkyTokens>()!;
     return MaterialApp(
       title: Strings.appName,
+      navigatorKey: appNavigatorKey,
       debugShowCheckedModeBanner: false,
       // German UI: the built-in pickers, dialogs and tooltips follow.
       locale: const Locale('de'),
@@ -164,9 +146,9 @@ class _TikkyAppState extends ConsumerState<TikkyApp>
   }
 }
 
-/// The app shell: waits for the bootstrap, then shows the three
-/// destinations with adaptive navigation (bottom bar on phones, rail on
-/// wide layouts). Destinations are built lazily and kept alive.
+/// The app shell: waits for the bootstrap, then shows the tracks screen.
+/// Its three views are the destinations of the navigation (pill on phones,
+/// rail on wide layouts); settings and history are pages behind "···".
 class AppShell extends ConsumerStatefulWidget {
   const AppShell({super.key});
 
@@ -175,8 +157,6 @@ class AppShell extends ConsumerStatefulWidget {
 }
 
 class _AppShellState extends ConsumerState<AppShell> {
-  final Set<ShellDestination> _visited = {ShellDestination.tracks};
-
   /// At most one "system time changed" notice per this many milliseconds
   /// (setting the clock by hand produces several jumps in a row).
   static const int _clockNoticeEveryMs = 30000;
@@ -223,27 +203,6 @@ class _AppShellState extends ConsumerState<AppShell> {
     );
   }
 
-  /// A visited destination stays mounted (scroll position, filter, open
-  /// pickers survive a tab change).
-  ///
-  /// The history is additionally switched to `TickerMode` off while it is
-  /// not shown: that pauses its provider subscriptions and with them the
-  /// session stream, which would otherwise re-read the whole history on
-  /// every event written on the tracks screen (see `watchTables`). It
-  /// catches up with one reload when it is shown again. Always the same
-  /// widget at the same place, so no state is lost.
-  Widget _keptAlive(ShellDestination destination, {required bool visible}) {
-    final page = _page(destination);
-    if (destination != ShellDestination.history) return page;
-    return TickerMode(enabled: visible, child: page);
-  }
-
-  Widget _page(ShellDestination destination) => switch (destination) {
-    ShellDestination.tracks => const TracksScreen(),
-    ShellDestination.history => const HistoryScreen(),
-    ShellDestination.settings => const SettingsScreen(),
-  };
-
   @override
   Widget build(BuildContext context) {
     final bootstrap = ref.watch(appBootstrapProvider);
@@ -262,39 +221,6 @@ class _AppShellState extends ConsumerState<AppShell> {
       );
     }
 
-    final selected = ref.watch(shellDestinationProvider);
-    _visited.add(selected);
-    return AdaptiveNavScaffold(
-      selectedIndex: selected.index,
-      onDestinationSelected: (index) => ref
-          .read(shellDestinationProvider.notifier)
-          .go(ShellDestination.values[index]),
-      destinations: [
-        AdaptiveDestination(
-          label: Strings.navTracks,
-          icon: AdaptiveIcons.tracks(context),
-          selectedIcon: AdaptiveIcons.tracksSelected(context),
-        ),
-        AdaptiveDestination(
-          label: Strings.navHistory,
-          icon: AdaptiveIcons.history(context),
-          selectedIcon: AdaptiveIcons.historySelected(context),
-        ),
-        AdaptiveDestination(
-          label: Strings.navSettings,
-          icon: AdaptiveIcons.settings(context),
-          selectedIcon: AdaptiveIcons.settingsSelected(context),
-        ),
-      ],
-      body: IndexedStack(
-        index: selected.index,
-        children: [
-          for (final destination in ShellDestination.values)
-            _visited.contains(destination)
-                ? _keptAlive(destination, visible: destination == selected)
-                : const SizedBox.shrink(),
-        ],
-      ),
-    );
+    return const TracksScreen();
   }
 }

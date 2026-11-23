@@ -21,31 +21,14 @@ abstract final class ProtocolStrings {
   static String lockoutFor(String substance, String duration) =>
       '$substance: frühestens wieder in $duration';
 
-  // ----------------------------------------------------- one-tap capture
+  // ------------------------------------------------------- person cards
   static const whoAreYou = 'Wer bist du?';
   static const others = 'Andere';
   static const showOthers = 'Andere Personen anzeigen';
 
   /// Semantics of a person card.
   static String choosePerson(String person) => '$person auswählen';
-  static const backToPersons = 'Zurück zur Personenwahl';
 
-  /// "Jacke · GBL eingetragen"
-  static String captured(String person, String substance) =>
-      '$person · $substance eingetragen';
-  static const details = 'Details';
-
-  /// The person's count of a substance in the current session: "3×".
-  static String timesCount(int n) => '$n×';
-
-  /// Semantics of a one-tap substance button. [remaining] is only passed
-  /// while a lockout the user set is still running.
-  static String captureLabel(String substance, int count, String? remaining) =>
-      [
-        '$substance eintragen',
-        'bisher $count in dieser Sitzung',
-        if (remaining != null) 'frühestens wieder in $remaining',
-      ].join(', ');
 
   // --------------------------------------------------------------- scene
   static const scene = 'Szene';
@@ -87,6 +70,45 @@ abstract final class ProtocolStrings {
 
   /// "21:05 · vor 10 min"
   static String timeWithAgo(String time, String ago) => '$time · $ago';
+
+  // ------------------------------------------------- sheet "Ändern"
+  static const when = 'Wann?';
+  static const howMuch = 'Wie viel?';
+  static const otherAmount = 'Andere Menge';
+  static const otherAmountHint = 'Menge als Freitext';
+  static const noNote = 'keine';
+  static const againNow = 'Nochmal jetzt';
+  static const againNowSemantics =
+      'Denselben Eintrag noch einmal mit der Uhrzeit von jetzt';
+  static const delete = 'Löschen';
+  static const editTitleEmpty = 'Eintrag';
+
+  /// "Wasser · Krille"
+  static String editTitle(String what, String who) => '$what · $who';
+
+  /// "eben eingetragen · 23:41"
+  static String justEntered(String time) => 'eben eingetragen · $time';
+
+  /// "1 h nach dem vorherigen"
+  static String afterPrevious(String duration) =>
+      '$duration nach dem vorherigen';
+
+  /// A shortcut of a just written entry: "−5 min" / "vor 5 Minuten".
+  static String minutesBack(int n) => '−$n min';
+  static String minutesBackSemantics(int n) =>
+      n == 1 ? 'vor 1 Minute' : 'vor $n Minuten';
+
+  /// A step of the time of an older entry: "−5" / "+1".
+  static String timeStep(int n) => n < 0 ? '−${-n}' : '+$n';
+  static String timeStepSemantics(int n) {
+    final m = n.abs();
+    final unit = m == 1 ? '1 Minute' : '$m Minuten';
+    return n < 0 ? '$unit früher' : '$unit später';
+  }
+
+  /// A folded row: "Wer: Krille. Aufklappen."
+  static String rowSemantics(String key, String value, {required bool open}) =>
+      '$key: $value. ${open ? 'Zuklappen' : 'Aufklappen'}.';
 
   // ------------------------------------------------------ session screen
   static const sessionTitle = 'Einträge';

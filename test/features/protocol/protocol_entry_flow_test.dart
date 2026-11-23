@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tikky_takka/core/domain/domain.dart';
 import 'package:tikky_takka/core/repo/repo.dart';
+import 'package:tikky_takka/features/protocol/entry_edit_sheet.dart';
 import 'package:tikky_takka/features/protocol/protocol_people_screen.dart';
 import 'package:tikky_takka/features/protocol/protocol_strings.dart';
 import 'package:tikky_takka/features/protocol/protocol_widgets.dart';
@@ -89,31 +90,6 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('a repeat entry takes two taps', (tester) async {
-    final f = await ProtocolFixture.pump(tester);
-    final alex = await f.person('Alex');
-    final water = await f.substance('Wasser');
-    await f.entry(personId: alex.id, substanceId: water.id, amount: '0,5 l');
-    await f.settle();
-    await f.advance(const Duration(minutes: 40));
-
-    // Tap 1: the person's card. Tap 2: the substance button - no sheet.
-    await f.tap(find.text('Alex · vor 40 min'));
-    expect(find.text(Strings.protocolNewEntry), findsNothing);
-    await f.tap(find.byKey(ValueKey('capture-${water.id}')));
-    expect(find.text(Strings.protocolNewEntry), findsNothing);
-
-    final entries = await f.entries();
-    expect(entries, hasLength(2));
-    expect(entries.last.personId, alex.id);
-    expect(entries.last.substanceId, water.id);
-    // The amount of the earlier entry is not carried over.
-    expect(entries.last.amount, isNull);
-    expect(entries.last.at, f.app.clock.nowMs());
-    expect(find.text('Alex · gerade eben'), findsOneWidget);
-    expect(tester.takeException(), isNull);
-  });
-
   testWidgets('earlier amounts of the chosen substance are offered', (
     tester,
   ) async {
@@ -174,9 +150,9 @@ void main() {
     await f.settle();
     await f.advance(const Duration(minutes: 30));
 
-    // The person's card, then "+": the sheet with only the person chosen.
-    await f.tap(find.text('Alex · vor 30 min'));
+    // "+": nothing is chosen until the user taps it.
     await f.tap(find.byKey(_add));
+    await f.tap(find.byKey(ValueKey('person-${alex.id}')));
     expect(
       tester
           .widget<ProtocolChoice>(find.byKey(ValueKey('person-${alex.id}')))
@@ -189,8 +165,13 @@ void main() {
           .selected,
       isFalse,
     );
-    expect(tester.widget<TextField>(find.byKey(const ValueKey('amount')))
-        .controller!.text, isEmpty);
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const ValueKey('amount')))
+          .controller!
+          .text,
+      isEmpty,
+    );
     await f.tap(find.byKey(ValueKey('substance-${water.id}')));
     expect(
       find.text('Alex · ${Strings.lockoutRemaining('1 h 30 min')}'),
@@ -219,12 +200,26 @@ void main() {
 
     await f.tap(find.byTooltip(ProtocolStrings.showEntries));
     await f.tap(find.text('Alex · Wasser · 0,5 l'));
-    expect(find.text(Strings.protocolEditEntry), findsOneWidget);
+    // The sheet "Ändern" of an older entry.
+    expect(find.text('Wasser · Alex'), findsOneWidget);
+    expect(find.byKey(EntrySheetKeys.again), findsOneWidget);
 
+    // Every change is written right away; "Fertig" only closes.
+    await f.tap(find.byKey(EntrySheetKeys.rowPerson));
     await f.tap(find.byKey(ValueKey('person-${sam.id}')));
-    await tester.enterText(find.byKey(const ValueKey('amount')), '1 l');
+    expect((await f.entries()).single.personId, sam.id);
+    await f.tap(find.byKey(EntrySheetKeys.amountOther));
+    await tester.enterText(find.byKey(EntrySheetKeys.amountField), '1 l');
     // 20 minutes ago -> 25 minutes ago.
-    await f.tap(find.byKey(const ValueKey('time-earlier')));
+    await f.tap(find.byKey(EntrySheetKeys.timeStep(-5)));
+    // Never into the future.
+    for (var i = 0; i < 6; i++) {
+      await f.tap(find.byKey(EntrySheetKeys.timeStep(5)));
+    }
+    expect((await f.entries()).single.at, f.app.clock.nowMs());
+    for (var i = 0; i < 5; i++) {
+      await f.tap(find.byKey(EntrySheetKeys.timeStep(-5)));
+    }
     await f.tap(find.byKey(_save));
 
     expect(find.text(ProtocolStrings.entryUpdated), findsOneWidget);
@@ -242,14 +237,62 @@ void main() {
     expect(entries.single.amount, '0,5 l');
     expect(entries.single.at, original.at);
 
-    // Delete from the edit sheet: no dialog, undo snackbar.
+    // Delete from the sheet: no dialog, undo snackbar.
     await f.tap(find.text('Alex · Wasser · 0,5 l'));
-    await f.tap(find.text(ProtocolStrings.deleteEntry));
+    await f.tap(find.byKey(EntrySheetKeys.delete));
     expect(find.byType(AlertDialog), findsNothing);
     expect(find.text(Strings.protocolDeleted), findsOneWidget);
     expect(await f.entries(), isEmpty);
     await f.tap(find.text(Strings.undo));
     expect((await f.entries()).single, isA<TrackEvent>());
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('"Ändern": earlier amounts as chips, one row open at a '
+      'time, "Nochmal jetzt" logs the entry again', (tester) async {
+    final f = await ProtocolFixture.pump(tester);
+    final alex = await f.person('Alex');
+    final water = await f.substance('Wasser');
+    await f.entry(personId: alex.id, substanceId: water.id, amount: '1 l');
+    await f.advance(const Duration(minutes: 10));
+    final original = (await f.entry(personId: alex.id, substanceId: water.id))!;
+    await f.settle();
+    await f.advance(const Duration(minutes: 26));
+
+    await f.tap(find.byTooltip(ProtocolStrings.showEntries));
+    await f.tap(find.text('Alex · Wasser'));
+    // The gap to the person's previous entry of that substance.
+    expect(
+      find.textContaining(ProtocolStrings.afterPrevious('10 min')),
+      findsOneWidget,
+    );
+
+    // The amount typed before is offered; tapping it again takes it off.
+    await f.tap(find.byKey(EntrySheetKeys.amount('1 l')));
+    expect((await f.entries()).last.amount, '1 l');
+    await f.tap(find.byKey(EntrySheetKeys.amount('1 l')));
+    expect((await f.entries()).last.amount, isNull);
+
+    // One row at a time.
+    await f.tap(find.byKey(EntrySheetKeys.rowPerson));
+    expect(find.byKey(ValueKey('person-${alex.id}')), findsOneWidget);
+    await f.tap(find.byKey(EntrySheetKeys.rowNote));
+    expect(find.byKey(ValueKey('person-${alex.id}')), findsNothing);
+    await tester.enterText(find.byKey(EntrySheetKeys.note), 'am Zelt');
+    await f.settle();
+    expect((await f.entries()).last.note, 'am Zelt');
+
+    await f.tap(find.byKey(EntrySheetKeys.again));
+    final entries = await f.entries();
+    expect(entries, hasLength(3));
+    expect(entries.last.id, isNot(original.id));
+    expect(entries.last.at, f.app.clock.nowMs());
+    expect(entries.last.personId, alex.id);
+    expect(entries.last.substanceId, water.id);
+    expect(entries.last.note, 'am Zelt');
+    expect(find.text(Strings.protocolSaved), findsOneWidget);
+    await f.tap(find.text(Strings.undo));
+    expect(await f.entries(), hasLength(2));
     expect(tester.takeException(), isNull);
   });
 
@@ -300,10 +343,7 @@ void main() {
     await tap(find.byTooltip(ProtocolStrings.newSubstance));
     expect(find.text(Strings.lockoutNone), findsOneWidget);
     expect(find.text(Strings.lockoutHint), findsOneWidget);
-    await tester.enterText(
-      find.byKey(const ValueKey('editor-name')),
-      'Wasser',
-    );
+    await tester.enterText(find.byKey(const ValueKey('editor-name')), 'Wasser');
     await tester.pump();
     await tap(find.byKey(const ValueKey('editor-save')));
 

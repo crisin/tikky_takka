@@ -20,6 +20,9 @@ final class TikkyColors {
     required this.danger,
     required this.success,
     required this.warning,
+    required this.warningText,
+    required this.onDanger,
+    required this.segment,
   });
 
   factory TikkyColors.fromJson(JsonMap json, TikkyColors fallback) =>
@@ -35,6 +38,10 @@ final class TikkyColors {
         danger: _color(json['danger'], fallback.danger),
         success: _color(json['success'], fallback.success),
         warning: _color(json['warning'], fallback.warning),
+        // Added with the "Pult" design; themes stored before that lack them.
+        warningText: _color(json['warningText'], fallback.warningText),
+        onDanger: _color(json['onDanger'], fallback.onDanger),
+        segment: _color(json['segment'], fallback.segment),
       );
 
   /// Screen background.
@@ -64,7 +71,18 @@ final class TikkyColors {
   /// Destructive actions, ringing state.
   final Color danger;
   final Color success;
+
+  /// Fills and outlines that come from a self-set interval ("Abstand").
   final Color warning;
+
+  /// [warning] as text: readable on every tinted surface of the theme.
+  final Color warningText;
+
+  /// Content on top of [danger] (a ringing lane).
+  final Color onDanger;
+
+  /// The selected entry of a segmented pill on a surface.
+  final Color segment;
 
   TikkyColors copyWith({
     Color? background,
@@ -78,6 +96,9 @@ final class TikkyColors {
     Color? danger,
     Color? success,
     Color? warning,
+    Color? warningText,
+    Color? onDanger,
+    Color? segment,
   }) => TikkyColors(
     background: background ?? this.background,
     surface: surface ?? this.surface,
@@ -90,6 +111,9 @@ final class TikkyColors {
     danger: danger ?? this.danger,
     success: success ?? this.success,
     warning: warning ?? this.warning,
+    warningText: warningText ?? this.warningText,
+    onDanger: onDanger ?? this.onDanger,
+    segment: segment ?? this.segment,
   );
 
   JsonMap toJson() => {
@@ -104,6 +128,9 @@ final class TikkyColors {
     'danger': colorToJson(danger.toARGB32()),
     'success': colorToJson(success.toARGB32()),
     'warning': colorToJson(warning.toARGB32()),
+    'warningText': colorToJson(warningText.toARGB32()),
+    'onDanger': colorToJson(onDanger.toARGB32()),
+    'segment': colorToJson(segment.toARGB32()),
   };
 
   List<int> get _values => [
@@ -118,6 +145,9 @@ final class TikkyColors {
     danger.toARGB32(),
     success.toARGB32(),
     warning.toARGB32(),
+    warningText.toARGB32(),
+    onDanger.toARGB32(),
+    segment.toARGB32(),
   ];
 
   @override
@@ -184,8 +214,8 @@ final class DigitStyle {
   int get hashCode => Object.hash(tabular, monospace, weight);
 }
 
-/// Font choices. Only fonts that ship with the operating systems are used;
-/// nothing is bundled or downloaded.
+/// Font choices for text: fonts that ship with the operating systems.
+/// The fonts the app bundles are in bundled_fonts.dart.
 abstract final class TikkyFonts {
   /// The platform's default UI font.
   static const system = 'system';

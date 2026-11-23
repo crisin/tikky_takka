@@ -46,11 +46,13 @@ class UiPrefField extends StatelessWidget {
     UiPrefsKeys.showTenths => Strings.prefShowTenths,
     UiPrefsKeys.showProgressBar => Strings.prefShowProgress,
     UiPrefsKeys.showSubLine => Strings.prefShowSubLine,
+    UiPrefsKeys.showEntryCounts => Strings.prefShowEntryCounts,
     UiPrefsKeys.leftHanded => Strings.prefLeftHanded,
     UiPrefsKeys.haptics => Strings.prefHaptics,
     UiPrefsKeys.keepScreenOn => Strings.prefKeepScreenOn,
     UiPrefsKeys.use24h => Strings.prefUse24h,
     UiPrefsKeys.csvSeparator => Strings.csvSeparator,
+    UiPrefsKeys.dayStartMinutes => SettingsStrings.prefDayStart,
     _ => key,
   };
 
@@ -59,6 +61,7 @@ class UiPrefField extends StatelessWidget {
     UiPrefsKeys.haptics => SettingsStrings.prefHapticsHint,
     UiPrefsKeys.keepScreenOn => SettingsStrings.prefKeepScreenOnHint,
     UiPrefsKeys.use24h => SettingsStrings.prefUse24hHint,
+    UiPrefsKeys.dayStartMinutes => SettingsStrings.prefDayStartHint,
     _ => null,
   };
 
@@ -159,6 +162,19 @@ class UiPrefField extends StatelessWidget {
         divisions: _divisions(UiPrefs.minButtonScale, UiPrefs.maxButtonScale),
         onChanged: (v) => onChanged(prefs.copyWith(buttonScale: _snap(v))),
       ),
+      // Whole hours from midnight to noon.
+      UiPrefsKeys.dayStartMinutes => SliderSettingTile(
+        title: label,
+        caption: caption,
+        trailing: reset,
+        valueLabel: SettingsStrings.hourOfDay(prefs.dayStartMinutes),
+        value: prefs.dayStartMinutes / 60,
+        min: 0,
+        max: UiPrefs.maxDayStartMinutes / 60,
+        divisions: UiPrefs.maxDayStartMinutes ~/ 60,
+        onChanged: (v) =>
+            onChanged(prefs.copyWith(dayStartMinutes: v.round() * 60)),
+      ),
       UiPrefsKeys.showTenths => toggle(
         prefs.showTenths,
         (v) => prefs.copyWith(showTenths: v),
@@ -170,6 +186,10 @@ class UiPrefField extends StatelessWidget {
       UiPrefsKeys.showSubLine => toggle(
         prefs.showSubLine,
         (v) => prefs.copyWith(showSubLine: v),
+      ),
+      UiPrefsKeys.showEntryCounts => toggle(
+        prefs.showEntryCounts,
+        (v) => prefs.copyWith(showEntryCounts: v),
       ),
       UiPrefsKeys.leftHanded => toggle(
         prefs.leftHanded,

@@ -24,11 +24,13 @@ abstract final class UiPrefsKeys {
   static const showTenths = 'showTenths';
   static const showProgressBar = 'showProgressBar';
   static const showSubLine = 'showSubLine';
+  static const showEntryCounts = 'showEntryCounts';
   static const leftHanded = 'leftHanded';
   static const haptics = 'haptics';
   static const keepScreenOn = 'keepScreenOn';
   static const use24h = 'use24h';
   static const csvSeparator = 'csvSeparator';
+  static const dayStartMinutes = 'dayStartMinutes';
 
   static const all = [
     layout,
@@ -38,11 +40,13 @@ abstract final class UiPrefsKeys {
     showTenths,
     showProgressBar,
     showSubLine,
+    showEntryCounts,
     leftHanded,
     haptics,
     keepScreenOn,
     use24h,
     csvSeparator,
+    dayStartMinutes,
   ];
 }
 
@@ -56,21 +60,31 @@ final class UiPrefs {
     this.showTenths = false,
     this.showProgressBar = true,
     this.showSubLine = true,
+    this.showEntryCounts = false,
     this.leftHanded = false,
     this.haptics = true,
     this.keepScreenOn = false,
     this.use24h = true,
     this.csvSeparator = CsvSeparator.semicolon,
+    this.dayStartMinutes = defaultDayStartMinutes,
   });
 
   factory UiPrefs.fromJson(JsonMap json) => UiPrefs(
-    layout: _byName(LaneLayout.values, json[UiPrefsKeys.layout], LaneLayout.rows),
+    layout: _byName(
+      LaneLayout.values,
+      json[UiPrefsKeys.layout],
+      LaneLayout.rows,
+    ),
     density: _byName(
       UiDensity.values,
       json[UiPrefsKeys.density],
       UiDensity.normal,
     ),
-    digitScale: _scale(json[UiPrefsKeys.digitScale], minDigitScale, maxDigitScale),
+    digitScale: _scale(
+      json[UiPrefsKeys.digitScale],
+      minDigitScale,
+      maxDigitScale,
+    ),
     buttonScale: _scale(
       json[UiPrefsKeys.buttonScale],
       minButtonScale,
@@ -79,6 +93,7 @@ final class UiPrefs {
     showTenths: jsonBool(json[UiPrefsKeys.showTenths], false),
     showProgressBar: jsonBool(json[UiPrefsKeys.showProgressBar], true),
     showSubLine: jsonBool(json[UiPrefsKeys.showSubLine], true),
+    showEntryCounts: jsonBool(json[UiPrefsKeys.showEntryCounts], false),
     leftHanded: jsonBool(json[UiPrefsKeys.leftHanded], false),
     haptics: jsonBool(json[UiPrefsKeys.haptics], true),
     keepScreenOn: jsonBool(json[UiPrefsKeys.keepScreenOn], false),
@@ -88,9 +103,17 @@ final class UiPrefs {
       json[UiPrefsKeys.csvSeparator],
       CsvSeparator.semicolon,
     ),
+    dayStartMinutes: _dayStart(json[UiPrefsKeys.dayStartMinutes]),
   );
 
   static const defaults = UiPrefs();
+
+  /// A day starts at 06:00: what happens after midnight still belongs to
+  /// the evening before.
+  static const int defaultDayStartMinutes = 6 * 60;
+
+  /// The latest a day may start (12:00).
+  static const int maxDayStartMinutes = 12 * 60;
 
   static const double minDigitScale = 0.7;
   static const double maxDigitScale = 1.6;
@@ -109,12 +132,24 @@ final class UiPrefs {
   final bool showProgressBar;
   final bool showSubLine;
 
+  /// "×3" on the capture fields of the tap pad (how often today's
+  /// session has it). Off by default.
+  final bool showEntryCounts;
+
   /// Primary button on the left side of a lane.
   final bool leftHanded;
   final bool haptics;
   final bool keepScreenOn;
   final bool use24h;
   final CsvSeparator csvSeparator;
+
+  /// Minutes after midnight at which a day of the timeline starts.
+  final int dayStartMinutes;
+
+  static int _dayStart(Object? v) {
+    final minutes = v is num ? v.round() : defaultDayStartMinutes;
+    return minutes.clamp(0, maxDayStartMinutes);
+  }
 
   static T _byName<T extends Enum>(List<T> values, Object? name, T fallback) {
     for (final v in values) {
@@ -153,11 +188,13 @@ final class UiPrefs {
     bool? showTenths,
     bool? showProgressBar,
     bool? showSubLine,
+    bool? showEntryCounts,
     bool? leftHanded,
     bool? haptics,
     bool? keepScreenOn,
     bool? use24h,
     CsvSeparator? csvSeparator,
+    int? dayStartMinutes,
   }) => UiPrefs(
     layout: layout ?? this.layout,
     density: density ?? this.density,
@@ -170,11 +207,16 @@ final class UiPrefs {
     showTenths: showTenths ?? this.showTenths,
     showProgressBar: showProgressBar ?? this.showProgressBar,
     showSubLine: showSubLine ?? this.showSubLine,
+    showEntryCounts: showEntryCounts ?? this.showEntryCounts,
     leftHanded: leftHanded ?? this.leftHanded,
     haptics: haptics ?? this.haptics,
     keepScreenOn: keepScreenOn ?? this.keepScreenOn,
     use24h: use24h ?? this.use24h,
     csvSeparator: csvSeparator ?? this.csvSeparator,
+    dayStartMinutes: (dayStartMinutes ?? this.dayStartMinutes).clamp(
+      0,
+      maxDayStartMinutes,
+    ),
   );
 
   JsonMap toJson() => {
@@ -185,11 +227,13 @@ final class UiPrefs {
     UiPrefsKeys.showTenths: showTenths,
     UiPrefsKeys.showProgressBar: showProgressBar,
     UiPrefsKeys.showSubLine: showSubLine,
+    UiPrefsKeys.showEntryCounts: showEntryCounts,
     UiPrefsKeys.leftHanded: leftHanded,
     UiPrefsKeys.haptics: haptics,
     UiPrefsKeys.keepScreenOn: keepScreenOn,
     UiPrefsKeys.use24h: use24h,
     UiPrefsKeys.csvSeparator: csvSeparator.name,
+    UiPrefsKeys.dayStartMinutes: dayStartMinutes,
   };
 
   @override
