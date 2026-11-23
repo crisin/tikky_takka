@@ -24,13 +24,16 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="Tikky Takka">
-  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#161618">
 
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
   <title>Tikky Takka</title>
   <link rel="manifest" href="manifest.json">
+  <!-- Same color as the app background: no white flash while loading. -->
+  <style>html, body { margin: 0; background: #161618; }</style>
 </head>
 <body>
   <!--
@@ -42,5 +45,34 @@
     * https://docs.flutter.dev/platform-integration/web/initialization
   -->
   <script src="flutter_bootstrap.js" async></script>
+  <script>
+    // Offline support (web/sw.js). After loading, tell the worker which
+    // files this start used, so the CanvasKit variant this browser picked
+    // is cached as well.
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', async () => {
+        try {
+          await navigator.serviceWorker.register('sw.js');
+          const worker = (await navigator.serviceWorker.ready).active;
+          const report = () => worker && worker.postMessage({
+            type: 'cache',
+            urls: performance.getEntriesByType('resource')
+              .map((entry) => entry.name.split('#')[0])
+              .filter((url) => url.startsWith(location.origin)),
+          });
+          // CanvasKit and the database worker load after the page itself.
+          setTimeout(report, 5000);
+        } catch (error) {
+          console.warn('Service worker not registered:', error);
+        }
+      });
+    }
+    // Installed (home screen): ask the browser to keep the data. Granted
+    // without a prompt there; in a plain tab it could ask, so not there.
+    if (navigator.storage && navigator.storage.persist &&
+        matchMedia('(display-mode: standalone)').matches) {
+      navigator.storage.persist();
+    }
+  </script>
 </body>
 </html>

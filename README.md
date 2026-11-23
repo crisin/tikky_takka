@@ -52,16 +52,39 @@ Nach Änderungen am Datenbankschema (`lib/core/db/tables.dart`):
 dart run build_runner build --delete-conflicting-outputs
 ```
 
-## Web (auch zum Testen auf iPhone / Android)
+## Web und PWA (auch zum Testen auf iPhone / Android)
+
+Jeder Push auf `master` baut die Web-Version und stellt sie auf GitHub Pages
+(Workflow `pages.yml`): **https://crisin.github.io/tikky_takka/**
+
+Auf dem Handy installieren: Seite öffnen, dann auf dem iPhone in Safari
+„Teilen → Zum Home-Bildschirm“, auf Android in Chrome „App installieren“.
+Die installierte App läuft ohne Netz. Ein neuer Stand kommt beim übernächsten
+Start: Beim ersten Start lädt sie ihn im Hintergrund, beim zweiten ist er da.
+
+Offline-Betrieb: `web/sw.js` (Service Worker) speichert alle App-Dateien.
+`tools/web_pwa.dart` trägt nach dem Build Version und Dateiliste ein.
+CanvasKit liegt mit im Build (`--no-web-resources-cdn`), nicht auf Googles
+CDN. Flutters eigener Service Worker ist abgeschaltet
+(`web/flutter_bootstrap.js`).
+
+Lokal:
 
 ```
-flutter build web --release
-python -m http.server 5180 --bind 0.0.0.0 --directory build/web
+flutter build web --release --no-web-resources-cdn
+dart run tools/web_pwa.dart
+python tools/serve_web.py
 ```
 
 Dann im Browser `http://localhost:5180` – oder vom Handy im selben WLAN
 `http://<IP des PCs>:5180` (IP per `ipconfig`). Beim ersten Start fragt die
 Windows-Firewall nach, ob Python im privaten Netz lauschen darf: zulassen.
+Über `http://<IP>` gibt es keinen Service Worker und keine Installation (der
+Browser verlangt dafür HTTPS); dafür die Pages-Adresse nehmen.
+`tools/serve_web.py` statt `python -m http.server`: Unter Windows liefert
+Letzteres `.js` oft als `text/plain`, dann startet die App nicht. Wie auf
+Pages unter `/tikky_takka/` testen: mit `--base-href /tikky_takka/` bauen und
+`python tools/serve_web.py --base /tikky_takka/`.
 
 Die Datenbank läuft im Browser als SQLite-WebAssembly
 (`web/sqlite3.wasm`, `web/drift_worker.js`, beide eingecheckt). Nach einem
@@ -74,7 +97,9 @@ gh release download sqlite3-<version> -R simolus3/sqlite3.dart -p sqlite3.wasm -
 
 Im Web **nicht** verfügbar: Benachrichtigungen/Alarme bei geschlossener
 App, App-Sperre, Systemfarben. Daten bleiben pro Browser gespeichert
-(privater Modus oder „Websitedaten löschen“ verwirft sie).
+(privater Modus oder „Websitedaten löschen“ verwirft sie). Als installierte
+App fordert sie dauerhaften Speicher an. Im normalen Safari-Tab löscht iOS
+die Daten nach rund 7 Tagen ohne Besuch, als App vom Home-Bildschirm nicht.
 
 ## Auf echten Geräten testen
 

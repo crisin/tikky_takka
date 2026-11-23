@@ -47,7 +47,8 @@ flutter run -d windows
 flutter analyze
 flutter test
 dart run build_runner build --delete-conflicting-outputs   # nach Änderungen an lib/core/db/tables.dart
-flutter build web --release                                 # Web-Build nach build/web
+flutter build web --release --no-web-resources-cdn         # Web-Build nach build/web
+dart run tools/web_pwa.dart                                 # danach: Service Worker füllen
 ```
 
 `flutter analyze` und `flutter test` müssen sauber sein, bevor ein Commit
@@ -56,6 +57,6 @@ vorgeschlagen wird.
 ## Ansehen, was gebaut wurde
 
 Web-Build bei 375 × 812 mit dem passenden Entwurf vergleichen:
-`python -m http.server 5180 --bind 0.0.0.0 --directory build/web`, dann
-`http://localhost:5180`. Die Entwürfe selbst: `docs/design/entwuerfe/index.html`
+`python tools/serve_web.py`, dann `http://localhost:5180`. Gebaut und auf
+GitHub Pages gestellt wird bei jedem Push auf `master` (`pages.yml`). Die Entwürfe selbst: `docs/design/entwuerfe/index.html`
 im Browser öffnen.

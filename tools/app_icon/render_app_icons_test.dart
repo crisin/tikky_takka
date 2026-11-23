@@ -237,6 +237,8 @@ void main() {
         'web/icons/Icon-maskable-512.png',
         _render(512, motifScale: 0.75),
       );
+      // Home screen icon on iOS: full square, iOS rounds the corners.
+      await _write('web/icons/apple-touch-icon.png', _render(180));
 
       await _writeIco('windows/runner/resources/app_icon.ico', [
         16,
