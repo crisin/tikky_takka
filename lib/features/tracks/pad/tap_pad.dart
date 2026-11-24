@@ -16,6 +16,7 @@ import '../../../l10n/formatters.dart';
 import '../../../l10n/strings.dart';
 import '../../../theme/theme.dart';
 import '../../protocol/entry_edit_sheet.dart';
+import '../../protocol/protocol_filter.dart';
 import '../../protocol/protocol_logic.dart';
 import '../../protocol/protocol_widgets.dart';
 import '../lane_view.dart';
@@ -51,6 +52,9 @@ abstract final class PadKeys {
 
   /// The small line of a button.
   static Key sub(String id) => ValueKey('pad-sub-$id');
+
+  /// "×3" on a person tile while the board is narrowed to a thing.
+  static Key count(String id) => ValueKey('pad-count-$id');
 
   /// "Abstand: noch ..." on a substance button.
   static Key lockout(String id) => ValueKey('pad-lockout-$id');
@@ -519,11 +523,16 @@ class _TapPadState extends ConsumerState<TapPad>
     }
     _visible = buttons;
 
-    // The counts of today, only when they are shown (O5).
+    // The thing the board is narrowed to: it changes what the person
+    // tiles show, never where they are or what a tap does.
+    final filter = ref.watch(protocolFilterProvider(widget.setId));
+    final hasBoard = mainButtons.any((b) => b.kind == PadButtonKind.person);
+
+    // The counts of today, only when they are shown (O5, or narrowed).
     final dayStart = t.prefs.dayStartMinutes;
     final nowMs = ref.read(clockProvider).nowMs();
     final day = logicalDayOf(nowMs, dayStart);
-    final counts = t.prefs.showEntryCounts
+    final counts = t.prefs.showEntryCounts || filter != null
         ? entryCountsOfDay(
             ref
                     .watch(
@@ -559,7 +568,10 @@ class _TapPadState extends ConsumerState<TapPad>
         substance: substance,
         substances: substancesById,
         facts: facts,
-        count: padEntryCount(button, counts),
+        count: button.kind == PadButtonKind.person
+            ? (counts[button.personId] ?? const <String, int>{})[filter] ?? 0
+            : (t.prefs.showEntryCounts ? padEntryCount(button, counts) : 0),
+        onlySubstanceId: filter,
         shape:
             shape ??
             (activePage == null ? _TileShape.regular : _TileShape.large),
@@ -668,6 +680,10 @@ class _TapPadState extends ConsumerState<TapPad>
         children: [
           _bar(context, activePage),
           SizedBox(height: t.space.sm),
+          if (activePage == null && hasBoard) ...[
+            ProtocolFilterRow(setId: widget.setId),
+            SizedBox(height: t.space.sm),
+          ],
           if (activePage != null) ...[
             _PageHeader(
               person: personsById[activePage.personId],
@@ -1012,6 +1028,7 @@ class _PadTile extends ConsumerStatefulWidget {
     required this.substances,
     required this.facts,
     required this.count,
+    required this.onlySubstanceId,
     required this.shape,
     required this.hit,
     required this.shortcut,
@@ -1031,8 +1048,12 @@ class _PadTile extends ConsumerStatefulWidget {
   /// When each person last had each thing (person tiles, lockouts).
   final List<LastEntryFact> facts;
 
-  /// How often the person of a thing button had that thing today.
+  /// How often the person of a thing button had that thing today; on a
+  /// person tile: how often the thing the board is narrowed to.
   final int count;
+
+  /// The thing the board is narrowed to (person tiles), if any.
+  final String? onlySubstanceId;
   final _TileShape shape;
 
   /// Just written: "eingetragen".
@@ -1339,10 +1360,19 @@ class _PadTileState extends ConsumerState<_PadTile> {
     final lockouts = ref.watch(lockoutsProvider);
     final substances = widget.substances;
     final facts = widget.facts;
+    final only = widget.onlySubstanceId;
     PadPersonFace face(int nowMs) => padPersonFace(
-      personStand(personId, facts, nowMs, lockoutMsBySubstance: lockouts),
+      personStand(
+        personId,
+        facts,
+        nowMs,
+        lockoutMsBySubstance: lockouts,
+        onlySubstanceId: only,
+      ),
       substances,
+      onlySubstanceId: only,
     );
+    final count = widget.count;
     return NowSelector<PadPersonFace>(
       enabled: padLatestFact(personId, facts) != null,
       selector: face,
@@ -1373,7 +1403,17 @@ class _PadTileState extends ConsumerState<_PadTile> {
                 style: t.text.padInitial,
               ),
               SizedBox(width: t.space.md),
-              Flexible(child: _name(t, paint, title)),
+              Expanded(child: _name(t, paint, title)),
+              // Narrowed to a thing: how often today.
+              if (only != null && count > 0) ...[
+                SizedBox(width: t.space.sm),
+                Text(
+                  TracksStrings.padCount(count),
+                  key: PadKeys.count(button.id),
+                  style: t.text.padCount.copyWith(color: paint.ink),
+                  maxLines: 1,
+                ),
+              ],
             ],
           ),
           bottom: Column(

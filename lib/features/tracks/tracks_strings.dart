@@ -224,6 +224,9 @@ abstract final class TracksStrings {
   static const padNoEntry = '–';
   static const padNothingYet = 'noch kein Eintrag';
 
+  /// A person who never had the thing the board is narrowed to.
+  static String padNothingOf(String thing) => '$thing: noch nichts';
+
   /// "seit Bier"
   static String padSinceThing(String thing) => 'seit $thing';
 

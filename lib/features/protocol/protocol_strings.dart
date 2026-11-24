@@ -33,6 +33,13 @@ abstract final class ProtocolStrings {
   static const scene = 'Szene';
   static const sceneEdit = 'Szene bearbeiten';
 
+  // ----------------------------------------------------------------- filter
+  static const filterAll = 'Alles';
+  static const filterAllSemantics = 'Alles zeigen';
+
+  /// Semantic label of a filter chip.
+  static String filterOnly(String thing) => 'Nur $thing zeigen';
+
   /// "Wasser entfernt"
   static String sceneRemoved(String name) => '$name entfernt';
   static const sceneLongPress =

@@ -6,6 +6,7 @@ import 'package:tikky_takka/core/domain/domain.dart';
 import 'package:tikky_takka/core/engine/engine.dart';
 import 'package:tikky_takka/core/repo/repo.dart';
 import 'package:tikky_takka/features/protocol/entry_edit_sheet.dart';
+import 'package:tikky_takka/features/protocol/protocol_filter.dart';
 import 'package:tikky_takka/features/protocol/protocol_strings.dart';
 import 'package:tikky_takka/features/tracks/pad/pad_model.dart';
 import 'package:tikky_takka/features/tracks/pad/tap_pad.dart';
@@ -1028,6 +1029,74 @@ void main() {
       await h.press(h.button(gbl));
       expect(await p.entries(h), hasLength(2));
       expect(find.byType(AlertDialog), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('the filter narrows what the tiles show: it moves nothing, '
+        'writes nothing, and the timeline shares it', (tester) async {
+      final h = await TracksHarness.start(tester);
+      final p = await _Protocol.create(h, scenePersons: ['Kim', 'Jacke']);
+      await h.run(() => h.entry(personId: p.kim.id, substanceId: p.gbl.id));
+      await h.run(() => h.entry(personId: p.jacke.id, substanceId: p.water.id));
+      await h.showPad();
+      await h.drain();
+      final kim = p.person(p.kim);
+      final jacke = p.person(p.jacke);
+
+      expect(find.byKey(ProtocolFilterKeys.row), findsOneWidget);
+      expect(h.sub(kim), TracksStrings.padSinceThing('GBL'));
+      expect(find.byKey(PadKeys.count(jacke)), findsNothing);
+      final places = {
+        for (final id in [kim, jacke]) id: tester.getRect(h.button(id)),
+      };
+
+      // Only water: Kim never had any, Jacke once today.
+      await h.press(find.byKey(ProtocolFilterKeys.thing(p.water.id)));
+      expect(h.value(kim), TracksStrings.padNoEntry);
+      expect(h.sub(kim), TracksStrings.padNothingOf('Wasser'));
+      expect(h.sub(jacke), TracksStrings.padSinceThing('Wasser'));
+      expect(
+        tester.widget<Text>(find.byKey(PadKeys.count(jacke))).data,
+        TracksStrings.padCount(1),
+      );
+      for (final id in [kim, jacke]) {
+        expect(tester.getRect(h.button(id)), places[id]);
+      }
+      expect(await p.entries(h), hasLength(2));
+
+      // A tap on a person still opens "Was?" and writes nothing.
+      await h.press(h.button(kim));
+      expect(find.byKey(PadKeys.back), findsOneWidget);
+      expect(h.button(p.substance(p.kim, p.gbl)), findsOneWidget);
+      expect(await p.entries(h), hasLength(2));
+      await h.press(find.byKey(PadKeys.back));
+
+      // The timeline is narrowed to the same thing.
+      expect(
+        h.container.read(protocolFilterProvider(h.activeSet.id)),
+        p.water.id,
+      );
+      await h.run(
+        () => h.container
+            .read(tracksViewsProvider.notifier)
+            .show(h.activeSet.id, TracksView.timeline),
+      );
+      await h.drain();
+      expect(
+        tester
+            .widget<FilterChip>(
+              find.byKey(ProtocolFilterKeys.thing(p.water.id)),
+            )
+            .selected,
+        isTrue,
+      );
+      await h.press(find.byKey(ProtocolFilterKeys.thing(p.water.id)));
+      expect(h.container.read(protocolFilterProvider(h.activeSet.id)), isNull);
+
+      // Back on the board everything is shown again.
+      await h.showPad();
+      await h.drain();
+      expect(h.sub(kim), TracksStrings.padSinceThing('GBL'));
       expect(tester.takeException(), isNull);
     });
   });

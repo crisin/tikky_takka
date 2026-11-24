@@ -566,15 +566,21 @@ int padEntryCount(PadButton button, Map<String, Map<String, int>> counts) =>
 typedef PadPersonFace = ({String digits, String line, bool warn, bool any});
 
 /// The face of a person tile for [stand] (see [personStand]).
+///
+/// [onlySubstanceId]: the thing the board is narrowed to, if any.
 PadPersonFace padPersonFace(
   PersonStand stand,
-  Map<String, Substance> substances,
-) {
+  Map<String, Substance> substances, {
+  String? onlySubstanceId,
+}) {
   final since = stand.sinceMs;
   if (since == null) {
+    final only = substances[onlySubstanceId]?.name;
     return (
       digits: TracksStrings.padNoEntry,
-      line: TracksStrings.padNothingYet,
+      line: only == null
+          ? TracksStrings.padNothingYet
+          : TracksStrings.padNothingOf(only),
       warn: false,
       any: false,
     );

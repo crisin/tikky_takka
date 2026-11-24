@@ -11,6 +11,7 @@ import '../../../l10n/formatters.dart';
 import '../../../l10n/strings.dart';
 import '../../../theme/theme.dart';
 import '../../protocol/entry_edit_sheet.dart';
+import '../../protocol/protocol_filter.dart';
 import '../../protocol/protocol_widgets.dart';
 import '../now_selector.dart';
 import '../tracks_strings.dart';
@@ -126,8 +127,6 @@ class _TimelineViewState extends ConsumerState<TimelineView> {
   /// `null` = the one going on now.
   LocalDay? _day;
 
-  /// What the month counts; `null` = everything.
-  String? _monthThing;
   bool _newestFirst = true;
   bool _showLifecycle = false;
   final Set<String> _hiddenTracks = {};
@@ -173,6 +172,10 @@ class _TimelineViewState extends ConsumerState<TimelineView> {
   ) {
     final dayStart = t.prefs.dayStartMinutes;
     final choices = ref.read(timelineChoicesProvider.notifier);
+    // The protocol and the thing it is narrowed to (shared with the board).
+    final hasProtocol = tracks.any(isProtocolLane);
+    final filter = ref.watch(protocolFilterProvider(widget.setId));
+    final monthThing = filter == null ? null : 's:$filter';
     final day = _day ?? today;
     final level = choice.level;
     final evening = level == TimelineLevel.evening;
@@ -208,6 +211,25 @@ class _TimelineViewState extends ConsumerState<TimelineView> {
       padding: EdgeInsets.symmetric(horizontal: t.space.page),
       child: Row(
         children: [
+          // The things of the scene: one narrows the protocol to itself,
+          // here and on the board alike. The month has its own row.
+          if (hasProtocol && level != TimelineLevel.month)
+            for (final s in protocolFilterThings(
+              ref.watch(setProvider(widget.setId)),
+              ref.watch(substancesByIdProvider),
+              filter,
+            )) ...[
+              FilterChip(
+                key: ProtocolFilterKeys.thing(s.id),
+                avatar: ColorDot(color: Color(s.color)),
+                label: Text(s.name),
+                selected: filter == s.id,
+                onSelected: (on) => ref
+                    .read(protocolFiltersProvider.notifier)
+                    .choose(widget.setId, on ? s.id : null),
+              ),
+              SizedBox(width: t.space.sm),
+            ],
           // Start and stop are only drawn in "Jetzt" and in the list.
           if (level == TimelineLevel.now || compact)
             FilterChip(
@@ -319,7 +341,7 @@ class _TimelineViewState extends ConsumerState<TimelineView> {
         );
       case TimelineLevel.month:
         final substances = ref.watch(substancesByIdProvider);
-        final thing = _monthThing;
+        final thing = monthThing;
         head = _PeriodRow(
           title: Fmt.monthYear(month),
           caption: Text(
@@ -368,8 +390,16 @@ class _TimelineViewState extends ConsumerState<TimelineView> {
               toMs: to,
               monday: monday,
               month: month,
-              monthThing: _monthThing,
-              onMonthThing: (thing) => setState(() => _monthThing = thing),
+              thing: filter,
+              monthThing: monthThing,
+              onMonthThing: (key) => ref
+                  .read(protocolFiltersProvider.notifier)
+                  .choose(
+                    widget.setId,
+                    key != null && key.startsWith('s:')
+                        ? key.substring(2)
+                        : null,
+                  ),
               onDay: openEvening,
               newestFirst: _newestFirst,
               showLifecycle: _showLifecycle,
@@ -509,6 +539,7 @@ class _TimelineBody extends ConsumerWidget {
     required this.toMs,
     required this.monday,
     required this.month,
+    required this.thing,
     required this.monthThing,
     required this.onMonthThing,
     required this.onDay,
@@ -519,6 +550,9 @@ class _TimelineBody extends ConsumerWidget {
 
   final LocalDay monday;
   final LocalDay month;
+
+  /// The thing the protocol is narrowed to (a substance id), if any.
+  final String? thing;
   final String? monthThing;
   final ValueChanged<String?> onMonthThing;
   final ValueChanged<LocalDay> onDay;
@@ -538,7 +572,27 @@ class _TimelineBody extends ConsumerWidget {
     final async = ref.watch(
       timelineActivityProvider((setId: setId, from: fromMs, to: toMs)),
     );
-    final sessions = async.value;
+    final all = async.value;
+    final only = thing;
+    // Narrowed to a thing: only its entries (the month counts by itself).
+    final sessions = all == null || only == null || level == TimelineLevel.month
+        ? all
+        : [
+            for (final s in all)
+              if (!isProtocolLane(s.track))
+                s
+              else
+                HistorySession(
+                  session: s.session,
+                  events: [
+                    for (final e in s.events)
+                      if (e.substanceId == only) e,
+                  ],
+                  summary: s.summary,
+                  track: s.track,
+                  set: s.set,
+                ),
+          ];
     if (sessions == null) {
       return async.hasError
           ? AdaptiveEmptyState(
