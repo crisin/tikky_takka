@@ -35,6 +35,7 @@ class ExportServiceImpl implements ExportService {
     required this._history,
     required this._backup,
     required this._people,
+    required this._entries,
     required this._settings,
     required this._clock,
     ExportDelivery? delivery,
@@ -47,6 +48,7 @@ class ExportServiceImpl implements ExportService {
         history: ref.watch(historyRepositoryProvider),
         backup: ref.watch(backupRepositoryProvider),
         people: ref.watch(peopleRepositoryProvider),
+        entries: ref.watch(entryRepositoryProvider),
         settings: ref.watch(settingsStoreProvider),
         clock: ref.watch(clockProvider),
         delivery: delivery,
@@ -55,16 +57,36 @@ class ExportServiceImpl implements ExportService {
   final HistoryRepository _history;
   final BackupRepository _backup;
   final PeopleRepository _people;
+  final EntryRepository _entries;
   final SettingsStore _settings;
   final Clock _clock;
   final ExportDelivery _delivery;
 
   /// The sessions an export covers: the active filter, with the protocol
   /// decision taken from the explicit opt-in and nothing else.
-  Future<List<HistorySession>> _sessions(ExportOptions options) =>
-      _history.getSessions(
-        options.filter.copyWith(includeProtocol: options.includeProtocol),
-      );
+  /// The sessions of the tracks. With [withEntries] and the explicit
+  /// opt-in the entries of the protocol follow as one more session
+  /// ([entriesAsSession]) - for the list of events only: the protocol has
+  /// no sessions, so the list of sessions never names it.
+  Future<List<HistorySession>> _sessions(
+    ExportOptions options, {
+    bool withEntries = false,
+  }) async {
+    final filter = options.filter;
+    final sessions = await _history.getSessions(
+      filter.copyWith(includeProtocol: false),
+    );
+    if (!withEntries || !options.includeProtocol) return sessions;
+    // Entries belong to persons, not to tracks or sets: a filter by set
+    // or track asks for something else.
+    if (filter.trackIds.isNotEmpty || filter.setId != null) return sessions;
+    final entries = await _entries.getRange(
+      filter.fromMs ?? -(1 << 62),
+      filter.toMs ?? 1 << 62,
+    );
+    final protocol = entriesAsSession('', entries, _clock.nowMs());
+    return [...sessions, ?protocol];
+  }
 
   ExportFile _file(ExportKind kind, Uint8List bytes) => ExportFile(
     fileName: ExportFormat.fileName(kind, _clock.nowMs()),
@@ -87,7 +109,7 @@ class ExportServiceImpl implements ExportService {
 
   @override
   Future<ExportFile> buildEventsCsv(ExportOptions options) async {
-    final sessions = await _sessions(options);
+    final sessions = await _sessions(options, withEntries: true);
     // Names are only needed (and only read) when protocol tracks are part
     // of the export.
     var personNames = const <String, String>{};

@@ -1,20 +1,23 @@
-import '../../../core/domain/domain.dart';
-import '../../../core/engine/engine.dart';
-import '../tracks_strings.dart';
+import '../../l10n/strings.dart';
+import '../domain/domain.dart';
+import 'history_math.dart';
+import 'summary.dart';
+import 'timeline.dart';
 
-// The timeline draws lanes of tracks, each with its sessions and events.
-// The protocol is no longer a track: its entries belong to persons. For the
-// timeline they are shown as ONE lane ("Protokoll") with one open session,
-// built here from the entries - nothing of it is stored.
+// The timeline and the exports work on tracks, each with its sessions and
+// events. The protocol is no longer a track: its entries belong to persons.
+// Where it has to appear among the tracks it is shown as ONE lane
+// ("Protokoll") with one open session, built here from the entries.
+// Nothing of it is stored.
 
-/// Id of the protocol lane of the timeline, and of its session.
+/// Id of the protocol lane, and of its session.
 const String protocolLaneId = 'protocol';
 
-/// The lane of the timeline that carries the entries of the protocol.
+/// The lane that carries the entries of the protocol.
 Track protocolLane(String setId) => Track(
   id: protocolLaneId,
   setId: setId,
-  name: TracksStrings.protocolLaneName,
+  name: Strings.modeName(TrackMode.protocol),
   config: const ProtocolConfig(),
 );
 

@@ -46,6 +46,7 @@ class ExportEnv {
       history: env.history,
       backup: env.backup,
       people: env.people,
+      entries: env.entries,
       settings: settings,
       clock: env.clock,
       delivery: delivery,
@@ -88,25 +89,17 @@ Future<String> _stopwatchRun(TestEnv e, Track track) async {
   return (await e.commands.stopTrack(track.id))!;
 }
 
-/// A protocol session with one entry (Alex, Wasser, "0,5 l").
-Future<Track> _protocolRun(TestEnv e, TrackSet set) async {
-  final track = await e.makeTrack(
-    set,
-    const ProtocolConfig(),
-    name: 'Protokoll',
-  );
+/// One protocol entry (Alex, Wasser, "0,5 l").
+Future<void> _protocolRun(TestEnv e, TrackSet set) async {
   final alex = await e.people.createPerson(name: 'Alex');
   final water = await e.people.createSubstance(name: 'Wasser');
-  await e.commands.addEntry(
-    track.id,
+  await e.entries.add(
     personId: alex.id,
     substanceId: water.id,
     amount: '0,5 l',
     note: 'nach dem Tanzen',
   );
   e.clock.advanceMs(min);
-  await e.commands.stopTrack(track.id);
-  return track;
 }
 
 void main() {
@@ -506,10 +499,9 @@ void main() {
     });
   });
 
-  group('protocol tracks', () {
+  group('the protocol', () {
     late TrackSet set;
     late Track stopwatch;
-    late Track protocol;
 
     setUp(() async {
       set = await e.makeSet('Festival');
@@ -519,7 +511,7 @@ void main() {
         name: 'Arbeit',
       );
       await _stopwatchRun(e, stopwatch);
-      protocol = await _protocolRun(e, set);
+      await _protocolRun(e, set);
     });
 
     test('are excluded from both CSV files by default', () async {
@@ -536,9 +528,9 @@ void main() {
       }
     });
 
-    test('stay excluded even when the filter names the track', () async {
+    test('stays excluded even when the filter names its lane', () async {
       final options = ExportOptions(
-        filter: HistoryFilter(trackIds: {protocol.id}),
+        filter: HistoryFilter(trackIds: {protocolLaneId}),
       );
       expect(
         _decode(await x.service.buildSessionsCsv(options), ';'),
@@ -558,9 +550,8 @@ void main() {
     test('are included in the CSV files with the explicit opt-in', () async {
       const options = ExportOptions(includeProtocol: true);
       final sessions = _decode(await x.service.buildSessionsCsv(options), ';');
-      expect(sessions.skip(1).map((r) => r[1]), ['Arbeit', 'Protokoll']);
-      expect(sessions[2][2], 'Protokoll');
-      expect(sessions[2][8], '1', reason: 'one entry');
+      // The protocol has no sessions: it is in the list of events only.
+      expect(sessions.skip(1).map((r) => r[1]), ['Arbeit']);
 
       final events = _decode(await x.service.buildEventsCsv(options), ';');
       final entry = events.singleWhere((r) => r[5] == 'Eintrag');
@@ -583,6 +574,7 @@ void main() {
       ]);
       expect(json['persons'], isEmpty);
       expect(json['substances'], isEmpty);
+      expect(json['entries'], isEmpty);
       expect((json['sessions'] as List).map((s) => (s as Map)['trackId']), [
         stopwatch.id,
       ]);
@@ -599,14 +591,13 @@ void main() {
         const ExportOptions(includeProtocol: true),
       );
       final json = jsonDecode(_text(file)) as Map<String, dynamic>;
-      expect(json['tracks'], hasLength(2));
+      // The protocol is no track and no session: it is its entries.
+      expect(json['tracks'], hasLength(1));
       expect(json['persons'], hasLength(1));
       expect(json['substances'], hasLength(1));
-      expect(json['sessions'], hasLength(2));
-      expect(
-        (json['events'] as List).map((ev) => (ev as Map)['type']),
-        contains('entry'),
-      );
+      expect(json['sessions'], hasLength(1));
+      expect(json['entries'], hasLength(1));
+      expect(((json['entries'] as List).single as Map)['amount'], '0,5 l');
     });
   });
 
@@ -636,6 +627,7 @@ void main() {
         'tracks': sorted(data.tracks.map((t) => t.toJson())),
         'sessions': sorted(data.sessions.map((s) => s.toJson())),
         'events': sorted(data.events.map((ev) => ev.toJson())),
+        'entries': sorted(data.entries.map((en) => en.toJson())),
         'persons': sorted(data.persons.map((p) => p.toJson())),
         'substances': sorted(data.substances.map((s) => s.toJson())),
       };
@@ -676,8 +668,9 @@ void main() {
       final report = await y.service.importJsonBackup(_text(file));
 
       expect(report.inserted['sets'], 1);
-      expect(report.inserted['tracks'], 4);
-      expect(report.inserted['sessions'], 4);
+      expect(report.inserted['tracks'], 3);
+      expect(report.inserted['sessions'], 3);
+      expect(report.inserted['entries'], 1);
       expect(report.inserted['persons'], 1);
       expect(report.inserted['substances'], 1);
       expect(report.updatedTotal, 0);

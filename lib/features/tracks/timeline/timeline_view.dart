@@ -19,7 +19,6 @@ import 'evening/evening_view.dart';
 import 'period/month_view.dart';
 import 'period/period_things.dart';
 import 'period/week_view.dart';
-import 'protocol_bridge.dart';
 import 'strip/strip_view.dart';
 import 'timeline_event_sheet.dart';
 import 'timeline_logic.dart';

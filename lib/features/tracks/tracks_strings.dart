@@ -241,9 +241,6 @@ abstract final class TracksStrings {
   static const emptyStartBody =
       'Lege eine Spur an – oder starte ein Protokoll: wer hatte wann was.';
 
-  /// Name of the lane that carries the protocol in the timeline.
-  static const protocolLaneName = 'Protokoll';
-
   /// "zuletzt Bier · vor 26 min"
   static String padLastOf(String thing, String ago) => 'zuletzt $thing · $ago';
   static String padMoreSemantics(String track) =>

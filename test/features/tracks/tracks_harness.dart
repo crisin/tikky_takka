@@ -6,7 +6,6 @@ import 'package:tikky_takka/core/engine/engine.dart';
 import 'package:tikky_takka/core/repo/repo.dart';
 import 'package:tikky_takka/features/tracks/lane_view.dart';
 import 'package:tikky_takka/features/tracks/ring_monitor.dart';
-import 'package:tikky_takka/features/tracks/timeline/protocol_bridge.dart';
 import 'package:tikky_takka/features/tracks/track_lane.dart';
 import 'package:tikky_takka/features/tracks/tracks_screen.dart';
 import 'package:tikky_takka/l10n/strings.dart';

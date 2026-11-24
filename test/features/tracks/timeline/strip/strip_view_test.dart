@@ -7,7 +7,7 @@ import 'package:tikky_takka/adaptive/adaptive.dart';
 import 'package:tikky_takka/core/domain/domain.dart';
 import 'package:tikky_takka/core/repo/repo.dart';
 import 'package:tikky_takka/features/tracks/timeline/evening/evening_view.dart';
-import 'package:tikky_takka/features/tracks/timeline/protocol_bridge.dart';
+import 'package:tikky_takka/core/engine/engine.dart';
 import 'package:tikky_takka/features/tracks/timeline/strip/strip_detail.dart';
 import 'package:tikky_takka/features/tracks/timeline/strip/strip_model.dart';
 import 'package:tikky_takka/features/tracks/timeline/strip/strip_view.dart';
