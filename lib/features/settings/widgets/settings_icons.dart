@@ -25,6 +25,10 @@ abstract final class SettingsIcons {
       _pick(c, Icons.info_outline_rounded, CupertinoIcons.info);
   static IconData diagnostics(BuildContext c) =>
       _pick(c, Icons.bug_report_outlined, CupertinoIcons.ant);
+  static IconData developer(BuildContext c) =>
+      _pick(c, Icons.terminal_rounded, CupertinoIcons.hammer);
+  static IconData refresh(BuildContext c) =>
+      _pick(c, Icons.refresh_rounded, CupertinoIcons.refresh);
   static IconData alarmTest(BuildContext c) =>
       _pick(c, Icons.alarm_add_outlined, CupertinoIcons.alarm);
   static IconData copy(BuildContext c) =>

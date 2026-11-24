@@ -196,4 +196,97 @@ abstract final class SettingsStrings {
   static const diagCopy = 'Bericht kopieren';
   static const diagCopied = 'Bericht kopiert';
   static const diagClear = 'Fehler leeren';
+
+  // -------------------------------------------------------------- developer
+  static const dev = 'Entwickler';
+  static const devHint = 'Offline-Cache, Daten, Leistung, Zurücksetzen.';
+  static const devPwa = 'Offline (PWA)';
+  static const devPwaFooter =
+      'Die App-Dateien liegen im Cache des Browsers, damit sie ohne Netz '
+      'startet. Eine neue Version gilt ab dem nächsten Start.';
+  static const devWorker = 'Service Worker';
+  static const devWorkerActive = 'Aktiv';
+  static const devWorkerNone = 'Nicht registriert';
+  static const devWorkerUnsupported = 'Nicht verfügbar';
+  static const devControlled = 'Seite kommt vom Worker';
+  static const devInstalled = 'Installiert';
+  static const devOnline = 'Online';
+  static const devPersisted = 'Speicher dauerhaft';
+  static const devUsage = 'Belegt';
+  static const devCachedVersion = 'Version im Cache';
+  static const devCaches = 'Dateien im Cache';
+  static const devNoCaches = 'Kein Cache vorhanden.';
+  static const devCheckUpdate = 'Nach Update suchen';
+  static const devUpdateFound =
+      'Neue Version geladen. Gilt ab dem nächsten Start.';
+  static const devUpdateNone = 'Kein Update gefunden.';
+  static const devUpdateFailed = 'Update-Suche fehlgeschlagen.';
+  static const devClearCache = 'Offline-Cache neu laden';
+  static const devClearCacheHint =
+      'Löscht die App-Dateien im Cache und lädt neu. Deine Daten bleiben.';
+  static const devNeedsNetwork = 'Das geht nur mit Internet.';
+  static const devData = 'Daten';
+  static const devDbSize = 'Datenbank';
+  static const devEvents = 'Ereignisse';
+  static const devSessions = 'Sitzungen';
+  static const devTracks = 'Spuren';
+  static const devSettingsRows = 'Einstellungen';
+  static const devPerf = 'Leistung';
+  static const devStartup = 'Start bis erstes Bild';
+  static const devFrames = 'Gemessene Bilder';
+  static const devBuild = 'Aufbau (Ø)';
+  static const devRaster = 'Zeichnen (Ø)';
+  static const devWorst = 'Längstes Bild';
+  static const devSlow = 'Zu langsam';
+  static const devMemory = 'Arbeitsspeicher';
+  static const devPerfReset = 'Messung neu starten';
+  static const devUnknown = '–';
+
+  /// Footer of the performance section.
+  static String devPerfFooter(int capacity, double budgetMs) =>
+      'Die letzten $capacity Bilder seit dem Start. Zu langsam heißt: länger '
+      'als ${DevFormat.ms(budgetMs)}.';
+
+  static const devReset = 'Zurücksetzen';
+  static const devResetApp = 'App zurücksetzen';
+  static const devResetHint = 'Löscht alle Daten und Einstellungen.';
+  static const devResetTitle = 'Wirklich alles löschen?';
+  static const devResetMessage =
+      'Alle Spuren, Verläufe, Personen, Designs und Einstellungen werden '
+      'gelöscht. Das lässt sich nicht rückgängig machen. Sichere vorher '
+      'unter „Daten exportieren“, was du behalten willst.';
+  static const devResetConfirm = 'Alles löschen';
+  static const devResetDone = 'App zurückgesetzt';
+  static const devResetFailed = 'Zurücksetzen fehlgeschlagen.';
+
+  /// "42 Dateien · 3,1 MB"
+  static String devCacheSummary(int files, int bytes) =>
+      '$files ${files == 1 ? 'Datei' : 'Dateien'} · ${DevFormat.bytes(bytes)}';
+
+  /// "3,2 MB von 2,0 GB"
+  static String devUsageOf(int used, int quota) =>
+      '${DevFormat.bytes(used)} von ${DevFormat.bytes(quota)}';
+
+  /// "4 von 600"
+  static String devCountOf(int part, int whole) => '$part von $whole';
+}
+
+/// Number formats of the developer page (German decimal comma).
+abstract final class DevFormat {
+  /// "812 B", "14 KB", "3,2 MB", "2,0 GB"
+  static String bytes(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).round()} KB';
+    if (bytes < 1024 * 1024 * 1024) {
+      return '${_fixed(bytes / (1024 * 1024))} MB';
+    }
+    return '${_fixed(bytes / (1024 * 1024 * 1024))} GB';
+  }
+
+  /// "4,2 ms"; from 100 ms on without decimals.
+  static String ms(double value) =>
+      value >= 100 ? '${value.round()} ms' : '${_fixed(value)} ms';
+
+  static String _fixed(double value) =>
+      value.toStringAsFixed(1).replaceAll('.', ',');
 }

@@ -8,6 +8,7 @@ import '../../l10n/strings.dart';
 import '../../theme/theme.dart';
 import 'data_actions.dart';
 import 'default_tiles.dart';
+import 'dev_screen.dart';
 import 'diagnostics_screen.dart';
 import 'display_settings_screen.dart';
 import 'set_overrides_screen.dart';
@@ -353,6 +354,16 @@ class _AboutSection extends StatelessWidget {
           onTap: () => pushAdaptivePage<void>(
             context,
             builder: (_) => DiagnosticsScreen(version: version),
+          ),
+        ),
+        AdaptiveTile(
+          key: const ValueKey('settings.dev'),
+          leading: Icon(SettingsIcons.developer(context)),
+          title: SettingsStrings.dev,
+          subtitle: SettingsStrings.devHint,
+          onTap: () => pushAdaptivePage<void>(
+            context,
+            builder: (_) => const DevScreen(),
           ),
         ),
         AdaptiveTile(

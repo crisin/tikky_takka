@@ -11,6 +11,8 @@ import 'app_wiring.dart';
 import 'core/db/app_database.dart';
 import 'core/repo/settings_store.dart';
 import 'core/services/alarms/alarms.dart';
+import 'core/services/dev/dev_tools.dart';
+import 'core/services/dev/frame_stats.dart';
 import 'core/services/diagnostics_log.dart';
 import 'core/services/lock_service.dart';
 import 'core/services/lock_service_impl.dart';
@@ -20,6 +22,7 @@ import 'theme/bundled_fonts.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   _recordErrors(DiagnosticsLog.instance);
+  _measure(FrameStats.instance);
   registerFontLicenses();
   // Draw behind the system bars (Android); a no-op elsewhere.
   unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
@@ -37,6 +40,19 @@ Future<void> main() async {
       child: const TikkyApp(),
     ),
   );
+}
+
+/// Frame times and the time to the first frame, for the developer page in
+/// the settings.
+void _measure(FrameStats stats) {
+  final sinceMain = Stopwatch()..start();
+  stats.attach();
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    // On the web the page's clock: it includes loading the app itself.
+    stats.startupMs =
+        platformDevTools().pageClockMs()?.round() ??
+        sinceMain.elapsedMilliseconds;
+  });
 }
 
 /// Uncaught errors also go to the diagnostics page in the settings (on a

@@ -107,7 +107,9 @@ Kurzfassung: GitHub Actions baut die nativen Apps (`.github/workflows/apps.yml`)
 ein Mac ist nicht nötig. iOS geht über TestFlight, Android als APK. Was
 auf dem Gerät zu prüfen ist: [docs/GERAETETEST.md](docs/GERAETETEST.md).
 In der App hilft **Einstellungen → Diagnose** (Berechtigungen, Test-Alarm,
-Fehler dieser Sitzung zum Kopieren).
+Fehler dieser Sitzung zum Kopieren) und **Einstellungen → Entwickler**
+(Service Worker und Dateien im Offline-Cache, Update suchen, Cache neu
+laden, Zeilen je Tabelle, Bildzeiten, App zurücksetzen).
 
 Bei jedem Push auf `master` laufen:
 
