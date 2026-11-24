@@ -172,9 +172,23 @@ class EntryRepository {
 
   /// Distinct amounts the user typed for [substanceId] before, newest
   /// first. Always the user's own inputs, never values from the app.
-  Future<List<String>> getAmounts(String substanceId, {int limit = 6}) async {
+  ///
+  /// [exceptId]: the entry that is being edited never suggests its own
+  /// amount.
+  Future<List<String>> getAmounts(
+    String substanceId, {
+    String? exceptId,
+    int limit = 6,
+  }) async {
     final query = _db.select(_db.entries)
-      ..where((e) => e.substanceId.equals(substanceId) & e.amount.isNotNull())
+      ..where(
+        (e) =>
+            e.substanceId.equals(substanceId) &
+            e.amount.isNotNull() &
+            (exceptId == null
+                ? const Constant(true)
+                : e.id.equals(exceptId).not()),
+      )
       ..orderBy([(e) => OrderingTerm.desc(e.at)])
       ..limit(200);
     final seen = <String>{};

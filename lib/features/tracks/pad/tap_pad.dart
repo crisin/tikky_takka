@@ -15,6 +15,7 @@ import '../../../core/services/haptics.dart';
 import '../../../l10n/formatters.dart';
 import '../../../l10n/strings.dart';
 import '../../../theme/theme.dart';
+import '../../protocol/entry_edit_sheet.dart';
 import '../../protocol/protocol_logic.dart';
 import '../../protocol/protocol_widgets.dart';
 import '../lane_view.dart';
@@ -32,6 +33,9 @@ abstract final class PadKeys {
 
   /// "zuletzt Bier · vor 26 min" under the name on the page "Was?".
   static const last = ValueKey('pad-last');
+
+  /// The tappable line around [last]: "Ändern" of the last entry.
+  static const editLast = ValueKey('pad-edit-last');
   static const scroll = ValueKey('pad-scroll');
 
   /// The page "Anderes" and its field for a new substance.
@@ -350,7 +354,62 @@ class _TapPadState extends ConsumerState<TapPad>
 
   /// "Ändern": the entry that was just written, with time, amount and
   /// note.
-  Future<void> _edit() async {}
+  Future<void> _edit() async {
+    final entry = _last?.entry;
+    if (entry != null) await _openEdit(entry, fresh: true);
+  }
+
+  /// "zuletzt Bier · vor 26 min" on the page "Was?": the last entry of
+  /// that person stays within reach after the bar is gone.
+  Future<void> _editLast(String personId) async {
+    unawaited(ref.read(hapticsProvider).selection());
+    final entry = await ref
+        .read(entryRepositoryProvider)
+        .lastOfPerson(personId);
+    if (entry != null && mounted) await _openEdit(entry, fresh: false);
+  }
+
+  /// Opens "Ändern" for [entry]. Afterwards the bar shows the entry as it
+  /// is now: "Rückgängig" takes a fresh entry back and puts an older one
+  /// back to what it was.
+  Future<void> _openEdit(Entry entry, {required bool fresh}) async {
+    final entries = ref.read(entryRepositoryProvider);
+    final saved = await showEntryEditSheet(
+      context,
+      entry: entry,
+      fresh: fresh,
+      // The bar above shows the changed entry with its undo.
+      quiet: true,
+    );
+    if (!mounted) return;
+    if (saved == null) {
+      // Deleted in the sheet: nothing left to take back here.
+      if (_last?.entry?.id == entry.id) setState(_clearLast);
+      return;
+    }
+    if (saved == entry) return;
+    final thing =
+        substanceLabel(saved.substanceId, ref.read(substancesByIdProvider)) ??
+        Strings.unknown;
+    final amount = saved.amount;
+    setState(() {
+      _showLast(
+        PadResult(
+          what: TracksStrings.padEntry(
+            personLabel(saved.personId, ref.read(personsByIdProvider)),
+            amount == null ? thing : '$thing · $amount',
+          ),
+          at: saved.at,
+          undo: fresh
+              ? () async {
+                  await entries.delete(saved.id);
+                }
+              : () => entries.restore(entry),
+          entry: saved,
+        ),
+      );
+    });
+  }
 
   /// "Neu anlegen" on the page "Anderes": the thing is created (or found
   /// by its name) and entered right away.
@@ -552,7 +611,7 @@ class _TapPadState extends ConsumerState<TapPad>
       final thing = latest == null
           ? null
           : substancesById[latest.substanceId]?.name ?? Strings.unknown;
-      return NowSelector<String>(
+      final line = NowSelector<String>(
         enabled: latest != null,
         selector: (nowMs) => latest == null || thing == null
             ? TracksStrings.padNothingYet
@@ -563,6 +622,35 @@ class _TapPadState extends ConsumerState<TapPad>
           style: t.text.caption,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
+        ),
+      );
+      // Always the same box, with or without an entry: the fields below
+      // do not move when the first one is written. With an entry the line
+      // is the way to "Ändern" of it.
+      return Semantics(
+        button: latest != null,
+        label: latest == null ? null : TracksStrings.padEditLast,
+        child: InkWell(
+          key: PadKeys.editLast,
+          borderRadius: t.radii.pillAll,
+          onTap: latest == null ? null : () => _editLast(personId),
+          child: SizedBox(
+            height: t.sizes.minTapTarget / 2,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(child: line),
+                SizedBox(width: t.space.xs),
+                Icon(
+                  AdaptiveIcons.chevronRight(context),
+                  size: t.sizes.iconSm,
+                  color: latest == null
+                      ? Colors.transparent
+                      : t.colors.textMuted,
+                ),
+              ],
+            ),
+          ),
         ),
       );
     }

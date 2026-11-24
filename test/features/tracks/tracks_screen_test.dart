@@ -133,19 +133,15 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('"Sets und Szene" shows the scene only for a set that logs', (
+    testWidgets('"Sets und Szene" shows the scene of the active set', (
       tester,
     ) async {
       final h = await TracksHarness.start(tester);
       await h.tap(find.byType(SetSwitcherButton));
-      expect(find.byType(SceneEditor), findsNothing);
-      await h.tap(find.byKey(SetSheetKeys.done));
-      expect(find.text(TracksStrings.setsTitle), findsNothing);
-
-      await h.addTrack(const ProtocolConfig(), name: 'Zelt');
-      await h.tap(find.byType(SetSwitcherButton));
       expect(find.byType(SceneEditor), findsOneWidget);
       expect(find.byKey(const ValueKey('scene-add-person')), findsOneWidget);
+      await h.tap(find.byKey(SetSheetKeys.done));
+      expect(find.text(TracksStrings.setsTitle), findsNothing);
       expect(tester.takeException(), isNull);
     });
 

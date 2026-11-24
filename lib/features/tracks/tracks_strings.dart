@@ -231,6 +231,8 @@ abstract final class TracksStrings {
   static String padLockoutOf(String thing, String duration) =>
       '$thing: noch $duration';
 
+  static const padEditLast = 'Letzten Eintrag ändern';
+
   /// "zuletzt Bier · vor 26 min"
   static String padLastOf(String thing, String ago) => 'zuletzt $thing · $ago';
   static String padMoreSemantics(String track) =>

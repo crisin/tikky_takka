@@ -501,58 +501,6 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('protocol: entries show who, what and how much', (
-      tester,
-    ) async {
-      await setUpApp(tester);
-      await fx.run(tester, () async {
-        final set = await fx.sets.createSet(name: 'Festival');
-        final track = await fx.tracks.createTrack(
-          setId: set.id,
-          name: 'Protokoll',
-          config: const ProtocolConfig(),
-        );
-        final alex = await fx.people.createPerson(name: 'Alex');
-        final water = await fx.people.createSubstance(name: 'Wasser');
-        await fx.commands.addEntry(
-          track.id,
-          personId: alex.id,
-          substanceId: water.id,
-          amount: '0,5 l',
-          note: 'nach dem Tanzen',
-        );
-        app.clock.advance(const Duration(minutes: 1));
-        await fx.commands.addEntry(track.id, amount: '1 Stück');
-        app.clock.advance(const Duration(minutes: 1));
-        await fx.commands.stopTrack(track.id);
-      });
-      await pumpHistory(tester);
-
-      expect(find.textContaining('2 Einträge'), findsOneWidget);
-      await tester.tap(find.text('Protokoll'));
-      await settleUi(tester, app);
-      expect(find.text('Alex · Wasser'), findsOneWidget);
-      expect(find.text('0,5 l'), findsOneWidget);
-      expect(find.text('nach dem Tanzen'), findsOneWidget);
-      expect(
-        find.text(
-          '${Strings.protocolNoPerson} · ${Strings.protocolNoSubstance}',
-        ),
-        findsOneWidget,
-      );
-      expect(find.text('1 Stück'), findsOneWidget);
-
-      // Entries are edited in the protocol sheet, not with a plain note.
-      final more = find.byTooltip(HistoryStrings.eventActions);
-      await tester.ensureVisible(more.first);
-      await settleUi(tester, app);
-      await tester.tap(more.first);
-      await settleUi(tester, app);
-      expect(find.text(HistoryStrings.editEntry), findsOneWidget);
-      expect(find.text(Strings.deleteEvent), findsOneWidget);
-      expect(tester.takeException(), isNull);
-    });
-
     testWidgets('deleting from the detail page returns to the list, with '
         'undo', (tester) async {
       await setUpApp(tester);

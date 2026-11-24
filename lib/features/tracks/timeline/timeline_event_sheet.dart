@@ -11,7 +11,6 @@ import '../../../core/services/haptics.dart';
 import '../../../l10n/formatters.dart';
 import '../../../l10n/strings.dart';
 import '../../../theme/theme.dart';
-import '../../protocol/protocol_entry_sheet.dart';
 import '../tracks_strings.dart';
 import 'timeline_logic.dart';
 
@@ -62,10 +61,8 @@ Future<void> openTimelineEvent(
   final haptics = ref.read(hapticsProvider);
   final event = row.event;
   unawaited(haptics.selection());
-  if (event.type == EventType.entry) {
-    await showProtocolEntrySheet(context, track: row.track, existing: event);
-    return;
-  }
+  // An entry of an old protocol track: nothing to edit any more.
+  if (event.type == EventType.entry) return;
   final result = await showAdaptiveSheet<_SheetResult>(
     context,
     builder: (context) => _EventSheet(row: row),

@@ -153,8 +153,19 @@ final setProvider = Provider.family<TrackSet?, String>((ref, setId) {
 // -------------------------------------------------------------------- tracks
 
 /// Non-archived tracks of one set, ordered.
+///
+/// The protocol is no longer a track: one that is still stored from an
+/// earlier version is left out everywhere.
 final tracksInSetProvider = StreamProvider.family<List<Track>, String>(
-  (ref, setId) => ref.watch(trackRepositoryProvider).watchTracks(setId),
+  (ref, setId) => ref
+      .watch(trackRepositoryProvider)
+      .watchTracks(setId)
+      .map(
+        (tracks) => [
+          for (final t in tracks)
+            if (t.mode != TrackMode.protocol) t,
+        ],
+      ),
 );
 
 /// Non-archived tracks of the active set, ordered. Empty while loading.

@@ -5,6 +5,8 @@ import 'package:tikky_takka/adaptive/adaptive.dart';
 import 'package:tikky_takka/core/domain/domain.dart';
 import 'package:tikky_takka/core/engine/engine.dart';
 import 'package:tikky_takka/core/repo/repo.dart';
+import 'package:tikky_takka/features/protocol/entry_edit_sheet.dart';
+import 'package:tikky_takka/features/protocol/protocol_strings.dart';
 import 'package:tikky_takka/features/tracks/pad/pad_model.dart';
 import 'package:tikky_takka/features/tracks/pad/tap_pad.dart';
 import 'package:tikky_takka/features/tracks/tracks_screen.dart';
@@ -144,7 +146,6 @@ void main() {
       }
       expect(await h.snapshot(birds), isNull);
       expect(h.barMessage, TracksStrings.padReady);
-      expect(h.barHasUndo, isFalse);
 
       await h.press(h.button(id('Reiher')));
       final first = (await h.snapshot(birds))! as CounterSnapshot;
@@ -379,7 +380,6 @@ void main() {
       expect(h.value(id('Reiher')), TracksStrings.padCount(1));
       expect(h.barMessage, startsWith(TracksStrings.padUndone));
       // Nothing more to take back.
-      expect(h.barHasUndo, isFalse);
 
       // A first tap that is taken back leaves no session behind.
       final plain = 'c:${h.counter.id}';
@@ -434,7 +434,6 @@ void main() {
       await h.press(h.button('s:${a.id}'));
       expect((await h.snapshot(a))!.isRunning, isTrue);
       expect(h.barMessage, startsWith(TracksStrings.padStarted('Arbeit')));
-      expect(h.barHasUndo, isFalse);
       expect(find.byKey(InlineUndoBar.undoKey), findsNothing);
       expect(tester.takeException(), isNull);
     });
@@ -468,7 +467,6 @@ void main() {
       await tester.pump(const Duration(seconds: 5));
       await h.settle();
       expect(h.barMessage, TracksStrings.padReady);
-      expect(h.barHasUndo, isFalse);
       expect(tester.getRect(find.byKey(PadKeys.undoBar)), barRect);
       expect(tester.takeException(), isNull);
     });
@@ -817,6 +815,67 @@ void main() {
       await tester.tap(h.button(ids[1]));
       await write();
       expect(await p.entries(h), hasLength(1));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('"Ändern" opens the entry that was just written; the line '
+        '"zuletzt" keeps the last entry within reach', (tester) async {
+      final h = await TracksHarness.start(tester);
+      final p = await _Protocol.create(h, scenePersons: ['Kim', 'Jacke']);
+      await h.showPad();
+      await h.press(h.button(p.person(p.jacke)));
+      await h.press(h.button(p.substance(p.jacke, p.water)));
+      expect(
+        tester
+            .widget<InlineUndoBar>(find.byKey(PadKeys.undoBar))
+            .secondaryLabel,
+        TracksStrings.padEdit,
+      );
+
+      final writtenAt = (await p.entries(h)).single.at;
+      await h.press(find.byKey(InlineUndoBar.secondaryKey));
+      // The sheet "Ändern" of an entry that was just written.
+      expect(find.text('Wasser · Jacke'), findsOneWidget);
+      expect(
+        tester.widget<SheetChip>(find.byKey(EntrySheetKeys.timeNow)).selected,
+        isTrue,
+      );
+      expect(find.byKey(EntrySheetKeys.again), findsNothing);
+      await h.press(find.byKey(EntrySheetKeys.timeBack(5)));
+      await h.press(find.byKey(EntrySheetKeys.amountOther));
+      await tester.enterText(find.byKey(EntrySheetKeys.amountField), '0,5 l');
+      await tester.ensureVisible(find.byKey(EntrySheetKeys.done));
+      await h.press(find.byKey(EntrySheetKeys.done));
+      await h.drain();
+      var entry = (await p.entries(h)).single;
+      expect(entry.substanceId, p.water.id);
+      expect(entry.amount, '0,5 l');
+      expect(entry.at, writtenAt - 5 * 60 * 1000);
+      // No snackbar over the pad: the bar shows the changed entry.
+      expect(find.text(ProtocolStrings.entryUpdated), findsNothing);
+      expect(h.barMessage, 'Jacke · Wasser · 0,5 l');
+
+      // Long after the bar is gone the line under the name still leads to
+      // that entry.
+      await h.wait(const Duration(minutes: 2));
+      await h.press(h.button(p.person(p.jacke)));
+      await h.press(find.byKey(PadKeys.editLast));
+      expect(find.text('Wasser · Jacke'), findsOneWidget);
+      expect(find.byKey(EntrySheetKeys.again), findsOneWidget);
+      await h.press(find.byKey(EntrySheetKeys.rowPerson));
+      await h.press(find.byKey(ValueKey('person-${p.kim.id}')));
+      await tester.ensureVisible(find.byKey(EntrySheetKeys.done));
+      await h.press(find.byKey(EntrySheetKeys.done));
+      await h.drain();
+      entry = (await p.entries(h)).single;
+      expect(entry.personId, p.kim.id);
+      expect(h.barMessage, 'Kim · Wasser · 0,5 l');
+
+      // "Rückgängig" puts an older entry back to what it was.
+      await h.tapUndo();
+      entry = (await p.entries(h)).single;
+      expect(entry.personId, p.jacke.id);
+      expect(entry.amount, '0,5 l');
       expect(tester.takeException(), isNull);
     });
 

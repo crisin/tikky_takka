@@ -292,15 +292,8 @@ class _SetSheetState extends ConsumerState<_SetSheet> {
     final archived = active == null
         ? const <Track>[]
         : ref.watch(archivedTracksProvider(active.id)).value ?? const <Track>[];
-    // The scene only matters for a set that logs something.
-    final activeTracks = active == null
-        ? const <Track>[]
-        : ref.watch(tracksInSetProvider(active.id)).value ?? const <Track>[];
-    final showScene =
-        active != null &&
-        (activeTracks.any((track) => track.mode == TrackMode.protocol) ||
-            active.scenePersonIds.isNotEmpty ||
-            active.sceneSubstanceIds.isNotEmpty);
+    // Every set can have a scene: who is here and what is on.
+    final showScene = active != null;
     final rows = ReorderableListView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),

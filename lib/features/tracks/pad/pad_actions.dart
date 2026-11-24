@@ -220,6 +220,7 @@ class PadActions {
       undo: () async {
         await entries.delete(entry.id);
       },
+      entry: entry,
     );
   }
 

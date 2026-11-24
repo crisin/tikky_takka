@@ -5,14 +5,11 @@ import 'package:tikky_takka/core/repo/repo.dart';
 import 'package:tikky_takka/features/protocol/protocol_strings.dart';
 import 'package:tikky_takka/features/protocol/protocol_widgets.dart';
 import 'package:tikky_takka/features/tracks/set_switcher.dart';
-import 'package:tikky_takka/features/tracks/tracks_strings.dart';
-import 'package:tikky_takka/l10n/strings.dart';
 import 'package:tikky_takka/theme/theme.dart';
 
 import '../tracks/tracks_harness.dart';
 import 'protocol_test_support.dart';
 
-const _edit = ValueKey('scene-edit');
 const _clear = ValueKey('scene-clear');
 const _done = ValueKey('scene-done');
 
@@ -31,7 +28,7 @@ void main() {
     expect((await f.storedSet()).hasScene, isFalse);
 
     // From the lane.
-    await f.tap(find.byKey(_edit));
+    await f.openScene();
     expect(find.text(ProtocolStrings.sceneOf('Festival')), findsOneWidget);
     expect(find.text(ProtocolStrings.sceneWho), findsOneWidget);
     expect(find.text(ProtocolStrings.sceneWhat), findsOneWidget);
@@ -84,9 +81,6 @@ void main() {
     // "Fertig": the lane follows the scene.
     await f.tap(find.byKey(_done));
     expect(find.text(ProtocolStrings.sceneWho), findsNothing);
-    expect(find.byKey(ProtocolFixture.card(kim)), findsOneWidget);
-    expect(find.byKey(ProtocolFixture.card(jacke)), findsOneWidget);
-    expect(find.byKey(ProtocolFixture.card(uli)), findsNothing);
     // Setting up a scene writes no entry.
     expect(await f.entries(), isEmpty);
     expect(tester.takeException(), isNull);
@@ -98,7 +92,7 @@ void main() {
     final jacke = await f.person('Jacke');
     await f.scene(persons: [jacke]);
 
-    await f.tap(find.byKey(_edit));
+    await f.openScene();
     expect(
       tester.widget<ProtocolChoice>(find.byKey(_person(jacke))).selected,
       isTrue,
@@ -150,13 +144,10 @@ void main() {
 
     await f.tap(find.byKey(_done));
     // No scene: everybody is listed again.
-    expect(find.byKey(ProtocolFixture.card(jacke)), findsOneWidget);
-    expect(find.byKey(ProtocolFixture.card(kim)), findsOneWidget);
-    expect(find.byKey(const ValueKey('capture-others')), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('the set sheet offers "Szene bearbeiten" for a set', (
+  testWidgets('"Sets und Szene" edits the scene of the active set', (
     tester,
   ) async {
     final h = await TracksHarness.start(tester);
@@ -164,15 +155,7 @@ void main() {
     final alex = await h.run(() => people.createPerson(name: 'Alex'));
 
     await h.tap(find.byType(SetSwitcherButton));
-    await h.tap(
-      find.byTooltip('${TracksStrings.setOptions}: ${Strings.seedSetName}'),
-    );
-    await h.tap(find.text(ProtocolStrings.sceneEdit));
-    expect(
-      find.text(ProtocolStrings.sceneOf(Strings.seedSetName)),
-      findsOneWidget,
-    );
-
+    await tester.ensureVisible(find.byKey(_person(alex)));
     await h.tap(find.byKey(_person(alex)));
     final stored = await h.run(
       () => h.container.read(setRepositoryProvider).getSet(h.activeSet.id),
