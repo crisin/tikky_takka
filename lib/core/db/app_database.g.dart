@@ -2835,6 +2835,562 @@ class EventsCompanion extends UpdateCompanion<EventRow> {
   }
 }
 
+class $EntriesTable extends Entries with TableInfo<$EntriesTable, EntryRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $EntriesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _atMeta = const VerificationMeta('at');
+  @override
+  late final GeneratedColumn<int> at = GeneratedColumn<int>(
+    'at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _personIdMeta = const VerificationMeta(
+    'personId',
+  );
+  @override
+  late final GeneratedColumn<String> personId = GeneratedColumn<String>(
+    'person_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _substanceIdMeta = const VerificationMeta(
+    'substanceId',
+  );
+  @override
+  late final GeneratedColumn<String> substanceId = GeneratedColumn<String>(
+    'substance_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _amountMeta = const VerificationMeta('amount');
+  @override
+  late final GeneratedColumn<String> amount = GeneratedColumn<String>(
+    'amount',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _noteMeta = const VerificationMeta('note');
+  @override
+  late final GeneratedColumn<String> note = GeneratedColumn<String>(
+    'note',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<int> createdAt = GeneratedColumn<int>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<int> updatedAt = GeneratedColumn<int>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _extraJsonMeta = const VerificationMeta(
+    'extraJson',
+  );
+  @override
+  late final GeneratedColumn<String> extraJson = GeneratedColumn<String>(
+    'extra_json',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    at,
+    personId,
+    substanceId,
+    amount,
+    note,
+    createdAt,
+    updatedAt,
+    extraJson,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'entries';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<EntryRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('at')) {
+      context.handle(_atMeta, at.isAcceptableOrUnknown(data['at']!, _atMeta));
+    } else if (isInserting) {
+      context.missing(_atMeta);
+    }
+    if (data.containsKey('person_id')) {
+      context.handle(
+        _personIdMeta,
+        personId.isAcceptableOrUnknown(data['person_id']!, _personIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_personIdMeta);
+    }
+    if (data.containsKey('substance_id')) {
+      context.handle(
+        _substanceIdMeta,
+        substanceId.isAcceptableOrUnknown(
+          data['substance_id']!,
+          _substanceIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_substanceIdMeta);
+    }
+    if (data.containsKey('amount')) {
+      context.handle(
+        _amountMeta,
+        amount.isAcceptableOrUnknown(data['amount']!, _amountMeta),
+      );
+    }
+    if (data.containsKey('note')) {
+      context.handle(
+        _noteMeta,
+        note.isAcceptableOrUnknown(data['note']!, _noteMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    if (data.containsKey('extra_json')) {
+      context.handle(
+        _extraJsonMeta,
+        extraJson.isAcceptableOrUnknown(data['extra_json']!, _extraJsonMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  EntryRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return EntryRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      at: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}at'],
+      )!,
+      personId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}person_id'],
+      )!,
+      substanceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}substance_id'],
+      )!,
+      amount: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}amount'],
+      ),
+      note: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}note'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      extraJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}extra_json'],
+      ),
+    );
+  }
+
+  @override
+  $EntriesTable createAlias(String alias) {
+    return $EntriesTable(attachedDatabase, alias);
+  }
+}
+
+class EntryRow extends DataClass implements Insertable<EntryRow> {
+  final String id;
+
+  /// Wall time, UTC milliseconds.
+  final int at;
+  final String personId;
+  final String substanceId;
+
+  /// Free text; never summed up.
+  final String? amount;
+  final String? note;
+  final int createdAt;
+  final int updatedAt;
+  final String? extraJson;
+  const EntryRow({
+    required this.id,
+    required this.at,
+    required this.personId,
+    required this.substanceId,
+    this.amount,
+    this.note,
+    required this.createdAt,
+    required this.updatedAt,
+    this.extraJson,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['at'] = Variable<int>(at);
+    map['person_id'] = Variable<String>(personId);
+    map['substance_id'] = Variable<String>(substanceId);
+    if (!nullToAbsent || amount != null) {
+      map['amount'] = Variable<String>(amount);
+    }
+    if (!nullToAbsent || note != null) {
+      map['note'] = Variable<String>(note);
+    }
+    map['created_at'] = Variable<int>(createdAt);
+    map['updated_at'] = Variable<int>(updatedAt);
+    if (!nullToAbsent || extraJson != null) {
+      map['extra_json'] = Variable<String>(extraJson);
+    }
+    return map;
+  }
+
+  EntriesCompanion toCompanion(bool nullToAbsent) {
+    return EntriesCompanion(
+      id: Value(id),
+      at: Value(at),
+      personId: Value(personId),
+      substanceId: Value(substanceId),
+      amount: amount == null && nullToAbsent
+          ? const Value.absent()
+          : Value(amount),
+      note: note == null && nullToAbsent ? const Value.absent() : Value(note),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+      extraJson: extraJson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(extraJson),
+    );
+  }
+
+  factory EntryRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return EntryRow(
+      id: serializer.fromJson<String>(json['id']),
+      at: serializer.fromJson<int>(json['at']),
+      personId: serializer.fromJson<String>(json['personId']),
+      substanceId: serializer.fromJson<String>(json['substanceId']),
+      amount: serializer.fromJson<String?>(json['amount']),
+      note: serializer.fromJson<String?>(json['note']),
+      createdAt: serializer.fromJson<int>(json['createdAt']),
+      updatedAt: serializer.fromJson<int>(json['updatedAt']),
+      extraJson: serializer.fromJson<String?>(json['extraJson']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'at': serializer.toJson<int>(at),
+      'personId': serializer.toJson<String>(personId),
+      'substanceId': serializer.toJson<String>(substanceId),
+      'amount': serializer.toJson<String?>(amount),
+      'note': serializer.toJson<String?>(note),
+      'createdAt': serializer.toJson<int>(createdAt),
+      'updatedAt': serializer.toJson<int>(updatedAt),
+      'extraJson': serializer.toJson<String?>(extraJson),
+    };
+  }
+
+  EntryRow copyWith({
+    String? id,
+    int? at,
+    String? personId,
+    String? substanceId,
+    Value<String?> amount = const Value.absent(),
+    Value<String?> note = const Value.absent(),
+    int? createdAt,
+    int? updatedAt,
+    Value<String?> extraJson = const Value.absent(),
+  }) => EntryRow(
+    id: id ?? this.id,
+    at: at ?? this.at,
+    personId: personId ?? this.personId,
+    substanceId: substanceId ?? this.substanceId,
+    amount: amount.present ? amount.value : this.amount,
+    note: note.present ? note.value : this.note,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+    extraJson: extraJson.present ? extraJson.value : this.extraJson,
+  );
+  EntryRow copyWithCompanion(EntriesCompanion data) {
+    return EntryRow(
+      id: data.id.present ? data.id.value : this.id,
+      at: data.at.present ? data.at.value : this.at,
+      personId: data.personId.present ? data.personId.value : this.personId,
+      substanceId: data.substanceId.present
+          ? data.substanceId.value
+          : this.substanceId,
+      amount: data.amount.present ? data.amount.value : this.amount,
+      note: data.note.present ? data.note.value : this.note,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      extraJson: data.extraJson.present ? data.extraJson.value : this.extraJson,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('EntryRow(')
+          ..write('id: $id, ')
+          ..write('at: $at, ')
+          ..write('personId: $personId, ')
+          ..write('substanceId: $substanceId, ')
+          ..write('amount: $amount, ')
+          ..write('note: $note, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('extraJson: $extraJson')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    at,
+    personId,
+    substanceId,
+    amount,
+    note,
+    createdAt,
+    updatedAt,
+    extraJson,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is EntryRow &&
+          other.id == this.id &&
+          other.at == this.at &&
+          other.personId == this.personId &&
+          other.substanceId == this.substanceId &&
+          other.amount == this.amount &&
+          other.note == this.note &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
+          other.extraJson == this.extraJson);
+}
+
+class EntriesCompanion extends UpdateCompanion<EntryRow> {
+  final Value<String> id;
+  final Value<int> at;
+  final Value<String> personId;
+  final Value<String> substanceId;
+  final Value<String?> amount;
+  final Value<String?> note;
+  final Value<int> createdAt;
+  final Value<int> updatedAt;
+  final Value<String?> extraJson;
+  final Value<int> rowid;
+  const EntriesCompanion({
+    this.id = const Value.absent(),
+    this.at = const Value.absent(),
+    this.personId = const Value.absent(),
+    this.substanceId = const Value.absent(),
+    this.amount = const Value.absent(),
+    this.note = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.extraJson = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  EntriesCompanion.insert({
+    required String id,
+    required int at,
+    required String personId,
+    required String substanceId,
+    this.amount = const Value.absent(),
+    this.note = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.extraJson = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       at = Value(at),
+       personId = Value(personId),
+       substanceId = Value(substanceId);
+  static Insertable<EntryRow> custom({
+    Expression<String>? id,
+    Expression<int>? at,
+    Expression<String>? personId,
+    Expression<String>? substanceId,
+    Expression<String>? amount,
+    Expression<String>? note,
+    Expression<int>? createdAt,
+    Expression<int>? updatedAt,
+    Expression<String>? extraJson,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (at != null) 'at': at,
+      if (personId != null) 'person_id': personId,
+      if (substanceId != null) 'substance_id': substanceId,
+      if (amount != null) 'amount': amount,
+      if (note != null) 'note': note,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (extraJson != null) 'extra_json': extraJson,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  EntriesCompanion copyWith({
+    Value<String>? id,
+    Value<int>? at,
+    Value<String>? personId,
+    Value<String>? substanceId,
+    Value<String?>? amount,
+    Value<String?>? note,
+    Value<int>? createdAt,
+    Value<int>? updatedAt,
+    Value<String?>? extraJson,
+    Value<int>? rowid,
+  }) {
+    return EntriesCompanion(
+      id: id ?? this.id,
+      at: at ?? this.at,
+      personId: personId ?? this.personId,
+      substanceId: substanceId ?? this.substanceId,
+      amount: amount ?? this.amount,
+      note: note ?? this.note,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      extraJson: extraJson ?? this.extraJson,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (at.present) {
+      map['at'] = Variable<int>(at.value);
+    }
+    if (personId.present) {
+      map['person_id'] = Variable<String>(personId.value);
+    }
+    if (substanceId.present) {
+      map['substance_id'] = Variable<String>(substanceId.value);
+    }
+    if (amount.present) {
+      map['amount'] = Variable<String>(amount.value);
+    }
+    if (note.present) {
+      map['note'] = Variable<String>(note.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<int>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(updatedAt.value);
+    }
+    if (extraJson.present) {
+      map['extra_json'] = Variable<String>(extraJson.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('EntriesCompanion(')
+          ..write('id: $id, ')
+          ..write('at: $at, ')
+          ..write('personId: $personId, ')
+          ..write('substanceId: $substanceId, ')
+          ..write('amount: $amount, ')
+          ..write('note: $note, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('extraJson: $extraJson, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $PersonsTable extends Persons with TableInfo<$PersonsTable, PersonRow> {
   @override
   final GeneratedDatabase attachedDatabase;
@@ -4250,6 +4806,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $TracksTable tracks = $TracksTable(this);
   late final $SessionsTable sessions = $SessionsTable(this);
   late final $EventsTable events = $EventsTable(this);
+  late final $EntriesTable entries = $EntriesTable(this);
   late final $PersonsTable persons = $PersonsTable(this);
   late final $SubstancesTable substances = $SubstancesTable(this);
   late final $SettingsTable settings = $SettingsTable(this);
@@ -4293,6 +4850,18 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'idx_events_substance',
     'CREATE INDEX idx_events_substance ON events (substance_id)',
   );
+  late final Index idxEntriesAt = Index(
+    'idx_entries_at',
+    'CREATE INDEX idx_entries_at ON entries (at)',
+  );
+  late final Index idxEntriesPerson = Index(
+    'idx_entries_person',
+    'CREATE INDEX idx_entries_person ON entries (person_id, at)',
+  );
+  late final Index idxEntriesSubstance = Index(
+    'idx_entries_substance',
+    'CREATE INDEX idx_entries_substance ON entries (substance_id)',
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -4302,6 +4871,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     tracks,
     sessions,
     events,
+    entries,
     persons,
     substances,
     settings,
@@ -4315,6 +4885,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     idxEventsAt,
     idxEventsPerson,
     idxEventsSubstance,
+    idxEntriesAt,
+    idxEntriesPerson,
+    idxEntriesSubstance,
   ];
 }
 
@@ -5673,6 +6246,285 @@ typedef $$EventsTableProcessedTableManager =
       EventRow,
       PrefetchHooks Function()
     >;
+typedef $$EntriesTableCreateCompanionBuilder = EntriesCompanion Function({
+  required String id,
+  required int at,
+  required String personId,
+  required String substanceId,
+  Value<String?> amount,
+  Value<String?> note,
+  Value<int> createdAt,
+  Value<int> updatedAt,
+  Value<String?> extraJson,
+  Value<int> rowid,
+});
+typedef $$EntriesTableUpdateCompanionBuilder = EntriesCompanion Function({
+  Value<String> id,
+  Value<int> at,
+  Value<String> personId,
+  Value<String> substanceId,
+  Value<String?> amount,
+  Value<String?> note,
+  Value<int> createdAt,
+  Value<int> updatedAt,
+  Value<String?> extraJson,
+  Value<int> rowid,
+});
+
+class $$EntriesTableFilterComposer
+    extends Composer<_$AppDatabase, $EntriesTable> {
+  $$EntriesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get at => $composableBuilder(
+    column: $table.at,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get personId => $composableBuilder(
+    column: $table.personId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get substanceId => $composableBuilder(
+    column: $table.substanceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get amount => $composableBuilder(
+    column: $table.amount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get note => $composableBuilder(
+    column: $table.note,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get extraJson => $composableBuilder(
+    column: $table.extraJson,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$EntriesTableOrderingComposer
+    extends Composer<_$AppDatabase, $EntriesTable> {
+  $$EntriesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get at => $composableBuilder(
+    column: $table.at,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get personId => $composableBuilder(
+    column: $table.personId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get substanceId => $composableBuilder(
+    column: $table.substanceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get amount => $composableBuilder(
+    column: $table.amount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get note => $composableBuilder(
+    column: $table.note,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get extraJson => $composableBuilder(
+    column: $table.extraJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$EntriesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $EntriesTable> {
+  $$EntriesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get at =>
+      $composableBuilder(column: $table.at, builder: (column) => column);
+
+  GeneratedColumn<String> get personId =>
+      $composableBuilder(column: $table.personId, builder: (column) => column);
+
+  GeneratedColumn<String> get substanceId => $composableBuilder(
+    column: $table.substanceId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get amount =>
+      $composableBuilder(column: $table.amount, builder: (column) => column);
+
+  GeneratedColumn<String> get note =>
+      $composableBuilder(column: $table.note, builder: (column) => column);
+
+  GeneratedColumn<int> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<int> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get extraJson =>
+      $composableBuilder(column: $table.extraJson, builder: (column) => column);
+}
+
+class $$EntriesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $EntriesTable,
+          EntryRow,
+          $$EntriesTableFilterComposer,
+          $$EntriesTableOrderingComposer,
+          $$EntriesTableAnnotationComposer,
+          $$EntriesTableCreateCompanionBuilder,
+          $$EntriesTableUpdateCompanionBuilder,
+          (EntryRow, BaseReferences<_$AppDatabase, $EntriesTable, EntryRow>),
+          EntryRow,
+          PrefetchHooks Function()
+        > {
+  $$EntriesTableTableManager(_$AppDatabase db, $EntriesTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$EntriesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$EntriesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$EntriesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<int> at = const Value.absent(),
+                Value<String> personId = const Value.absent(),
+                Value<String> substanceId = const Value.absent(),
+                Value<String?> amount = const Value.absent(),
+                Value<String?> note = const Value.absent(),
+                Value<int> createdAt = const Value.absent(),
+                Value<int> updatedAt = const Value.absent(),
+                Value<String?> extraJson = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => EntriesCompanion(
+                id: id,
+                at: at,
+                personId: personId,
+                substanceId: substanceId,
+                amount: amount,
+                note: note,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                extraJson: extraJson,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required int at,
+                required String personId,
+                required String substanceId,
+                Value<String?> amount = const Value.absent(),
+                Value<String?> note = const Value.absent(),
+                Value<int> createdAt = const Value.absent(),
+                Value<int> updatedAt = const Value.absent(),
+                Value<String?> extraJson = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => EntriesCompanion.insert(
+                id: id,
+                at: at,
+                personId: personId,
+                substanceId: substanceId,
+                amount: amount,
+                note: note,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                extraJson: extraJson,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$EntriesTable, EntryRow>(table),
+                  BaseReferences<_$AppDatabase, $EntriesTable, EntryRow>(
+                    db,
+                    table,
+                    e,
+                  ),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$EntriesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $EntriesTable,
+      EntryRow,
+      $$EntriesTableFilterComposer,
+      $$EntriesTableOrderingComposer,
+      $$EntriesTableAnnotationComposer,
+      $$EntriesTableCreateCompanionBuilder,
+      $$EntriesTableUpdateCompanionBuilder,
+      (EntryRow, BaseReferences<_$AppDatabase, $EntriesTable, EntryRow>),
+      EntryRow,
+      PrefetchHooks Function()
+    >;
 typedef $$PersonsTableCreateCompanionBuilder = PersonsCompanion Function({
   required String id,
   required String name,
@@ -6430,6 +7282,8 @@ class $AppDatabaseManager {
       $$SessionsTableTableManager(_db, _db.sessions);
   $$EventsTableTableManager get events =>
       $$EventsTableTableManager(_db, _db.events);
+  $$EntriesTableTableManager get entries =>
+      $$EntriesTableTableManager(_db, _db.entries);
   $$PersonsTableTableManager get persons =>
       $$PersonsTableTableManager(_db, _db.persons);
   $$SubstancesTableTableManager get substances =>

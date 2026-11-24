@@ -12,6 +12,7 @@ typedef TableCounts = ({
   int tracks,
   int sessions,
   int events,
+  int entries,
   int persons,
   int substances,
   int settings,
@@ -36,6 +37,7 @@ class AppReset {
     tracks: await _db.tracks.count().getSingle(),
     sessions: await _db.sessions.count().getSingle(),
     events: await _db.events.count().getSingle(),
+    entries: await _db.entries.count().getSingle(),
     persons: await _db.persons.count().getSingle(),
     substances: await _db.substances.count().getSingle(),
     settings: await _db.settings.count().getSingle(),
@@ -53,6 +55,7 @@ class AppReset {
       // Children before parents.
       final tables = <TableInfo<Table, Object?>>[
         _db.events,
+        _db.entries,
         _db.sessions,
         _db.tracks,
         _db.trackSets,

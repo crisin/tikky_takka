@@ -9,11 +9,13 @@ import 'package:tikky_takka/core/domain/domain.dart';
 import 'package:tikky_takka/core/engine/engine.dart';
 import 'package:tikky_takka/core/repo/repo.dart';
 import 'package:tikky_takka/features/protocol/protocol_scene_sheet.dart';
+import 'package:tikky_takka/features/tracks/pad/tap_pad.dart';
 import 'package:tikky_takka/features/tracks/set_switcher.dart';
 import 'package:tikky_takka/features/tracks/track_editor_sheet.dart';
 import 'package:tikky_takka/features/tracks/track_lane.dart';
 import 'package:tikky_takka/features/tracks/tracks_screen.dart';
 import 'package:tikky_takka/features/tracks/tracks_strings.dart';
+import 'package:tikky_takka/features/tracks/tracks_view.dart';
 import 'package:tikky_takka/l10n/strings.dart';
 import 'package:tikky_takka/theme/theme.dart';
 
@@ -133,19 +135,64 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('"Sets und Szene" shows the scene only for a set that logs', (
+    testWidgets('a set without tracks offers a track or the protocol; with '
+        'somebody in the scene the board needs no track', (tester) async {
+      final h = await TracksHarness.start(tester);
+      final sets = h.container.read(setRepositoryProvider);
+      final people = h.container.read(peopleRepositoryProvider);
+      final festival = await h.run(() => sets.createSet(name: 'Festival'));
+      await h.run(
+        () =>
+            h.container.read(activeSetIdProvider.notifier).select(festival.id),
+      );
+      await h.settle();
+      expect(find.text(Strings.tracksEmptyTitle), findsOneWidget);
+      expect(find.byKey(TracksScreenKeys.emptyAddTrack), findsOneWidget);
+
+      // "Protokoll starten" opens the scene; with a person the pad shows.
+      await h.tap(find.byKey(TracksScreenKeys.emptyStartProtocol));
+      expect(find.byType(SceneEditor), findsOneWidget);
+      await h.tap(find.byKey(const ValueKey('scene-add-person')));
+      await tester.enterText(
+        find.descendant(
+          of: find.byKey(const ValueKey('scene-new-person')),
+          matching: find.byType(EditableText),
+        ),
+        'Kim',
+      );
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await h.settle();
+      final kim = (await h.run(people.getPersons)).single;
+      await h.tap(find.byKey(const ValueKey('scene-done')));
+
+      expect(h.container.read(tracksViewProvider(festival.id)), TracksView.pad);
+      expect(find.byType(TapPad), findsOneWidget);
+      expect(find.text(Strings.tracksEmptyTitle), findsNothing);
+      // One person: "Anderes" is right there.
+      expect(find.byKey(PadKeys.button('o:${kim.id}')), findsOneWidget);
+
+      // The lanes of that set still say there is no track - without
+      // offering the protocol a second time.
+      await h.run(
+        () => h.container
+            .read(tracksViewsProvider.notifier)
+            .show(festival.id, TracksView.lanes),
+      );
+      await h.settle();
+      expect(find.text(Strings.tracksEmptyTitle), findsOneWidget);
+      expect(find.byKey(TracksScreenKeys.emptyStartProtocol), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('"Sets und Szene" shows the scene of the active set', (
       tester,
     ) async {
       final h = await TracksHarness.start(tester);
       await h.tap(find.byType(SetSwitcherButton));
-      expect(find.byType(SceneEditor), findsNothing);
-      await h.tap(find.byKey(SetSheetKeys.done));
-      expect(find.text(TracksStrings.setsTitle), findsNothing);
-
-      await h.addTrack(const ProtocolConfig(), name: 'Zelt');
-      await h.tap(find.byType(SetSwitcherButton));
       expect(find.byType(SceneEditor), findsOneWidget);
       expect(find.byKey(const ValueKey('scene-add-person')), findsOneWidget);
+      await h.tap(find.byKey(SetSheetKeys.done));
+      expect(find.text(TracksStrings.setsTitle), findsNothing);
       expect(tester.takeException(), isNull);
     });
 

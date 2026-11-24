@@ -55,6 +55,8 @@ dependencies:
   flutter_localizations:
     sdk: flutter
 
+  local_auth_android: any
+  local_auth_darwin: any
 dev_dependencies:
   flutter_test:
     sdk: flutter

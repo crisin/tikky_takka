@@ -48,11 +48,23 @@ class BackupRepository {
     ];
     final tracks = [
       for (final r in await _db.select(_db.tracks).get())
-        if (includeProtocol || r.mode != TrackMode.protocol.name) r.toDomain(),
+        // The protocol is no longer a track; one that is still stored
+        // from an earlier version is not carried on.
+        if (r.mode != TrackMode.protocol.name) r.toDomain(),
     ];
     final history = await _history.getSessions(
-      filter.copyWith(includeProtocol: includeProtocol, includeOpen: true),
+      filter.copyWith(includeProtocol: false, includeOpen: true),
     );
+    final entries = <Entry>[];
+    if (includeProtocol) {
+      final query = _db.select(_db.entries)
+        ..orderBy([(e) => OrderingTerm.asc(e.at)]);
+      final from = filter.fromMs;
+      final to = filter.toMs;
+      if (from != null) query.where((e) => e.at.isBiggerOrEqualValue(from));
+      if (to != null) query.where((e) => e.at.isSmallerThanValue(to));
+      entries.addAll([for (final r in await query.get()) r.toDomain()]);
+    }
     final persons = includeProtocol
         ? [for (final r in await _db.select(_db.persons).get()) r.toDomain()]
         : const <Person>[];
@@ -69,6 +81,7 @@ class BackupRepository {
       tracks: tracks,
       sessions: [for (final h in history) h.session],
       events: [for (final h in history) ...h.events],
+      entries: entries,
       persons: persons,
       substances: substances,
       settings: settings,
@@ -171,10 +184,19 @@ class BackupRepository {
           _db.trackSets,
         )..where((t) => t.id.equals(id))).getSingleOrNull(),
       );
+      // A protocol track of an earlier version is skipped with all it
+      // carries: the protocol lives in the entries now.
+      final oldProtocol = {
+        for (final t in data.tracks)
+          if (t.mode == TrackMode.protocol) t.id,
+      };
       await mergeRows<$TracksTable, TrackRow>(
         key: 'tracks',
         table: _db.tracks,
-        rows: data.tracks.map((t) => t.toRow()),
+        rows: [
+          for (final t in data.tracks)
+            if (!oldProtocol.contains(t.id)) t.toRow(),
+        ],
         idOf: (r) => r.id,
         updatedAtOf: (r) => r.updatedAt,
         find: (id) => (_db.select(
@@ -184,7 +206,12 @@ class BackupRepository {
       await mergeRows<$SessionsTable, SessionRow>(
         key: 'sessions',
         table: _db.sessions,
-        rows: data.sessions.map((s) => s.toRow()),
+        rows: [
+          for (final s in data.sessions)
+            if (!oldProtocol.contains(s.trackId) &&
+                s.config.mode != TrackMode.protocol)
+              s.toRow(),
+        ],
         idOf: (r) => r.id,
         updatedAtOf: (r) => r.updatedAt,
         find: (id) => (_db.select(
@@ -196,7 +223,10 @@ class BackupRepository {
         table: _db.events,
         rows: [
           for (final e in data.events)
-            if (!tombstones.contains(e.id)) e.toRow(),
+            if (!tombstones.contains(e.id) &&
+                !oldProtocol.contains(e.trackId) &&
+                e.type != EventType.entry)
+              e.toRow(),
         ],
         idOf: (r) => r.id,
         updatedAtOf: (r) => r.updatedAt,
@@ -262,9 +292,22 @@ class BackupRepository {
 
       skipped['events'] = (skipped['events'] ?? 0) + deletedLocally;
 
+      await mergeRows<$EntriesTable, EntryRow>(
+        key: 'entries',
+        table: _db.entries,
+        rows: data.entries.map((e) => e.toRow()),
+        idOf: (r) => r.id,
+        updatedAtOf: (r) => r.updatedAt,
+        find: (id) => (_db.select(
+          _db.entries,
+        )..where((t) => t.id.equals(id))).getSingleOrNull(),
+      );
+
       await _reconcileSessions({
-        for (final s in data.sessions) s.id,
-        for (final e in data.events) e.sessionId,
+        for (final s in data.sessions)
+          if (!oldProtocol.contains(s.trackId)) s.id,
+        for (final e in data.events)
+          if (!oldProtocol.contains(e.trackId)) e.sessionId,
       });
       await _closeDuplicateOpenSessions();
     });

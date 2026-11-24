@@ -152,6 +152,7 @@ final class BackupData {
     this.tracks = const [],
     this.sessions = const [],
     this.events = const [],
+    this.entries = const [],
     this.persons = const [],
     this.substances = const [],
     this.settings = const {},
@@ -188,6 +189,14 @@ final class BackupData {
       events: [
         for (final m in maps(json['events'])) ?TrackEvent.tryFromJson(m),
       ],
+      entries: [
+        for (final m in maps(json['entries']))
+          if (Entry.fromJson(m) case final e
+              when e.id.isNotEmpty &&
+                  e.personId.isNotEmpty &&
+                  e.substanceId.isNotEmpty)
+            e,
+      ],
       persons: [for (final m in maps(json['persons'])) Person.fromJson(m)],
       substances: [
         for (final m in maps(json['substances'])) Substance.fromJson(m),
@@ -207,6 +216,9 @@ final class BackupData {
   final List<Track> tracks;
   final List<Session> sessions;
   final List<TrackEvent> events;
+
+  /// The protocol: who had what, when. Missing in older backups.
+  final List<Entry> entries;
   final List<Person> persons;
   final List<Substance> substances;
 
@@ -221,6 +233,7 @@ final class BackupData {
     'tracks': [for (final t in tracks) t.toJson()],
     'sessions': [for (final s in sessions) s.toJson()],
     'events': [for (final e in events) e.toJson()],
+    'entries': [for (final e in entries) e.toJson()],
     'persons': [for (final p in persons) p.toJson()],
     'substances': [for (final s in substances) s.toJson()],
     'settings': settings,
@@ -241,6 +254,7 @@ final class ImportReport {
     'tracks',
     'sessions',
     'events',
+    'entries',
     'persons',
     'substances',
     'settings',

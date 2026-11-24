@@ -11,7 +11,16 @@ part 'app_database.g.dart';
 /// The schema is FROZEN: do not change tables or re-run build_runner without
 /// adding a migration step in [migration] and bumping [schemaVersion].
 @DriftDatabase(
-  tables: [TrackSets, Tracks, Sessions, Events, Persons, Substances, Settings],
+  tables: [
+    TrackSets,
+    Tracks,
+    Sessions,
+    Events,
+    Entries,
+    Persons,
+    Substances,
+    Settings,
+  ],
 )
 class AppDatabase extends _$AppDatabase {
   /// Opens the database on the given executor (used by tests and tools).
@@ -30,7 +39,7 @@ class AppDatabase extends _$AppDatabase {
   /// Opens a fresh in-memory database. Use in tests.
   AppDatabase.inMemory() : super(openInMemoryConnection());
 
-  static const int currentSchemaVersion = 1;
+  static const int currentSchemaVersion = 2;
 
   @override
   int get schemaVersion => currentSchemaVersion;
@@ -52,7 +61,9 @@ class AppDatabase extends _$AppDatabase {
 
   Future<void> _migrateFrom(Migrator m, int fromVersion) async {
     switch (fromVersion) {
-      // case 1: await m.addColumn(tracks, tracks.someNewColumn);
+      case 1:
+        // Protocol entries get a table of their own.
+        await m.createTable(entries);
       default:
         break;
     }

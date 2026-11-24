@@ -246,4 +246,20 @@ class TrackRepository {
     });
     await _alarmSync.cancelTrack(id);
   }
+
+  /// Removes every track of the mode "protocol" with its sessions and
+  /// events, and returns how many there were.
+  ///
+  /// The protocol is no longer a track: it lives in the entries. Tracks of
+  /// that mode can only be left over from an earlier version; their data
+  /// is not carried over.
+  Future<int> purgeProtocolTracks() async {
+    final rows = await (_db.select(
+      _db.tracks,
+    )..where((t) => t.mode.equals(TrackMode.protocol.name))).get();
+    for (final row in rows) {
+      await deleteTrack(row.id);
+    }
+    return rows.length;
+  }
 }

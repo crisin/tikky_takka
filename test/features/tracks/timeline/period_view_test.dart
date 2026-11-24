@@ -33,11 +33,9 @@ void main() {
     final mate = await h.run(
       () => people.createSubstance(name: 'Mate', color: 0xFF40C080),
     );
-    final tent = await h.addTrack(const ProtocolConfig(), name: 'Zelt');
-    final commands = h.container.read(trackCommandsProvider);
-    Future<void> add(Substance s) => h.run(
-      () => commands.addEntry(tent.id, personId: jacke.id, substanceId: s.id),
-    );
+    Future<void> add(Substance s) =>
+        h.run(() => h.entry(personId: jacke.id, substanceId: s.id));
+    final tent = protocolLane(h.activeSet.id);
     final dayStart = h.container.read(uiPrefsProvider).dayStartMinutes;
     final tuesday = logicalDayOf(h.app.clock.nowMs(), dayStart);
     await add(beer);

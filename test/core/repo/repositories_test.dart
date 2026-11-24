@@ -236,7 +236,7 @@ void main() {
         durationMs: 3 * hour,
       );
       e.clock.setMs(DateTime(2026, 11, 11, 20).millisecondsSinceEpoch);
-      await e.commands.addEntry(log.id, personId: 'p');
+      await e.commands.startTrack(log.id);
       e.clock.advanceMs(hour);
       final s4 = (await e.commands.stopTrack(log.id))!;
       // Still running.
@@ -271,7 +271,7 @@ void main() {
       expect(all.last.track!.name, 'A');
       expect(all.last.set!.name, 'Arbeit');
       expect(all.last.summary.netMs, 2 * hour);
-      expect(all.first.summary.entryCount, 1);
+      expect(all.first.track!.mode, TrackMode.protocol);
 
       final days = groupSessionsByDay(all);
       expect(days.map((d) => d.day.toString()), [
@@ -534,7 +534,6 @@ void main() {
       await e.sets.ensureSeedData();
       final set = (await e.sets.getSets()).single;
       final tracks = await e.tracks.getTracks(set.id);
-      final protocol = await e.makeTrack(set, const ProtocolConfig());
       final alex = await e.people.createPerson(name: 'Alex');
       final thing = await e.people.createSubstance(name: 'X', lockoutMs: hour);
       await e.commands.startTrack(tracks[0].id);
@@ -542,8 +541,7 @@ void main() {
       await e.commands.lap(tracks[0].id);
       await e.commands.stopTrack(tracks[0].id);
       await e.commands.tick(tracks[2].id, label: 'Hund');
-      await e.commands.addEntry(
-        protocol.id,
+      await e.entries.add(
         personId: alex.id,
         substanceId: thing.id,
         amount: '1',
@@ -557,18 +555,16 @@ void main() {
       await populate(e);
 
       final plain = await e.backup.readAll();
-      expect(plain.tracks.any((t) => t.mode == TrackMode.protocol), isFalse);
-      expect(plain.sessions.any((s) => s.mode == TrackMode.protocol), isFalse);
-      expect(plain.events.any((ev) => ev.type == EventType.entry), isFalse);
+      expect(plain.entries, isEmpty);
       expect(plain.persons, isEmpty);
       expect(plain.substances, isEmpty);
       expect(plain.sessions.length, 2);
       expect(plain.settings[SettingsKeys.uiPrefs], '{"layout":"tiles"}');
 
       final full = await e.backup.readAll(includeProtocol: true);
-      expect(full.tracks.length, 4);
-      expect(full.sessions.length, 3);
-      expect(full.events.where((ev) => ev.type == EventType.entry).length, 1);
+      expect(full.tracks.length, 3);
+      expect(full.sessions.length, 2);
+      expect(full.entries.single.amount, '1');
       expect(full.persons.single.name, 'Alex');
       expect(full.substances.single.lockoutMs, hour);
     });
@@ -587,9 +583,10 @@ void main() {
         expect(parsed.schemaVersion, BackupData.currentSchemaVersion);
         final report = await target.backup.merge(parsed);
         expect(report.inserted['sets'], 1);
-        expect(report.inserted['tracks'], 4);
-        expect(report.inserted['sessions'], 3);
+        expect(report.inserted['tracks'], 3);
+        expect(report.inserted['sessions'], 2);
         expect(report.inserted['events'], data.events.length);
+        expect(report.inserted['entries'], 1);
         expect(report.inserted['persons'], 1);
         expect(report.inserted['substances'], 1);
         expect(report.updatedTotal, 0);
@@ -599,11 +596,59 @@ void main() {
         expect(again.tracks.toSet(), data.tracks.toSet());
         expect(again.sessions.toSet(), data.sessions.toSet());
         expect(again.events.toSet(), data.events.toSet());
+        expect(again.entries, data.entries);
         expect(again.persons, data.persons);
         expect(again.substances, data.substances);
         expect(again.settings[SettingsKeys.uiPrefs], '{"layout":"tiles"}');
         // The seed flag is never imported.
         expect(again.settings.containsKey(SettingsKeys.seedDone), isFalse);
+      },
+    );
+
+    test(
+      'a protocol track of an earlier version is skipped on import',
+      () async {
+        final e = env();
+        final set = await e.makeSet('Festival');
+        final data = BackupData(
+          sets: [set],
+          tracks: [
+            Track(
+              id: 'old-protocol',
+              setId: set.id,
+              name: 'Zelt',
+              config: const ProtocolConfig(),
+              updatedAt: 5,
+            ),
+          ],
+          sessions: const [
+            Session(
+              id: 'old-session',
+              trackId: 'old-protocol',
+              config: ProtocolConfig(),
+              startedAt: 1,
+              updatedAt: 5,
+            ),
+          ],
+          events: const [
+            TrackEvent(
+              id: 'old-entry',
+              sessionId: 'old-session',
+              trackId: 'old-protocol',
+              type: EventType.entry,
+              at: 2,
+              personId: 'p',
+              updatedAt: 5,
+            ),
+          ],
+        );
+
+        final report = await e.backup.merge(data);
+        expect(report.inserted['tracks'], 0);
+        expect(report.inserted['sessions'], 0);
+        expect(report.inserted['events'], 0);
+        expect(await e.tracks.getTracks(set.id), isEmpty);
+        expect(await e.entries.getAll(), isEmpty);
       },
     );
 

@@ -23,6 +23,7 @@ class TestEnv {
     commands = TrackCommands(db, clock, newId, alarmSync);
     history = HistoryRepository(db, clock, alarmSync);
     people = PeopleRepository(db, clock, newId);
+    entries = EntryRepository(db, clock, newId);
     backup = BackupRepository(db, clock, history, alarmSync);
   }
 
@@ -35,6 +36,7 @@ class TestEnv {
   late final TrackCommands commands;
   late final HistoryRepository history;
   late final PeopleRepository people;
+  late final EntryRepository entries;
   late final BackupRepository backup;
 
   int _id = 0;

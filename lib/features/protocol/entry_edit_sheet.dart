@@ -6,7 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../adaptive/adaptive.dart';
 import '../../core/clock.dart';
 import '../../core/domain/domain.dart';
+import '../../core/repo/entry_repository.dart';
 import '../../core/repo/providers.dart';
+import '../../core/services/haptics.dart';
 import '../../l10n/formatters.dart';
 import '../../l10n/strings.dart';
 import '../../theme/theme.dart';
@@ -50,23 +52,20 @@ abstract final class EntrySheetKeys {
 ///
 /// Returns the entry as it is after the sheet, or `null` when it was
 /// deleted.
-Future<TrackEvent?> showEntryEditSheet(
+Future<Entry?> showEntryEditSheet(
   BuildContext context, {
-  required Track track,
-  required TrackEvent entry,
+  required Entry entry,
   bool fresh = false,
   bool quiet = false,
 }) async {
   // Fetched up front: undo may run long after the calling widget is gone.
-  final actions = ProviderScope.containerOf(
-    context,
-    listen: false,
-  ).read(protocolActionsProvider);
-  final edit = _Edit(entry, actions);
+  final container = ProviderScope.containerOf(context, listen: false);
+  final entries = container.read(entryRepositoryProvider);
+  final edit = _Edit(entry, entries, container.read(hapticsProvider));
 
   await showAdaptiveSheet<void>(
     context,
-    builder: (context) => _EditSheet(track: track, edit: edit, fresh: fresh),
+    builder: (context) => _EditSheet(edit: edit, fresh: fresh),
   );
   await edit.writes;
 
@@ -76,7 +75,7 @@ Future<TrackEvent?> showEntryEditSheet(
       showUndoSnackBar(
         context,
         message: Strings.protocolDeleted,
-        onUndo: () => actions.restoreEntry(deleted),
+        onUndo: () => entries.restore(deleted),
       );
     }
     return null;
@@ -87,14 +86,17 @@ Future<TrackEvent?> showEntryEditSheet(
       showUndoSnackBar(
         context,
         message: Strings.protocolSaved,
-        onUndo: () => actions.undoAdd(again),
+        onUndo: () async {
+          await entries.delete(again.id);
+        },
       );
     }
   } else if (edit.changed && !quiet && context.mounted) {
     showUndoSnackBar(
       context,
       message: ProtocolStrings.entryUpdated,
-      onUndo: () => actions.updateEntry(entry),
+      // Back to the entry as it was when the sheet opened.
+      onUndo: () => entries.restore(entry),
     );
   }
   return edit.current;
@@ -102,24 +104,25 @@ Future<TrackEvent?> showEntryEditSheet(
 
 /// What happened to the entry while the sheet was open.
 final class _Edit {
-  _Edit(this.before, this.actions) : current = before;
+  _Edit(this.before, this.entries, this.haptics) : current = before;
 
-  final TrackEvent before;
-  final ProtocolActions actions;
-  TrackEvent current;
+  final Entry before;
+  final EntryRepository entries;
+  final Haptics haptics;
+  Entry current;
   bool changed = false;
-  TrackEvent? deleted;
-  AddedEntry? again;
+  Entry? deleted;
+  Entry? again;
 
-  /// The writes, strictly one after the other.
+  /// The writes so far, one after the other.
   Future<void> writes = Future<void>.value();
 
-  void write(TrackEvent next) {
+  void write(Entry next) {
     current = next;
     changed = true;
     writes = writes.then((_) async {
       try {
-        await actions.updateEntry(next);
+        await entries.update(next);
       } catch (_) {
         // The next change or the close writes again.
       }
@@ -131,13 +134,8 @@ final class _Edit {
 enum _Row { person, substance, note }
 
 class _EditSheet extends ConsumerStatefulWidget {
-  const _EditSheet({
-    required this.track,
-    required this.edit,
-    required this.fresh,
-  });
+  const _EditSheet({required this.edit, required this.fresh});
 
-  final Track track;
   final _Edit edit;
   final bool fresh;
 
@@ -166,13 +164,33 @@ class _EditSheetState extends ConsumerState<_EditSheet> {
   /// The time the shortcuts of a just written entry count back from.
   late final int _base = widget.edit.before.at;
 
-  TrackEvent get _e => widget.edit.current;
+  Entry get _e => widget.edit.current;
 
   @override
   void initState() {
     super.initState();
     _amount.text = _e.amount ?? '';
     _note.text = _e.note ?? '';
+    unawaited(_load());
+  }
+
+  /// The user's own earlier amounts of the entry's thing.
+  List<String> _amounts = const [];
+
+  /// When this person had this thing before the entry.
+  int? _previousAt;
+
+  /// Reads what the sheet shows about the entry's neighbours.
+  Future<void> _load() async {
+    final e = _e;
+    final entries = widget.edit.entries;
+    final amounts = await entries.getAmounts(e.substanceId, exceptId: e.id);
+    final previous = await entries.previousOf(e.personId, e.substanceId, e.at);
+    if (!mounted) return;
+    setState(() {
+      _amounts = amounts;
+      _previousAt = previous?.at;
+    });
   }
 
   @override
@@ -186,11 +204,16 @@ class _EditSheetState extends ConsumerState<_EditSheet> {
 
   int get _nowMs => ref.read(clockProvider).nowMs();
 
-  void _apply(TrackEvent next) {
+  void _apply(Entry next) {
+    final moved =
+        next.at != _e.at ||
+        next.personId != _e.personId ||
+        next.substanceId != _e.substanceId;
     setState(() => widget.edit.write(next));
+    if (moved) unawaited(_load());
   }
 
-  void _tick() => unawaited(widget.edit.actions.haptics.selection());
+  void _tick() => unawaited(widget.edit.haptics.selection());
 
   // ------------------------------------------------------------------ time
 
@@ -249,25 +272,28 @@ class _EditSheetState extends ConsumerState<_EditSheet> {
   }
 
   void _choosePerson(String id) {
+    if (_e.personId == id) return;
     _tick();
-    _apply(_e.copyWith(personId: () => _e.personId == id ? null : id));
+    _apply(_e.copyWith(personId: id));
   }
 
   void _chooseSubstance(String id) {
+    if (_e.substanceId == id) return;
     _tick();
-    _apply(_e.copyWith(substanceId: () => _e.substanceId == id ? null : id));
+    _apply(_e.copyWith(substanceId: id));
   }
 
-  /// Creates the person typed into the inline field (an existing one of
-  /// that name is taken instead) and puts it on the entry.
   Future<void> _commitNewPerson() async {
     final name = _newPerson.text.trim();
     _newPerson.clear();
     setState(() => _addingPerson = false);
     if (name.isEmpty) return;
-    final all = ref.read(allPersonsProvider).value ?? const <Person>[];
+    // Read from the database: nothing may be watching the list yet, and a
+    // stale count would give every new one the same colour.
+    final t = context.tikky;
     final people = ref.read(peopleRepositoryProvider);
-    final color = context.tikky.paletteColor(all.length).toARGB32();
+    final all = await people.getPersons(includeArchived: true);
+    final color = t.paletteColor(all.length).toARGB32();
     Person? match;
     for (final p in all) {
       if (p.name.toLowerCase() == name.toLowerCase()) match = p;
@@ -278,7 +304,7 @@ class _EditSheetState extends ConsumerState<_EditSheet> {
       await people.setPersonArchived(match.id, archived: false);
     }
     if (!mounted) return;
-    _apply(_e.copyWith(personId: () => match!.id));
+    _apply(_e.copyWith(personId: match.id));
   }
 
   /// Like [_commitNewPerson]. A new substance never gets a lockout here.
@@ -287,9 +313,12 @@ class _EditSheetState extends ConsumerState<_EditSheet> {
     _newSubstance.clear();
     setState(() => _addingSubstance = false);
     if (name.isEmpty) return;
-    final all = ref.read(allSubstancesProvider).value ?? const <Substance>[];
+    // Read from the database: nothing may be watching the list yet, and a
+    // stale count would give every new one the same colour.
+    final t = context.tikky;
     final people = ref.read(peopleRepositoryProvider);
-    final color = context.tikky.paletteColor(all.length).toARGB32();
+    final all = await people.getSubstances(includeArchived: true);
+    final color = t.paletteColor(all.length).toARGB32();
     Substance? match;
     for (final s in all) {
       if (s.name.toLowerCase() == name.toLowerCase()) match = s;
@@ -300,7 +329,7 @@ class _EditSheetState extends ConsumerState<_EditSheet> {
       await people.setSubstanceArchived(match.id, archived: false);
     }
     if (!mounted) return;
-    _apply(_e.copyWith(substanceId: () => match!.id));
+    _apply(_e.copyWith(substanceId: match.id));
   }
 
   // --------------------------------------------------------------- actions
@@ -311,8 +340,8 @@ class _EditSheetState extends ConsumerState<_EditSheet> {
     final edit = widget.edit;
     final navigator = Navigator.of(context);
     await edit.writes;
-    edit.deleted = await edit.actions.deleteEntry(_e.id);
-    await edit.actions.haptics.heavy();
+    edit.deleted = await edit.entries.delete(_e.id);
+    await edit.haptics.heavy();
     if (navigator.mounted) navigator.pop();
   }
 
@@ -323,14 +352,13 @@ class _EditSheetState extends ConsumerState<_EditSheet> {
     final navigator = Navigator.of(context);
     await edit.writes;
     final e = _e;
-    edit.again = await edit.actions.addEntry(
-      widget.track.id,
+    edit.again = await edit.entries.add(
       personId: e.personId,
       substanceId: e.substanceId,
-      amount: e.amount ?? '',
-      note: e.note ?? '',
+      amount: e.amount,
+      note: e.note,
     );
-    if (edit.again != null) await edit.actions.haptics.tick();
+    await edit.haptics.tick();
     if (navigator.mounted) navigator.pop();
   }
 
@@ -344,15 +372,7 @@ class _EditSheetState extends ConsumerState<_EditSheet> {
     final e = _e;
     final byPerson = ref.watch(personsByIdProvider);
     final bySubstance = ref.watch(substancesByIdProvider);
-    final history =
-        ref.watch(protocolEntryHistoryProvider(widget.track.id)).value ??
-        const <TrackEvent>[];
-    // The entry itself never suggests an amount (it is being typed).
-    final others = [
-      for (final h in history)
-        if (h.id != e.id) h,
-    ];
-    final suggestions = recentAmounts(others, substanceId: e.substanceId);
+    final suggestions = _amounts;
     final amount = e.amount;
     final custom =
         _customAmount || (amount != null && !suggestions.contains(amount));
@@ -392,7 +412,7 @@ class _EditSheetState extends ConsumerState<_EditSheet> {
                         _Subtitle(
                           entry: e,
                           fresh: widget.fresh,
-                          history: others,
+                          previousAt: _previousAt,
                         ),
                       ],
                     ),
@@ -531,7 +551,7 @@ class _EditSheetState extends ConsumerState<_EditSheet> {
   }
 
   /// Jetzt · −5 · −10 · −30 min · a time of its own.
-  Widget _freshTime(TikkyTokens t, TrackEvent e) {
+  Widget _freshTime(TikkyTokens t, Entry e) {
     final back = _base - e.at;
     final picked = back != 0 && !_backMinutes.any((m) => back == m * 60 * 1000);
     return Semantics(
@@ -575,7 +595,7 @@ class _EditSheetState extends ConsumerState<_EditSheet> {
   }
 
   /// −5 · −1 · the time · +1 · +5.
-  Widget _olderTime(TikkyTokens t, TrackEvent e) {
+  Widget _olderTime(TikkyTokens t, Entry e) {
     Widget step(int m) => SizedBox(
       width: t.sizes.timeStep,
       child: SheetChip(
@@ -620,14 +640,10 @@ class _EditSheetState extends ConsumerState<_EditSheet> {
     );
   }
 
-  Widget _personChoices(
-    TikkyTokens t,
-    TrackEvent e,
-    Map<String, Person> byPerson,
-  ) {
+  Widget _personChoices(TikkyTokens t, Entry e, Map<String, Person> byPerson) {
     final persons = [...ref.watch(personsProvider).value ?? const <Person>[]];
     // The entry may name someone who was removed from the list.
-    final current = e.personId == null ? null : byPerson[e.personId];
+    final current = byPerson[e.personId];
     if (current != null && persons.every((p) => p.id != current.id)) {
       persons.add(current);
     }
@@ -661,13 +677,13 @@ class _EditSheetState extends ConsumerState<_EditSheet> {
 
   Widget _substanceChoices(
     TikkyTokens t,
-    TrackEvent e,
+    Entry e,
     Map<String, Substance> bySubstance,
   ) {
     final substances = [
       ...ref.watch(substancesProvider).value ?? const <Substance>[],
     ];
-    final current = e.substanceId == null ? null : bySubstance[e.substanceId];
+    final current = bySubstance[e.substanceId];
     if (current != null && substances.every((s) => s.id != current.id)) {
       substances.add(current);
     }
@@ -706,26 +722,14 @@ class _Subtitle extends StatelessWidget {
   const _Subtitle({
     required this.entry,
     required this.fresh,
-    required this.history,
+    required this.previousAt,
   });
 
-  final TrackEvent entry;
+  final Entry entry;
   final bool fresh;
 
-  /// The other entries of the track, newest first.
-  final List<TrackEvent> history;
-
-  /// The person's entry of the same substance right before [entry].
-  TrackEvent? get _previous {
-    for (final h in history) {
-      if (h.type != EventType.entry) continue;
-      if (h.personId != entry.personId || h.substanceId != entry.substanceId) {
-        continue;
-      }
-      if (h.at < entry.at) return h;
-    }
-    return null;
-  }
+  /// When this person had this thing before [entry], if ever.
+  final int? previousAt;
 
   @override
   Widget build(BuildContext context) {
@@ -736,13 +740,13 @@ class _Subtitle extends StatelessWidget {
         style: t.text.caption,
       );
     }
-    final previous = _previous;
+    final previous = previousAt;
     return CoarseNowBuilder(
       builder: (context, nowMs) => Text(
         [
           Fmt.dayShort(entry.at),
-          if (previous != null)
-            ProtocolStrings.afterPrevious(Fmt.coarse(entry.at - previous.at)),
+          if (previous != null && previous < entry.at)
+            ProtocolStrings.afterPrevious(Fmt.coarse(entry.at - previous)),
           Fmt.ago(nowMs - entry.at),
         ].join(' · '),
         style: t.text.caption,

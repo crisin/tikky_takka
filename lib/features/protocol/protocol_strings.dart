@@ -32,12 +32,24 @@ abstract final class ProtocolStrings {
   // --------------------------------------------------------------- scene
   static const scene = 'Szene';
   static const sceneEdit = 'Szene bearbeiten';
+
+  // ----------------------------------------------------------------- filter
+  static const filterAll = 'Alles';
+  static const filterAllSemantics = 'Alles zeigen';
+
+  /// Semantic label of a filter chip.
+  static String filterOnly(String thing) => 'Nur $thing zeigen';
+
+  /// "Wasser entfernt"
+  static String sceneRemoved(String name) => '$name entfernt';
+  static const sceneLongPress =
+      'Lange drücken: Name, Farbe und eigenen Abstand ändern oder entfernen.';
   static const sceneWho = 'Wer ist dabei?';
   static const sceneWhat = 'Was ist heute dran?';
   static const sceneClear = 'Szene leeren';
   static const sceneHint =
       'Die Szene gilt für dieses Set. Was du hier antippst, steht bei der '
-      'Erfassung vorn; alles andere bleibt über + erreichbar.';
+      'Erfassung vorn; alles andere bleibt über „Anderes“ erreichbar.';
 
   /// Title of the scene editor: "Szene · Festival".
   static String sceneOf(String setName) => '$scene · $setName';

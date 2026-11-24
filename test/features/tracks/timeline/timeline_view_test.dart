@@ -294,47 +294,6 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('a protocol entry reads "Person · Substanz · Menge" and '
-      'opens the protocol entry sheet', (tester) async {
-    final h = await TracksHarness.start(tester);
-    final people = h.container.read(peopleRepositoryProvider);
-    final jacke = await h.run(() => people.createPerson(name: 'Jacke'));
-    final gbl = await h.run(() => people.createSubstance(name: 'GBL'));
-    final tent = await h.addTrack(const ProtocolConfig(), name: 'Zelt');
-    final entry = (await h.run(
-      () => h.commands.addEntry(
-        tent.id,
-        personId: jacke.id,
-        substanceId: gbl.id,
-        amount: '1 ml',
-      ),
-    ))!;
-    final bare = (await h.run(() => h.commands.addEntry(tent.id)))!;
-    await h.showTimeline();
-
-    expect(h.inRow(entry, 'Jacke · GBL · 1 ml'), findsOneWidget);
-    expect(
-      h.inRow(
-        bare,
-        '${Strings.protocolNoPerson} · ${Strings.protocolNoSubstance}',
-      ),
-      findsOneWidget,
-    );
-
-    await h.tap(h.row(entry));
-    // The sheet "Ändern" of the entry.
-    expect(find.text('GBL · Jacke'), findsOneWidget);
-    expect(find.text(TracksStrings.eventEditTitle), findsNothing);
-    expect(
-      tester
-          .widget<TextField>(find.byKey(const ValueKey('amount')))
-          .controller!
-          .text,
-      '1 ml',
-    );
-    expect(tester.takeException(), isNull);
-  });
-
   testWidgets('the evening: one logical day, back and forth; the next '
       'one only up to the evening going on', (tester) async {
     final h = await TracksHarness.start(tester);
@@ -479,4 +438,30 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets('a protocol entry reads "Person · Substanz · Menge" and '
+      'opens the protocol entry sheet', (tester) async {
+    final h = await TracksHarness.start(tester);
+    final people = h.container.read(peopleRepositoryProvider);
+    final jacke = await h.run(() => people.createPerson(name: 'Jacke'));
+    final gbl = await h.run(() => people.createSubstance(name: 'GBL'));
+    final entry = (await h.run(
+      () => h.entry(personId: jacke.id, substanceId: gbl.id, amount: '1 ml'),
+    ))!;
+    await h.showTimeline();
+
+    expect(h.inRow(entry, 'Jacke · GBL · 1 ml'), findsOneWidget);
+    await h.tap(h.row(entry));
+    // The sheet "Ändern" of the entry.
+    expect(find.text('GBL · Jacke'), findsOneWidget);
+    expect(find.text(TracksStrings.eventEditTitle), findsNothing);
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const ValueKey('amount')))
+          .controller!
+          .text,
+      '1 ml',
+    );
+    expect(tester.takeException(), isNull);
+  });
 }

@@ -6,6 +6,7 @@ import 'package:tikky_takka/core/domain/domain.dart';
 import 'package:tikky_takka/core/engine/engine.dart';
 import 'package:tikky_takka/core/repo/repo.dart';
 import 'package:tikky_takka/features/protocol/entry_edit_sheet.dart';
+import 'package:tikky_takka/features/protocol/protocol_filter.dart';
 import 'package:tikky_takka/features/protocol/protocol_strings.dart';
 import 'package:tikky_takka/features/tracks/pad/pad_model.dart';
 import 'package:tikky_takka/features/tracks/pad/tap_pad.dart';
@@ -86,11 +87,10 @@ extension on TracksHarness {
 String _stamp(TracksHarness h) =>
     TracksStrings.padWhen(Fmt.time(h.app.clock.nowMs()), TracksStrings.padNow);
 
-/// People, substances and a scene for a protocol track.
+/// People, things and a scene: the protocol of the active set.
 class _Protocol {
-  _Protocol(this.track, this.jacke, this.kim, this.gbl, this.water);
+  _Protocol(this.jacke, this.kim, this.gbl, this.water);
 
-  final Track track;
   final Person jacke;
   final Person kim;
   final Substance gbl;
@@ -105,7 +105,6 @@ class _Protocol {
     final kim = await h.run(() => people.createPerson(name: 'Kim'));
     final gbl = await h.run(() => people.createSubstance(name: 'GBL'));
     final water = await h.run(() => people.createSubstance(name: 'Wasser'));
-    final track = await h.addTrack(const ProtocolConfig(), name: 'Zelt');
     final ids = {'Jacke': jacke.id, 'Kim': kim.id};
     await h.run(
       () => h.container
@@ -117,16 +116,15 @@ class _Protocol {
           ),
     );
     await h.settle();
-    return _Protocol(track, jacke, kim, gbl, water);
+    return _Protocol(jacke, kim, gbl, water);
   }
 
-  String person(Person p) => 'p:${track.id}:${p.id}';
-  String substance(Person p, Substance s) => 'x:${track.id}:${p.id}:${s.id}';
-  String more([Person? p]) => 'm:${track.id}:${p?.id ?? '-'}';
-  String other(Person p) => 'o:${track.id}:${p.id}';
+  String person(Person p) => 'p:${p.id}';
+  String substance(Person p, Substance s) => 'x:${p.id}:${s.id}';
+  String other(Person p) => 'o:${p.id}';
 
-  Future<List<TrackEvent>> entries(TracksHarness h) =>
-      h.ofType(track, EventType.entry);
+  Future<List<Entry>> entries(TracksHarness h) =>
+      h.run(() => h.container.read(entryRepositoryProvider).getAll());
 }
 
 void main() {
@@ -149,7 +147,6 @@ void main() {
       }
       expect(await h.snapshot(birds), isNull);
       expect(h.barMessage, TracksStrings.padReady);
-      expect(h.barHasUndo, isFalse);
 
       await h.press(h.button(id('Reiher')));
       final first = (await h.snapshot(birds))! as CounterSnapshot;
@@ -384,7 +381,6 @@ void main() {
       expect(h.value(id('Reiher')), TracksStrings.padCount(1));
       expect(h.barMessage, startsWith(TracksStrings.padUndone));
       // Nothing more to take back.
-      expect(h.barHasUndo, isFalse);
 
       // A first tap that is taken back leaves no session behind.
       final plain = 'c:${h.counter.id}';
@@ -439,7 +435,6 @@ void main() {
       await h.press(h.button('s:${a.id}'));
       expect((await h.snapshot(a))!.isRunning, isTrue);
       expect(h.barMessage, startsWith(TracksStrings.padStarted('Arbeit')));
-      expect(h.barHasUndo, isFalse);
       expect(find.byKey(InlineUndoBar.undoKey), findsNothing);
       expect(tester.takeException(), isNull);
     });
@@ -473,7 +468,6 @@ void main() {
       await tester.pump(const Duration(seconds: 5));
       await h.settle();
       expect(h.barMessage, TracksStrings.padReady);
-      expect(h.barHasUndo, isFalse);
       expect(tester.getRect(find.byKey(PadKeys.undoBar)), barRect);
       expect(tester.takeException(), isNull);
     });
@@ -655,11 +649,13 @@ void main() {
         findsOneWidget,
       );
       expect(
-        find.bySemanticsLabel(TracksStrings.padPersonSemantics('Zelt', 'Kim')),
-        findsOneWidget,
-      );
-      expect(
-        find.bySemanticsLabel(TracksStrings.padMoreSemantics('Zelt')),
+        find.bySemanticsLabel(
+          TracksStrings.padPersonSemantics(
+            'Kim',
+            TracksStrings.padNoEntry,
+            TracksStrings.padNothingYet,
+          ),
+        ),
         findsOneWidget,
       );
       await h.press(h.button(p.person(p.kim)));
@@ -678,29 +674,38 @@ void main() {
   });
 
   group('protocol', () {
-    testWidgets('two steps: person, then one tap on a substance writes the '
-        'entry and returns to the main pad', (tester) async {
+    testWidgets('two steps: person, then one tap on a thing writes the '
+        'entry and returns to the board', (tester) async {
       final h = await TracksHarness.start(tester);
       final p = await _Protocol.create(h, scenePersons: ['Kim', 'Jacke']);
       await h.showPad();
 
-      // Main pad: one button per scene person (scene order) and "+".
+      // The board: one tile per person of the scene, in its order, before
+      // the tracks.
       expect(h.button(p.person(p.kim)), findsOneWidget);
       expect(h.button(p.person(p.jacke)), findsOneWidget);
-      expect(h.button(p.more()), findsOneWidget);
       expect(h.button(p.substance(p.jacke, p.gbl)), findsNothing);
       expect(find.byKey(PadKeys.back), findsNothing);
-      final kimAt = tester.getTopLeft(h.button(p.person(p.kim)));
-      final jackeAt = tester.getTopLeft(h.button(p.person(p.jacke)));
+      bool before(Finder a, Finder b) {
+        final at = tester.getTopLeft(a);
+        final bt = tester.getTopLeft(b);
+        return at.dy < bt.dy || (at.dy == bt.dy && at.dx < bt.dx);
+      }
+
       expect(
-        kimAt.dy < jackeAt.dy ||
-            (kimAt.dy == jackeAt.dy && kimAt.dx < jackeAt.dx),
+        before(h.button(p.person(p.kim)), h.button(p.person(p.jacke))),
         isTrue,
       );
+      expect(
+        before(h.button(p.person(p.jacke)), h.button('s:${h.stopwatch.id}')),
+        isTrue,
+      );
+      expect(h.value(p.person(p.kim)), TracksStrings.padNoEntry);
+      expect(h.sub(p.person(p.kim)), TracksStrings.padNothingYet);
 
       // Step 1 writes nothing.
       await h.press(h.button(p.person(p.jacke)));
-      expect(await h.snapshot(p.track), isNull);
+      expect(await p.entries(h), isEmpty);
       expect(find.byKey(PadKeys.back), findsOneWidget);
       expect(
         find.descendant(
@@ -710,10 +715,14 @@ void main() {
         findsOneWidget,
       );
       expect(h.barMessage, TracksStrings.padWhatTitle);
+      expect(
+        tester.widget<Text>(find.byKey(PadKeys.last)).data,
+        TracksStrings.padNothingYet,
+      );
       expect(h.button(p.substance(p.jacke, p.gbl)), findsOneWidget);
       expect(h.button(p.substance(p.jacke, p.water)), findsOneWidget);
       expect(h.button(p.other(p.jacke)), findsOneWidget);
-      // Only this person's buttons.
+      // Only this person's fields.
       expect(h.button(p.person(p.kim)), findsNothing);
       expect(h.button('s:${h.stopwatch.id}'), findsNothing);
 
@@ -727,39 +736,46 @@ void main() {
       // The app fills in nothing the user did not choose.
       expect(entry.amount, isNull);
       expect(entry.note, isNull);
-      expect(entry.label, isNull);
       expect(find.byType(AlertDialog), findsNothing);
       expect(find.byType(SnackBar), findsNothing);
-      expect(find.text(Strings.protocolNewEntry), findsNothing);
       expect(h.barMessage, 'Jacke · GBL');
       expect(h.barDetail, _stamp(h));
 
-      // Back on the main pad after a moment, the entry in the undo bar.
+      // Back on the board after a moment: the tile shows where Jacke
+      // stands, the entry is in the undo bar.
       await h.wait(TikkyTokens.fallback.motion.captureConfirm);
       expect(find.byKey(PadKeys.back), findsNothing);
       expect(h.button(p.person(p.kim)), findsOneWidget);
-      expect(
-        h.sub(p.person(p.jacke)),
-        TracksStrings.padPersonLast('GBL', padSince(entry.at, entry.at)),
-      );
-      expect(h.sub(p.person(p.kim)), '');
+      expect(h.sub(p.person(p.jacke)), TracksStrings.padSinceThing('GBL'));
+      expect(h.value(p.person(p.jacke)), isNot(TracksStrings.padNoEntry));
+      expect(h.sub(p.person(p.kim)), TracksStrings.padNothingYet);
       expect(h.barMessage, 'Jacke · GBL');
 
-      // Undo deletes the entry - and the session it had opened.
+      // The page now names the last entry.
+      await h.press(h.button(p.person(p.jacke)));
+      expect(
+        tester.widget<Text>(find.byKey(PadKeys.last)).data,
+        startsWith(TracksStrings.padLastOf('GBL', '')),
+      );
+      await h.press(find.byKey(PadKeys.back));
+
+      // Undo deletes the entry.
       await h.tapUndo();
-      expect(await h.snapshot(p.track), isNull);
-      expect(h.sub(p.person(p.jacke)), '');
+      expect(await p.entries(h), isEmpty);
+      expect(h.sub(p.person(p.jacke)), TracksStrings.padNothingYet);
 
       // The back button leaves a person without writing.
       await h.press(h.button(p.person(p.kim)));
       await h.press(find.byKey(PadKeys.back));
       expect(find.byKey(PadKeys.back), findsNothing);
-      expect(await h.snapshot(p.track), isNull);
+      expect(await p.entries(h), isEmpty);
+      // No track and no session is involved.
+      expect(await h.snapshot(h.stopwatch), isNull);
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('"eingetragen" on the field, nothing moves; "Ändern" opens '
-        'the entry that was just written', (tester) async {
+    testWidgets('"eingetragen" on the field, nothing moves, a double tap is '
+        'one entry', (tester) async {
       final h = await TracksHarness.start(tester);
       final p = await _Protocol.create(h, scenePersons: ['Kim', 'Jacke']);
       await h.showPad();
@@ -778,18 +794,38 @@ void main() {
         of: h.button(id),
         matching: find.text(TracksStrings.padCaptured),
       );
+      Future<void> write() async {
+        for (var i = 0; i < 6; i++) {
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 5)),
+          );
+          await tester.pump(const Duration(milliseconds: 10));
+        }
+      }
 
       // Within the moment the pad stays: write without letting time pass.
       await tester.tap(h.button(ids[1]));
-      for (var i = 0; i < 6; i++) {
-        await tester.runAsync(
-          () => Future<void>.delayed(const Duration(milliseconds: 5)),
-        );
-        await tester.pump(const Duration(milliseconds: 10));
-      }
+      await write();
       expect(captured(ids[1]), findsOneWidget);
       expect(captured(ids[0]), findsNothing);
       expect(rects(), before);
+
+      // The same field again, past the bounce guard but while it still
+      // says "eingetragen": nothing more is written.
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.tap(h.button(ids[1]));
+      await write();
+      expect(await p.entries(h), hasLength(1));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('"Ändern" opens the entry that was just written; the line '
+        '"zuletzt" keeps the last entry within reach', (tester) async {
+      final h = await TracksHarness.start(tester);
+      final p = await _Protocol.create(h, scenePersons: ['Kim', 'Jacke']);
+      await h.showPad();
+      await h.press(h.button(p.person(p.jacke)));
+      await h.press(h.button(p.substance(p.jacke, p.water)));
       expect(
         tester
             .widget<InlineUndoBar>(find.byKey(PadKeys.undoBar))
@@ -811,21 +847,40 @@ void main() {
       await tester.enterText(find.byKey(EntrySheetKeys.amountField), '0,5 l');
       await tester.ensureVisible(find.byKey(EntrySheetKeys.done));
       await h.press(find.byKey(EntrySheetKeys.done));
-      await h.settle();
-      final entry = (await p.entries(h)).single;
+      await h.drain();
+      var entry = (await p.entries(h)).single;
       expect(entry.substanceId, p.water.id);
       expect(entry.amount, '0,5 l');
       expect(entry.at, writtenAt - 5 * 60 * 1000);
       // No snackbar over the pad: the bar shows the changed entry.
       expect(find.text(ProtocolStrings.entryUpdated), findsNothing);
       expect(h.barMessage, 'Jacke · Wasser · 0,5 l');
-      // Undo still takes the (changed) entry back.
+
+      // Long after the bar is gone the line under the name still leads to
+      // that entry.
+      await h.wait(const Duration(minutes: 2));
+      await h.press(h.button(p.person(p.jacke)));
+      await h.press(find.byKey(PadKeys.editLast));
+      expect(find.text('Wasser · Jacke'), findsOneWidget);
+      expect(find.byKey(EntrySheetKeys.again), findsOneWidget);
+      await h.press(find.byKey(EntrySheetKeys.rowPerson));
+      await h.press(find.byKey(ValueKey('person-${p.kim.id}')));
+      await tester.ensureVisible(find.byKey(EntrySheetKeys.done));
+      await h.press(find.byKey(EntrySheetKeys.done));
+      await h.drain();
+      entry = (await p.entries(h)).single;
+      expect(entry.personId, p.kim.id);
+      expect(h.barMessage, 'Kim · Wasser · 0,5 l');
+
+      // "Rückgängig" puts an older entry back to what it was.
       await h.tapUndo();
-      expect(await h.snapshot(p.track), isNull);
+      entry = (await p.entries(h)).single;
+      expect(entry.personId, p.jacke.id);
+      expect(entry.amount, '0,5 l');
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('"Anderes": the remaining substances, one tap writes; a new '
+    testWidgets('"Anderes": the remaining things, one tap writes; a new '
         'name is created and written', (tester) async {
       final h = await TracksHarness.start(tester);
       final p = await _Protocol.create(h, scenePersons: ['Kim', 'Jacke']);
@@ -843,7 +898,7 @@ void main() {
       expect(h.button(p.substance(p.kim, tea)), findsOneWidget);
       expect(h.button(p.substance(p.kim, p.gbl)), findsNothing);
 
-      // Back goes to "Was?", not to the pad.
+      // Back goes to "Was?", not to the board.
       await h.press(find.byKey(PadKeys.back));
       expect(find.byKey(PadKeys.other), findsNothing);
       expect(h.button(p.substance(p.kim, p.gbl)), findsOneWidget);
@@ -856,8 +911,11 @@ void main() {
       await h.wait(TikkyTokens.fallback.motion.captureConfirm);
       expect(find.byKey(PadKeys.back), findsNothing);
 
-      // A new one: typed, "Eintragen", in the list and in the entry.
+      // What was entered through "Anderes" does not join "Was?" by itself.
       await h.press(h.button(p.person(p.kim)));
+      expect(h.button(p.substance(p.kim, tea)), findsNothing);
+
+      // A new one: typed, "Eintragen", in the list and in the entry.
       await h.press(h.button(p.other(p.kim)));
       await tester.enterText(find.byKey(PadKeys.newName), 'Mate');
       await h.press(find.byKey(PadKeys.newSave));
@@ -874,8 +932,8 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('a single-person scene shows the substance buttons on the '
-        'main pad: one tap writes', (tester) async {
+    testWidgets('a scene of one person shows the things on the board: one '
+        'tap writes', (tester) async {
       final h = await TracksHarness.start(tester);
       final p = await _Protocol.create(h, scenePersons: ['Kim']);
       await h.showPad();
@@ -885,7 +943,7 @@ void main() {
       expect(h.button(p.substance(p.kim, p.gbl)), findsOneWidget);
       expect(h.button(p.substance(p.kim, p.water)), findsOneWidget);
       expect(h.button(p.other(p.kim)), findsOneWidget);
-      // Next to the other tracks.
+      // Next to the tracks.
       expect(h.button('s:${h.stopwatch.id}'), findsOneWidget);
       final places = {
         for (final s in [p.gbl, p.water])
@@ -893,7 +951,7 @@ void main() {
       };
 
       await h.press(h.button(p.substance(p.kim, p.water)));
-      await h.wait();
+      await h.wait(TikkyTokens.fallback.motion.captureConfirm);
       await h.press(h.button(p.substance(p.kim, p.water)));
       await h.press(h.button(p.substance(p.kim, p.gbl)));
       final entries = await p.entries(h);
@@ -910,50 +968,35 @@ void main() {
         findsNothing,
       );
       await h.setPrefs(const UiPrefs(showEntryCounts: true));
-      await h.settle();
+      await h.drain();
       expect(h.value(p.substance(p.kim, p.water)), TracksStrings.padCount(2));
       expect(h.value(p.substance(p.kim, p.gbl)), TracksStrings.padCount(1));
       expect(h.barMessage, startsWith('Kim · GBL'));
-      // Water is the most used now - the buttons stay where they were.
+      // Water is the most used now - the fields stay where they were.
       for (final s in [p.gbl, p.water]) {
         expect(tester.getRect(h.button(p.substance(p.kim, s))), places[s.id]);
       }
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('without a scene every person has a button; "+" opens the '
-        'full sheet, quietly', (tester) async {
+    testWidgets('without persons in the scene the pad has no protocol', (
+      tester,
+    ) async {
       final h = await TracksHarness.start(tester);
       final p = await _Protocol.create(h, scenePersons: const []);
       await h.showPad();
 
-      expect(h.button(p.person(p.jacke)), findsOneWidget);
-      expect(h.button(p.person(p.kim)), findsOneWidget);
-
-      await h.press(h.button(p.more()));
-      expect(find.text(Strings.protocolNewEntry), findsOneWidget);
-      await h.press(find.byKey(ValueKey('person-${p.kim.id}')));
-      await h.press(find.byKey(ValueKey('substance-${p.water.id}')));
-      await tester.ensureVisible(find.byKey(const ValueKey('save-entry')));
-      await h.press(find.byKey(const ValueKey('save-entry')));
-      await h.settle();
-
-      final entry = (await p.entries(h)).single;
-      expect(entry.personId, p.kim.id);
-      expect(entry.substanceId, p.water.id);
-      // No snackbar over the pad: the entry is in the undo bar.
-      expect(find.byType(SnackBar), findsNothing);
-      expect(h.barMessage, startsWith('Kim · Wasser'));
-      expect(find.byKey(PadKeys.back), findsNothing);
-      await h.tapUndo();
-      expect(await h.snapshot(p.track), isNull);
+      expect(h.button(p.person(p.jacke)), findsNothing);
+      expect(h.button(p.person(p.kim)), findsNothing);
+      expect(h.button(p.other(p.kim)), findsNothing);
+      expect(h.button('s:${h.stopwatch.id}'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('a lockout the user set is shown on the button and never '
-        'blocks the tap', (tester) async {
+    testWidgets('a lockout the user set is shown on the field and on the '
+        'tile, and never blocks the tap', (tester) async {
       final h = await TracksHarness.start(tester);
-      final p = await _Protocol.create(h, scenePersons: ['Kim']);
+      final p = await _Protocol.create(h, scenePersons: ['Kim', 'Jacke']);
       await h.run(
         () => h.container
             .read(peopleRepositoryProvider)
@@ -966,25 +1009,94 @@ void main() {
         of: h.button(id),
         matching: find.textContaining(TracksStrings.padLockout('')),
       );
-      expect(lockout(gbl), findsNothing);
+      final confirm = TikkyTokens.fallback.motion.captureConfirm;
 
+      await h.press(h.button(p.person(p.kim)));
+      expect(lockout(gbl), findsNothing);
       await h.press(h.button(gbl));
-      await h.press(h.button(water));
+      await h.wait(confirm);
+      // The tile: the lockout decides, in the user's own words.
+      expect(h.sub(p.person(p.kim)), TracksStrings.padLockoutOf('GBL', '2 h'));
+      // Nobody else is locked.
+      expect(h.sub(p.person(p.jacke)), TracksStrings.padNothingYet);
+
+      await h.press(h.button(p.person(p.kim)));
       expect(lockout(gbl), findsOneWidget);
-      expect(
-        find.descendant(
-          of: h.button(gbl),
-          matching: find.text(TracksStrings.padLockout('2 h')),
-        ),
-        findsOneWidget,
-      );
-      // No lockout set for water: no time of any kind beyond "since".
+      // No lockout set for water: no time of any kind on it.
       expect(lockout(water), findsNothing);
 
       await h.wait(const Duration(minutes: 30));
       await h.press(h.button(gbl));
-      expect(await p.entries(h), hasLength(3));
+      expect(await p.entries(h), hasLength(2));
       expect(find.byType(AlertDialog), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('the filter narrows what the tiles show: it moves nothing, '
+        'writes nothing, and the timeline shares it', (tester) async {
+      final h = await TracksHarness.start(tester);
+      final p = await _Protocol.create(h, scenePersons: ['Kim', 'Jacke']);
+      await h.run(() => h.entry(personId: p.kim.id, substanceId: p.gbl.id));
+      await h.run(() => h.entry(personId: p.jacke.id, substanceId: p.water.id));
+      await h.showPad();
+      await h.drain();
+      final kim = p.person(p.kim);
+      final jacke = p.person(p.jacke);
+
+      expect(find.byKey(ProtocolFilterKeys.row), findsOneWidget);
+      expect(h.sub(kim), TracksStrings.padSinceThing('GBL'));
+      expect(find.byKey(PadKeys.count(jacke)), findsNothing);
+      final places = {
+        for (final id in [kim, jacke]) id: tester.getRect(h.button(id)),
+      };
+
+      // Only water: Kim never had any, Jacke once today.
+      await h.press(find.byKey(ProtocolFilterKeys.thing(p.water.id)));
+      expect(h.value(kim), TracksStrings.padNoEntry);
+      expect(h.sub(kim), TracksStrings.padNothingOf('Wasser'));
+      expect(h.sub(jacke), TracksStrings.padSinceThing('Wasser'));
+      expect(
+        tester.widget<Text>(find.byKey(PadKeys.count(jacke))).data,
+        TracksStrings.padCount(1),
+      );
+      for (final id in [kim, jacke]) {
+        expect(tester.getRect(h.button(id)), places[id]);
+      }
+      expect(await p.entries(h), hasLength(2));
+
+      // A tap on a person still opens "Was?" and writes nothing.
+      await h.press(h.button(kim));
+      expect(find.byKey(PadKeys.back), findsOneWidget);
+      expect(h.button(p.substance(p.kim, p.gbl)), findsOneWidget);
+      expect(await p.entries(h), hasLength(2));
+      await h.press(find.byKey(PadKeys.back));
+
+      // The timeline is narrowed to the same thing.
+      expect(
+        h.container.read(protocolFilterProvider(h.activeSet.id)),
+        p.water.id,
+      );
+      await h.run(
+        () => h.container
+            .read(tracksViewsProvider.notifier)
+            .show(h.activeSet.id, TracksView.timeline),
+      );
+      await h.drain();
+      expect(
+        tester
+            .widget<FilterChip>(
+              find.byKey(ProtocolFilterKeys.thing(p.water.id)),
+            )
+            .selected,
+        isTrue,
+      );
+      await h.press(find.byKey(ProtocolFilterKeys.thing(p.water.id)));
+      expect(h.container.read(protocolFilterProvider(h.activeSet.id)), isNull);
+
+      // Back on the board everything is shown again.
+      await h.showPad();
+      await h.drain();
+      expect(h.sub(kim), TracksStrings.padSinceThing('GBL'));
       expect(tester.takeException(), isNull);
     });
   });
@@ -1003,12 +1115,13 @@ void main() {
       final p = await _Protocol.create(h, scenePersons: ['Jacke', 'Kim']);
       await h.showPad();
 
-      // 1 = stopwatch: start, then LAP (the lane shortcut would pause).
-      await tester.sendKeyEvent(LogicalKeyboardKey.digit1);
+      // 3 = stopwatch (after the two persons): start, then LAP (the lane
+      // shortcut would pause).
+      await tester.sendKeyEvent(LogicalKeyboardKey.digit3);
       await h.drain();
       expect((await h.snapshot(h.stopwatch))!.isRunning, isTrue);
       await h.wait(const Duration(seconds: 2));
-      await tester.sendKeyEvent(LogicalKeyboardKey.numpad1);
+      await tester.sendKeyEvent(LogicalKeyboardKey.numpad3);
       await h.drain();
       final watch = (await h.snapshot(h.stopwatch))! as StopwatchSnapshot;
       expect(watch.isRunning, isTrue);
@@ -1023,16 +1136,16 @@ void main() {
       await h.drain();
       expect((await h.snapshot(h.stopwatch))!.isRunning, isTrue);
 
-      // 3 = counter, 4 = first label, 0 = tenth button (seventh label).
-      await tester.sendKeyEvent(LogicalKeyboardKey.digit3);
-      await tester.sendKeyEvent(LogicalKeyboardKey.digit4);
+      // 5 = counter, 6 = first label, 0 = tenth button (fifth label).
+      await tester.sendKeyEvent(LogicalKeyboardKey.digit5);
+      await tester.sendKeyEvent(LogicalKeyboardKey.digit6);
       await tester.sendKeyEvent(LogicalKeyboardKey.digit0);
       await tester.sendKeyEvent(LogicalKeyboardKey.numpad0);
       await h.drain();
       expect(await h.ofType(h.counter, EventType.tick), hasLength(1));
       expect(
         [for (final e in await h.ofType(birds, EventType.tick)) e.label],
-        ['Art 1', 'Art 7'],
+        ['Art 1', 'Art 5'],
       );
 
       // Space does not start everything from the pad.
@@ -1060,7 +1173,7 @@ void main() {
       await h.drain();
       expect(find.text(Strings.newTrack), findsOneWidget);
       // While the sheet is open the pad keys rest.
-      await tester.sendKeyEvent(LogicalKeyboardKey.digit3);
+      await tester.sendKeyEvent(LogicalKeyboardKey.digit5);
       await h.drain();
       expect(await h.ofType(h.counter, EventType.tick), hasLength(1));
       expect(tester.takeException(), isNull);

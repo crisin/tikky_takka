@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../adaptive/adaptive.dart';
+import '../../../core/clock.dart';
 import '../../../core/domain/domain.dart';
 import '../../../core/engine/engine.dart';
 import '../../../core/repo/repo.dart';
@@ -10,6 +11,7 @@ import '../../../l10n/formatters.dart';
 import '../../../l10n/strings.dart';
 import '../../../theme/theme.dart';
 import '../../protocol/entry_edit_sheet.dart';
+import '../../protocol/protocol_filter.dart';
 import '../../protocol/protocol_widgets.dart';
 import '../now_selector.dart';
 import '../tracks_strings.dart';
@@ -17,7 +19,6 @@ import 'evening/evening_view.dart';
 import 'period/month_view.dart';
 import 'period/period_things.dart';
 import 'period/week_view.dart';
-import 'person_cards.dart';
 import 'strip/strip_view.dart';
 import 'timeline_event_sheet.dart';
 import 'timeline_logic.dart';
@@ -42,10 +43,10 @@ abstract final class TimelineKeys {
 /// or the sessions of a range.
 typedef TimelineRange = ({String setId, int? from, int? to});
 
-/// The sessions behind the timeline of one set: a stream scoped to the
-/// range in the database (`HistoryRepository.watchSetActivity`) that only
-/// lives while the timeline is shown.
-final timelineActivityProvider = StreamProvider.autoDispose
+/// The sessions of the tracks of one set: a stream scoped to the range in
+/// the database (`HistoryRepository.watchSetActivity`) that only lives
+/// while the timeline is shown.
+final _trackActivityProvider = StreamProvider.autoDispose
     .family<List<HistorySession>, TimelineRange>((ref, key) {
       final from = key.from;
       return ref
@@ -56,6 +57,42 @@ final timelineActivityProvider = StreamProvider.autoDispose
             untilMs: key.to,
           );
     });
+
+/// What the timeline of one set draws: the sessions of its tracks, and
+/// the entries of the protocol as one more lane ([entriesAsSession]).
+///
+/// Entries belong to persons, not to a set: every set shows all of them.
+/// Without a range ("Jetzt") the entries of the logical day are taken.
+final timelineActivityProvider = Provider.autoDispose
+    .family<AsyncValue<List<HistorySession>>, TimelineRange>((ref, key) {
+      final tracks = ref.watch(_trackActivityProvider(key));
+      final dayStart = ref.watch(
+        uiPrefsProvider.select((p) => p.dayStartMinutes),
+      );
+      final now = ref.read(clockProvider).nowMs();
+      final from =
+          key.from ?? logicalDayStartMs(logicalDayOf(now, dayStart), dayStart);
+      final entries = ref.watch(
+        entriesInRangeProvider((from: from, to: key.to ?? _endOfTime)),
+      );
+      if (!entries.hasValue) return const AsyncLoading();
+      return tracks.whenData((sessions) {
+        final protocol = entriesAsSession(
+          key.setId,
+          entries.value ?? const <Entry>[],
+          now,
+          set: ref.read(setProvider(key.setId)),
+        );
+        return [
+          // A protocol track of an earlier version is not shown any more.
+          for (final s in sessions)
+            if (s.track?.mode != TrackMode.protocol) s,
+          ?protocol,
+        ];
+      });
+    });
+
+const int _endOfTime = 1 << 62;
 
 /// "Zeitleiste": everything that happened in a set, across its tracks.
 /// The level is remembered per set ([timelineChoiceProvider]):
@@ -89,8 +126,6 @@ class _TimelineViewState extends ConsumerState<TimelineView> {
   /// `null` = the one going on now.
   LocalDay? _day;
 
-  /// What the month counts; `null` = everything.
-  String? _monthThing;
   bool _newestFirst = true;
   bool _showLifecycle = false;
   final Set<String> _hiddenTracks = {};
@@ -109,7 +144,15 @@ class _TimelineViewState extends ConsumerState<TimelineView> {
   @override
   Widget build(BuildContext context) {
     final t = context.tikky;
-    final tracks = widget.tracks;
+    // The protocol is one more lane, as soon as there is something to it.
+    final hasProtocol =
+        (ref.watch(setProvider(widget.setId))?.scenePersonIds.isNotEmpty ??
+            false) ||
+        (ref.watch(entryFactsProvider).value?.isNotEmpty ?? false);
+    final tracks = [
+      if (hasProtocol) protocolLane(widget.setId),
+      ...widget.tracks,
+    ];
     final choice = ref.watch(timelineChoiceProvider(widget.setId));
     final dayStart = t.prefs.dayStartMinutes;
     // The evening going on changes with the time: listen to the day.
@@ -128,6 +171,10 @@ class _TimelineViewState extends ConsumerState<TimelineView> {
   ) {
     final dayStart = t.prefs.dayStartMinutes;
     final choices = ref.read(timelineChoicesProvider.notifier);
+    // The protocol and the thing it is narrowed to (shared with the board).
+    final hasProtocol = tracks.any(isProtocolLane);
+    final filter = ref.watch(protocolFilterProvider(widget.setId));
+    final monthThing = filter == null ? null : 's:$filter';
     final day = _day ?? today;
     final level = choice.level;
     final evening = level == TimelineLevel.evening;
@@ -163,6 +210,25 @@ class _TimelineViewState extends ConsumerState<TimelineView> {
       padding: EdgeInsets.symmetric(horizontal: t.space.page),
       child: Row(
         children: [
+          // The things of the scene: one narrows the protocol to itself,
+          // here and on the board alike. The month has its own row.
+          if (hasProtocol && level != TimelineLevel.month)
+            for (final s in protocolFilterThings(
+              ref.watch(setProvider(widget.setId)),
+              ref.watch(substancesByIdProvider),
+              filter,
+            )) ...[
+              FilterChip(
+                key: ProtocolFilterKeys.thing(s.id),
+                avatar: ColorDot(color: Color(s.color)),
+                label: Text(s.name),
+                selected: filter == s.id,
+                onSelected: (on) => ref
+                    .read(protocolFiltersProvider.notifier)
+                    .choose(widget.setId, on ? s.id : null),
+              ),
+              SizedBox(width: t.space.sm),
+            ],
           // Start and stop are only drawn in "Jetzt" and in the list.
           if (level == TimelineLevel.now || compact)
             FilterChip(
@@ -274,7 +340,7 @@ class _TimelineViewState extends ConsumerState<TimelineView> {
         );
       case TimelineLevel.month:
         final substances = ref.watch(substancesByIdProvider);
-        final thing = _monthThing;
+        final thing = monthThing;
         head = _PeriodRow(
           title: Fmt.monthYear(month),
           caption: Text(
@@ -323,8 +389,16 @@ class _TimelineViewState extends ConsumerState<TimelineView> {
               toMs: to,
               monday: monday,
               month: month,
-              monthThing: _monthThing,
-              onMonthThing: (thing) => setState(() => _monthThing = thing),
+              thing: filter,
+              monthThing: monthThing,
+              onMonthThing: (key) => ref
+                  .read(protocolFiltersProvider.notifier)
+                  .choose(
+                    widget.setId,
+                    key != null && key.startsWith('s:')
+                        ? key.substring(2)
+                        : null,
+                  ),
               onDay: openEvening,
               newestFirst: _newestFirst,
               showLifecycle: _showLifecycle,
@@ -464,6 +538,7 @@ class _TimelineBody extends ConsumerWidget {
     required this.toMs,
     required this.monday,
     required this.month,
+    required this.thing,
     required this.monthThing,
     required this.onMonthThing,
     required this.onDay,
@@ -474,6 +549,9 @@ class _TimelineBody extends ConsumerWidget {
 
   final LocalDay monday;
   final LocalDay month;
+
+  /// The thing the protocol is narrowed to (a substance id), if any.
+  final String? thing;
   final String? monthThing;
   final ValueChanged<String?> onMonthThing;
   final ValueChanged<LocalDay> onDay;
@@ -493,7 +571,27 @@ class _TimelineBody extends ConsumerWidget {
     final async = ref.watch(
       timelineActivityProvider((setId: setId, from: fromMs, to: toMs)),
     );
-    final sessions = async.value;
+    final all = async.value;
+    final only = thing;
+    // Narrowed to a thing: only its entries (the month counts by itself).
+    final sessions = all == null || only == null || level == TimelineLevel.month
+        ? all
+        : [
+            for (final s in all)
+              if (!isProtocolLane(s.track))
+                s
+              else
+                HistorySession(
+                  session: s.session,
+                  events: [
+                    for (final e in s.events)
+                      if (e.substanceId == only) e,
+                  ],
+                  summary: s.summary,
+                  track: s.track,
+                  set: s.set,
+                ),
+          ];
     if (sessions == null) {
       return async.hasError
           ? AdaptiveEmptyState(
@@ -514,19 +612,8 @@ class _TimelineBody extends ConsumerWidget {
         hiddenTracks: hiddenTracks,
         emptyMessage: TracksStrings.timelineEmptyOpen,
       );
-      // Low (a phone held sideways): the strip keeps all the room.
-      return LayoutBuilder(
-        builder: (context, constraints) =>
-            constraints.maxHeight < t.strip.cardsMinHeight
-            ? strip
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  PersonCards(setId: setId, sessions: sessions),
-                  Expanded(child: strip),
-                ],
-              ),
-      );
+      // The cards per person are the board of the tap pad now.
+      return strip;
     }
 
     if (level == TimelineLevel.week || level == TimelineLevel.month) {

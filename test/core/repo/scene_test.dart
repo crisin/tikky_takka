@@ -177,15 +177,10 @@ void main() {
   group('backup', () {
     Future<(TrackSet, Person, Substance)> populate(TestEnv e) async {
       final set = await e.sets.createSet(name: 'Festival');
-      final protocol = await e.makeTrack(set, const ProtocolConfig());
       await e.makeTrack(set, const StopwatchConfig());
       final alex = await e.people.createPerson(name: 'Alex');
       final water = await e.people.createSubstance(name: 'Wasser');
-      await e.commands.addEntry(
-        protocol.id,
-        personId: alex.id,
-        substanceId: water.id,
-      );
+      await e.entries.add(personId: alex.id, substanceId: water.id);
       await e.sets.updateScene(
         set.id,
         personIds: [alex.id],
@@ -257,32 +252,5 @@ void main() {
         expect(stored.sceneSubstanceIds, [water.id]);
       },
     );
-  });
-
-  group('substance use', () {
-    test('counts per person and substance over all sessions', () async {
-      final e = env();
-      final set = await e.sets.createSet(name: 'Festival');
-      final track = await e.makeTrack(set, const ProtocolConfig());
-      final other = await e.makeTrack(set, const ProtocolConfig(), name: 'B');
-      await e.commands.addEntry(track.id, personId: 'p1', substanceId: 'x1');
-      e.clock.advanceMs(1000);
-      await e.commands.addEntry(track.id, personId: 'p1', substanceId: 'x1');
-      await e.commands.stopTrack(track.id);
-      e.clock.advanceMs(1000);
-      await e.commands.addEntry(track.id, personId: 'p1', substanceId: 'x1');
-      await e.commands.addEntry(track.id, personId: 'p2', substanceId: 'x1');
-      await e.commands.addEntry(track.id, personId: 'p1');
-      await e.commands.addEntry(other.id, personId: 'p1', substanceId: 'x9');
-
-      final use = await e.history.getSubstanceUse(track.id);
-      final now = e.clock.nowMs();
-      expect(use.toSet(), {
-        SubstanceUse(personId: 'p1', substanceId: 'x1', count: 3, lastAt: now),
-        SubstanceUse(personId: 'p2', substanceId: 'x1', count: 1, lastAt: now),
-        SubstanceUse(personId: 'p1', substanceId: null, count: 1, lastAt: now),
-      });
-      expect(await e.history.getSubstanceUse('missing'), isEmpty);
-    });
   });
 }

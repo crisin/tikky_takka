@@ -261,34 +261,6 @@ class TrackCommands {
     return event;
   }
 
-  /// Adds a protocol entry. Creates the session when the track has none.
-  /// [at] defaults to now (pass it to back-date an entry).
-  Future<TrackEvent?> addEntry(
-    String trackId, {
-    String? personId,
-    String? substanceId,
-    String? amount,
-    String? note,
-    int? at,
-  }) {
-    return _db.transaction(() async {
-      final track = await _store.track(trackId);
-      if (track == null || track.mode != TrackMode.protocol) return null;
-      final open =
-          await _writableOpenSession(trackId) ??
-          await _createSession(track, at: at);
-      return _append(
-        open,
-        EventType.entry,
-        at: at,
-        personId: personId,
-        substanceId: substanceId,
-        amount: _blankToNull(amount),
-        note: _blankToNull(note),
-      );
-    });
-  }
-
   /// Ends the open session of the track (dismisses a ringing timer): appends
   /// `stop` and closes the session, which then shows up in the history.
   /// Returns the id of the closed session, or `null` if none was open.
@@ -442,12 +414,6 @@ class TrackCommands {
     for (final id in trackIds) {
       await _alarmSync.syncTrack(id);
     }
-  }
-
-  String? _blankToNull(String? value) {
-    if (value == null) return null;
-    final trimmed = value.trim();
-    return trimmed.isEmpty ? null : trimmed;
   }
 
   /// The open session of the track for a command that is about to write.

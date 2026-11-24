@@ -43,7 +43,10 @@ void main(List<String> args) {
     hash = _fnv(hash, utf8.encode(path));
     hash = _fnv(hash, File('${root.path}/$path').readAsBytesSync());
   }
-  final version = hash.toUnsigned(64).toRadixString(16).padLeft(16, '0');
+  // Two halves: a 64-bit int with the top bit set would print with a minus
+  // sign (toUnsigned(64) changes nothing on the VM).
+  String half(int value) => value.toRadixString(16).padLeft(8, '0');
+  final version = half(hash >>> 32) + half(hash & 0xffffffff);
 
   // The app shell is cached under the scope URL ('./'), not 'index.html'.
   final core = ['./', ...files.where((p) => p != 'index.html')];

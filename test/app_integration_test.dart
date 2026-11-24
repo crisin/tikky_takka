@@ -8,7 +8,6 @@ import 'package:tikky_takka/core/repo/repo.dart';
 import 'package:tikky_takka/core/services/export_service.dart';
 import 'package:tikky_takka/core/services/export_service_impl.dart';
 import 'package:tikky_takka/features/history/history_screen.dart';
-import 'package:tikky_takka/features/protocol/protocol_people_screen.dart';
 import 'package:tikky_takka/features/settings/lock_gate.dart';
 import 'package:tikky_takka/features/settings/settings_screen.dart';
 import 'package:tikky_takka/features/settings/theme_editor_screen.dart';
@@ -167,26 +166,9 @@ void main() {
     expect(find.text(Strings.exportIncludeProtocol), findsOneWidget);
     await pop(tester, app);
 
-    // Data -> persons / substances open the protocol feature's screen.
-    final persons = find.byKey(const ValueKey('settings.persons'));
-    await reveal(tester, persons);
-    await tester.tap(persons);
-    await settle(tester, app);
-    expect(find.byType(ProtocolPeopleScreen), findsOneWidget);
-    expect(find.text(Strings.comingSoon), findsNothing);
-    await pop(tester, app);
-
-    final substances = find.byKey(const ValueKey('settings.substances'));
-    await reveal(tester, substances);
-    await tester.tap(substances);
-    await settle(tester, app);
-    expect(
-      tester
-          .widget<ProtocolPeopleScreen>(find.byType(ProtocolPeopleScreen))
-          .initialTab,
-      ProtocolPeopleTab.substances,
-    );
-    await pop(tester, app);
+    // Persons and things are managed in the scene, not in the settings.
+    expect(find.byKey(const ValueKey('settings.persons')), findsNothing);
+    expect(find.byKey(const ValueKey('settings.substances')), findsNothing);
 
     // Privacy -> the lock feature's own tile (disabled: no lock in tests).
     await reveal(tester, find.byType(AppLockTile));

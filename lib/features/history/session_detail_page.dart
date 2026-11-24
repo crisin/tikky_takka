@@ -8,7 +8,6 @@ import '../../core/core.dart';
 import '../../l10n/formatters.dart';
 import '../../l10n/strings.dart';
 import '../../theme/theme.dart';
-import '../protocol/protocol_entry_sheet.dart';
 import 'history_actions.dart';
 import 'history_strings.dart';
 import 'history_widgets.dart';
@@ -231,21 +230,12 @@ class _SessionDetailBody extends ConsumerWidget {
     WidgetRef ref,
     TrackEvent event,
   ) async {
-    final track = item.track;
     unawaited(ref.read(hapticsProvider).selection());
     final action = await showAdaptiveActionSheet<_EventAction>(
       context,
       title: Strings.eventTypeName(event.type),
       actions: [
-        // Entries are edited in the protocol sheet (who, what, amount,
-        // note and time); it needs the track.
-        if (event.type == EventType.entry && track != null)
-          AdaptiveSheetAction(
-            value: _EventAction.editEntry,
-            label: HistoryStrings.editEntry,
-            icon: AdaptiveIcons.edit(context),
-          )
-        else
+        if (event.type != EventType.entry)
           AdaptiveSheetAction(
             value: _EventAction.editNote,
             label: event.note == null
@@ -263,8 +253,6 @@ class _SessionDetailBody extends ConsumerWidget {
     );
     if (action == null || !context.mounted) return;
     switch (action) {
-      case _EventAction.editEntry:
-        await showProtocolEntrySheet(context, track: track!, existing: event);
       case _EventAction.editNote:
         await HistoryActions.editEventNote(context, ref, event);
       case _EventAction.delete:
@@ -273,7 +261,7 @@ class _SessionDetailBody extends ConsumerWidget {
   }
 }
 
-enum _EventAction { editEntry, editNote, delete }
+enum _EventAction { editNote, delete }
 
 /// The texts of one event row.
 final class EventLine {

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tikky_takka/core/domain/domain.dart';
 import 'package:tikky_takka/core/engine/engine.dart';
-import 'package:tikky_takka/features/protocol/protocol_lane.dart';
 import 'package:tikky_takka/features/tracks/lane_undo.dart';
 import 'package:tikky_takka/features/tracks/lane_view.dart';
 import 'package:tikky_takka/features/tracks/track_lane.dart';
@@ -369,21 +368,14 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('protocol tracks use the protocol lane', (tester) async {
+  testWidgets('a protocol track from an earlier version is left out', (
+    tester,
+  ) async {
     final h = await TracksHarness.start(tester);
     final track = await h.addTrack(const ProtocolConfig(), name: 'Festival');
 
-    expect(find.byType(ProtocolLane), findsOneWidget);
-    expect(
-      find.descendant(of: h.lane(track), matching: find.byType(TrackLane)),
-      findsNothing,
-    );
-    // It still has the grip and an edit button.
-    expect(find.byKey(LaneKeys.handle(track.id)), findsOneWidget);
-    expect(
-      find.bySemanticsLabel('Festival: ${Strings.editTrack}'),
-      findsWidgets,
-    );
+    expect(h.lane(track), findsNothing);
+    expect(h.lane(h.stopwatch), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

@@ -12,8 +12,6 @@ import '../../l10n/strings.dart';
 import '../../theme/theme.dart';
 import '../alarms/alarms.dart';
 import '../history/history_screen.dart';
-import '../protocol/protocol_entry_sheet.dart';
-import '../protocol/protocol_lane.dart';
 import '../settings/settings_screen.dart';
 import 'lane_actions.dart';
 import 'lane_undo.dart';
@@ -26,6 +24,7 @@ import 'set_switcher.dart';
 import 'timeline/timeline_view.dart';
 import 'track_editor_sheet.dart';
 import 'track_lane.dart';
+import 'protocol_start.dart';
 import 'tracks_strings.dart';
 import 'tracks_view.dart';
 
@@ -36,6 +35,9 @@ abstract final class TracksScreenKeys {
   static const more = ValueKey('tracks-more');
   static const settings = ValueKey('tracks-settings');
   static const emptyAddTrack = ValueKey('tracks-empty-add-track');
+
+  /// "Protokoll starten" on a set without tracks and without a scene.
+  static const emptyStartProtocol = ValueKey('tracks-empty-start-protocol');
   static const list = ValueKey('tracks-list');
   static const grid = ValueKey('tracks-grid');
 }
@@ -176,20 +178,40 @@ class TracksScreen extends ConsumerWidget {
           ? _error(context, tracks.error)
           : const SizedBox.shrink();
     }
-    if (list.isEmpty) {
+    final view = ref.watch(tracksViewProvider(set.id));
+    // The protocol needs no track: a set with somebody in its scene has a
+    // board on the tap pad and entries in the timeline.
+    final hasProtocol = set.scenePersonIds.isNotEmpty;
+    if (list.isEmpty && (!hasProtocol || view == TracksView.lanes)) {
+      final t = context.tikky;
       return AdaptiveEmptyState(
         icon: AdaptiveIcons.tracks(context),
         title: Strings.tracksEmptyTitle,
-        message: Strings.tracksEmptyBody,
-        action: AdaptiveFilledButton(
-          key: TracksScreenKeys.emptyAddTrack,
-          label: Strings.addTrack,
-          icon: AdaptiveIcons.add(context),
-          onPressed: () => showTrackEditorSheet(context, setId: set.id),
+        message: hasProtocol
+            ? Strings.tracksEmptyBody
+            : TracksStrings.emptyStartBody,
+        action: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AdaptiveFilledButton(
+              key: TracksScreenKeys.emptyAddTrack,
+              label: Strings.addTrack,
+              icon: AdaptiveIcons.add(context),
+              onPressed: () => showTrackEditorSheet(context, setId: set.id),
+            ),
+            if (!hasProtocol) ...[
+              SizedBox(height: t.space.sm),
+              AdaptiveTextButton(
+                key: TracksScreenKeys.emptyStartProtocol,
+                label: TracksStrings.startProtocol,
+                onPressed: () => startProtocol(context, setId: set.id),
+              ),
+            ],
+          ],
         ),
       );
     }
-    return _withBanners(set, switch (ref.watch(tracksViewProvider(set.id))) {
+    return _withBanners(set, switch (view) {
       TracksView.lanes => TrackLanes(setId: set.id, tracks: list),
       TracksView.pad => TapPad(setId: set.id, tracks: list),
       TracksView.timeline => TimelineView(setId: set.id, tracks: list),
@@ -509,13 +531,8 @@ class _TrackLanesState extends ConsumerState<TrackLanes> {
       itemBuilder: (context, rowIndex) {
         final start = rowIndex * columns;
         final rowTracks = tracks.skip(start).take(columns).toList();
-        // Equal heights per row need intrinsic sizing, which a foreign
-        // lane (protocol) may not support - such rows align at the top.
-        final stretch = rowTracks.every((t) => t.mode != TrackMode.protocol);
         final row = Row(
-          crossAxisAlignment: stretch
-              ? CrossAxisAlignment.stretch
-              : CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             for (var c = 0; c < columns; c++) ...[
               if (c > 0) SizedBox(width: t.space.sm),
@@ -536,7 +553,7 @@ class _TrackLanesState extends ConsumerState<TrackLanes> {
         );
         return Padding(
           padding: EdgeInsets.only(bottom: t.space.sm),
-          child: stretch ? IntrinsicHeight(child: row) : row,
+          child: IntrinsicHeight(child: row),
         );
       },
     );
@@ -644,39 +661,12 @@ class _LaneCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (track.mode != TrackMode.protocol) {
-      return TrackLane(
-        key: LaneKeys.lane(track.id),
-        track: track,
-        layout: layout,
-        dragHandle: dragHandle,
-        onEdit: onEdit,
-      );
-    }
-    final t = context.tikky;
-    return GestureDetector(
+    return TrackLane(
       key: LaneKeys.lane(track.id),
-      behavior: HitTestBehavior.translucent,
-      onLongPress: onEdit,
-      onSecondaryTap: onEdit,
-      child: Row(
-        children: [
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              dragHandle,
-              AdaptiveIconButton(
-                icon: AdaptiveIcons.edit(context),
-                semanticLabel: '${track.name}: ${Strings.editTrack}',
-                size: t.sizes.iconSm,
-                color: t.colors.textMuted,
-                onPressed: onEdit,
-              ),
-            ],
-          ),
-          Expanded(child: ProtocolLane(track: track)),
-        ],
-      ),
+      track: track,
+      layout: layout,
+      dragHandle: dragHandle,
+      onEdit: onEdit,
     );
   }
 }
@@ -798,11 +788,7 @@ class _TracksShortcutsState extends ConsumerState<TracksShortcuts> {
       final tracks = ref.read(activeTracksProvider);
       if (digit > tracks.length) return false;
       final track = tracks[digit - 1];
-      if (track.mode == TrackMode.protocol) {
-        showProtocolEntrySheet(context, track: track);
-      } else {
-        ref.read(laneActionsProvider).toggle(track);
-      }
+      ref.read(laneActionsProvider).toggle(track);
       return true;
     }
     if (key == LogicalKeyboardKey.space) {

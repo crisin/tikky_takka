@@ -12,6 +12,8 @@ Dieser Ordner ist die Vorlage für die Umsetzung in Flutter.
 | `DESIGNS.md` | Design-Modell, die sieben Designs, alle Tokens, Kontrastregeln, Bewegung |
 | `UMSETZUNG.md` | Arbeitspakete in sinnvoller Reihenfolge, mit den Dateien in `lib/`, die sie betreffen |
 | `PLAN.md` | die Pakete als einzelne Schritte, gegen den Code geprüft, mit den anstehenden Entscheidungen |
+| `PROTOKOLL.md` | das Bedienkonzept fürs Protokoll (Brett, Was?, Ändern, Szene, Filter); ersetzt die Protokoll-Teile von `FLOWS.md` |
+| `PROTOKOLL-UMSETZUNG.md` | die Pakete B1–B8 dazu, mit Stand und Abweichungen |
 | `tokens.json` | alle Farb- und Formwerte der sieben Designs, maschinenlesbar |
 | `entwuerfe/` | 25 Bildschirme als HTML (im Browser öffnen: `entwuerfe/index.html`) und als PNG (750 × 1624, also 375 × 812 in doppelter Auflösung) |
 

@@ -87,6 +87,28 @@ class TracksHarness {
   Track get timer => trackNamed(Strings.seedTimerName);
   Track get counter => trackNamed(Strings.seedCounterName);
 
+  /// Writes a protocol entry at the time of the clock and returns it as
+  /// the event the timeline shows for it (same id).
+  Future<TrackEvent?> entry({
+    required String personId,
+    required String substanceId,
+    String? amount,
+    String? note,
+  }) async => entryAsEvent(
+    await container
+        .read(entryRepositoryProvider)
+        .add(
+          personId: personId,
+          substanceId: substanceId,
+          amount: amount,
+          note: note,
+        ),
+  );
+
+  /// The entries of the protocol, oldest first.
+  Future<List<Entry>> entries() =>
+      run(() => container.read(entryRepositoryProvider).getAll());
+
   Future<Track> addTrack(TrackConfig config, {required String name}) => run(
     () => container
         .read(trackRepositoryProvider)

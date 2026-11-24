@@ -8,8 +8,6 @@ import '../../core/services/haptics.dart';
 import '../../l10n/strings.dart';
 import '../../theme/theme.dart';
 import '../protocol/protocol_scene_sheet.dart';
-import '../protocol/protocol_strings.dart';
-import '../protocol/protocol_widgets.dart';
 import 'track_lane.dart';
 import 'track_undo.dart';
 import 'tracks_strings.dart';
@@ -156,7 +154,7 @@ class _SetSheetOutcome {
   final Future<void> Function() undo;
 }
 
-enum _SetAction { rename, scene, delete }
+enum _SetAction { rename, delete }
 
 class _SetSheet extends ConsumerStatefulWidget {
   const _SetSheet();
@@ -212,11 +210,6 @@ class _SetSheetState extends ConsumerState<_SetSheet> {
           icon: AdaptiveIcons.edit(context),
         ),
         AdaptiveSheetAction(
-          value: _SetAction.scene,
-          label: ProtocolStrings.sceneEdit,
-          icon: ProtocolIcons.scene(context),
-        ),
-        AdaptiveSheetAction(
           value: _SetAction.delete,
           label: Strings.deleteSet,
           icon: AdaptiveIcons.delete(context),
@@ -228,8 +221,6 @@ class _SetSheetState extends ConsumerState<_SetSheet> {
     switch (action) {
       case _SetAction.rename:
         await _rename(set);
-      case _SetAction.scene:
-        await showSceneEditor(context, setId: set.id);
       case _SetAction.delete:
         await _delete(set);
     }
@@ -292,15 +283,8 @@ class _SetSheetState extends ConsumerState<_SetSheet> {
     final archived = active == null
         ? const <Track>[]
         : ref.watch(archivedTracksProvider(active.id)).value ?? const <Track>[];
-    // The scene only matters for a set that logs something.
-    final activeTracks = active == null
-        ? const <Track>[]
-        : ref.watch(tracksInSetProvider(active.id)).value ?? const <Track>[];
-    final showScene =
-        active != null &&
-        (activeTracks.any((track) => track.mode == TrackMode.protocol) ||
-            active.scenePersonIds.isNotEmpty ||
-            active.sceneSubstanceIds.isNotEmpty);
+    // Every set can have a scene: who is here and what is on.
+    final showScene = active != null;
     final rows = ReorderableListView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),

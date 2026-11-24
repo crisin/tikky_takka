@@ -34,7 +34,6 @@ void main() {
   final timer = _track('timer', const CountdownConfig(durationMs: 60 * sec));
   final interval = _track('interval', const IntervalConfig());
   final reminder = _track('reminder', const ReminderConfig(intervalMs: min));
-  final tent = _track('tent', const ProtocolConfig(), name: 'Zelt');
 
   const jacke = Person(id: 'jacke', name: 'Jacke');
   const kim = Person(id: 'kim', name: 'Kim');
@@ -80,33 +79,61 @@ void main() {
       expect(_ids(buttons), ['c:c:A', 'c:c:B']);
     });
 
-    test('protocol without a scene: every person, then "+"', () {
+    test('a set without persons in its scene has no protocol on the pad', () {
       final buttons = buildMainPad(
-        tracks: [tent],
+        tracks: [watch],
         persons: const [jacke, kim],
         scenePersonIds: const [],
-        sceneSubstanceIds: const [],
+        sceneSubstanceIds: const ['water'],
         substances: const [water],
       );
-      expect(_ids(buttons), ['p:tent:jacke', 'p:tent:kim', 'm:tent:-']);
-      expect(buttons.first.kind, PadButtonKind.person);
-      expect(buttons.last.kind, PadButtonKind.more);
+      expect(_ids(buttons), ['s:watch']);
     });
 
-    test('protocol with a scene: the scene persons in scene order; unknown '
-        'ids are skipped', () {
+    test('the persons of the scene come first, in the order of the scene; '
+        'unknown ids are skipped', () {
       final buttons = buildMainPad(
-        tracks: [tent],
+        tracks: [watch],
         persons: const [jacke, kim],
-        scenePersonIds: const ['kim', 'gone', 'jacke'],
+        scenePersonIds: const ['kim', 'gone', 'jacke', 'kim'],
         sceneSubstanceIds: const [],
         substances: const [water],
       );
-      expect(_ids(buttons), ['p:tent:kim', 'p:tent:jacke', 'm:tent:-']);
+      expect(_ids(buttons), ['p:kim', 'p:jacke', 's:watch']);
+      expect(buttons.first.kind, PadButtonKind.person);
+      expect(buttons.first.trackOrNull, isNull);
     });
 
-    test('a single-person scene shows the substance buttons directly: scene '
-        'substances first, then the most used, at most five', () {
+    test('an old protocol track gets no button', () {
+      final old = _track('tent', const ProtocolConfig());
+      final buttons = buildMainPad(
+        tracks: [old, watch],
+        persons: const [],
+        scenePersonIds: const [],
+        sceneSubstanceIds: const [],
+        substances: const [],
+      );
+      expect(_ids(buttons), ['s:watch']);
+    });
+
+    test('a scene of one person shows that person\'s things right away', () {
+      final buttons = buildMainPad(
+        tracks: [watch],
+        persons: const [jacke, kim],
+        scenePersonIds: const ['kim'],
+        sceneSubstanceIds: const ['tea', 'water'],
+        substances: const [water, tea, cola],
+      );
+      expect(_ids(buttons), ['x:kim:tea', 'x:kim:water', 'o:kim', 's:watch']);
+      expect(buttons.first.kind, PadButtonKind.substance);
+      expect(buttons.first.personId, 'kim');
+      expect(buttons.first.substanceId, 'tea');
+    });
+  });
+
+  group('buildSubstancePad', () {
+    test('the things of the scene in its order, the same for everybody, '
+        'at most five, then "Anderes"', () {
       const many = [
         water,
         tea,
@@ -114,80 +141,76 @@ void main() {
         Substance(id: 'a', name: 'A'),
         Substance(id: 'b', name: 'B'),
         Substance(id: 'c', name: 'C'),
-        Substance(id: 'd', name: 'D'),
       ];
-      final buttons = buildMainPad(
-        tracks: [tent],
-        persons: const [jacke, kim],
-        scenePersonIds: const ['kim'],
-        sceneSubstanceIds: const ['tea'],
-        substances: many,
-        useByTrack: const {
-          'tent': [
-            SubstanceUse(
-              personId: 'kim',
-              substanceId: 'cola',
-              count: 4,
-              lastAt: 10,
-            ),
-            SubstanceUse(
-              personId: 'kim',
-              substanceId: 'a',
-              count: 2,
-              lastAt: 10,
-            ),
-            SubstanceUse(
-              personId: 'kim',
-              substanceId: 'b',
-              count: 2,
-              lastAt: 20,
-            ),
-            SubstanceUse(
-              personId: 'kim',
-              substanceId: 'c',
-              count: 1,
-              lastAt: 30,
-            ),
-            SubstanceUse(
-              personId: 'kim',
-              substanceId: 'd',
-              count: 1,
-              lastAt: 5,
-            ),
-            // Somebody else's use does not count for Kim.
-            SubstanceUse(
-              personId: 'jacke',
-              substanceId: 'water',
-              count: 99,
-              lastAt: 99,
-            ),
+      List<String> pad(String person) => _ids(
+        buildSubstancePad(
+          personId: person,
+          sceneSubstanceIds: const [
+            'c',
+            'tea',
+            'gone',
+            'a',
+            'water',
+            'b',
+            'cola',
           ],
-        },
+          substances: many,
+        ),
       );
-      expect(_ids(buttons), [
-        'x:tent:kim:tea',
-        'x:tent:kim:cola',
-        'x:tent:kim:b',
-        'x:tent:kim:a',
-        'x:tent:kim:c',
-        'o:tent:kim',
+      expect(pad('kim'), [
+        'x:kim:c',
+        'x:kim:tea',
+        'x:kim:a',
+        'x:kim:water',
+        'x:kim:b',
+        'o:kim',
       ]);
-      expect(buttons.first.kind, PadButtonKind.substance);
-      expect(buttons.first.personId, 'kim');
-      expect(buttons.first.substanceId, 'tea');
-      expect(buttons.last.personId, 'kim');
+      expect(pad('jacke'), [
+        for (final id in pad('kim')) id.replaceFirst('kim', 'jacke'),
+      ]);
     });
 
-    test('the pad never invents a substance button: no scene substance and '
-        'no earlier entry means only "+"', () {
+    test('the pad never invents a field: no thing in the scene means only '
+        '"Anderes"', () {
       final buttons = buildSubstancePad(
-        track: tent,
         personId: 'jacke',
         sceneSubstanceIds: const [],
         substances: const [water, tea],
-        use: const [],
       );
-      expect(_ids(buttons), ['o:tent:jacke']);
+      expect(_ids(buttons), ['o:jacke']);
+    });
+  });
+
+  group('buildOtherPad', () {
+    test('everything that is not on "Was?", what this person had most '
+        'often first, then the order of the list', () {
+      final buttons = buildOtherPad(
+        personId: 'kim',
+        substances: const [
+          water,
+          tea,
+          cola,
+          Substance(id: 'a', name: 'A'),
+        ],
+        shownIds: const {'water'},
+        use: const [
+          SubstanceUse(personId: 'kim', substanceId: 'a', count: 3, lastAt: 1),
+          SubstanceUse(
+            personId: 'kim',
+            substanceId: 'water',
+            count: 9,
+            lastAt: 9,
+          ),
+          // Somebody else's use does not count for Kim.
+          SubstanceUse(
+            personId: 'jacke',
+            substanceId: 'cola',
+            count: 99,
+            lastAt: 99,
+          ),
+        ],
+      );
+      expect(_ids(buttons), ['x:kim:a', 'x:kim:tea', 'x:kim:cola']);
     });
   });
 
@@ -201,10 +224,7 @@ void main() {
     );
 
     test('a new pad shows the fresh buttons', () {
-      expect(
-        mergePadButtons(shownIds: const [], fresh: fresh, candidates: fresh),
-        fresh,
-      );
+      expect(mergePadButtons(shownIds: const [], fresh: fresh), fresh);
     });
 
     test('shown buttons keep their places when the tracks are reordered, '
@@ -219,80 +239,22 @@ void main() {
           plain,
           watch,
         ],
-        persons: const [],
-        scenePersonIds: const [],
+        persons: const [kim, jacke],
+        scenePersonIds: const ['kim', 'jacke'],
         sceneSubstanceIds: const [],
         substances: const [],
       );
-      final merged = mergePadButtons(
-        shownIds: shown,
-        fresh: reordered,
-        candidates: reordered,
-      );
+      final merged = mergePadButtons(shownIds: shown, fresh: reordered);
       expect(_ids(merged), [
         's:watch',
         'c:birds:Reiher',
         'c:birds:Ente',
-        // "Specht" is gone; "Uhu" and the new track are appended.
+        // "Specht" is gone; who joined and what is new is appended.
+        'p:kim',
+        'p:jacke',
         'c:birds:Uhu',
         'c:plain',
       ]);
-    });
-
-    test('a substance button stays although another became more used, and '
-        'a group never grows beyond the limit', () {
-      List<PadButton> pad(List<SubstanceUse> use, {int? limit = 2}) =>
-          buildMainPad(
-            tracks: [tent],
-            persons: const [kim],
-            scenePersonIds: const ['kim'],
-            sceneSubstanceIds: const [],
-            substances: const [water, tea, cola],
-            useByTrack: {'tent': use},
-            limit: limit,
-          );
-      const before = [
-        SubstanceUse(
-          personId: 'kim',
-          substanceId: 'water',
-          count: 3,
-          lastAt: 1,
-        ),
-        SubstanceUse(personId: 'kim', substanceId: 'tea', count: 2, lastAt: 1),
-      ];
-      const after = [
-        ...before,
-        SubstanceUse(personId: 'kim', substanceId: 'cola', count: 9, lastAt: 9),
-      ];
-      final shown = _ids(pad(before));
-      expect(shown, ['x:tent:kim:water', 'x:tent:kim:tea', 'o:tent:kim']);
-      // A new pad would now lead with Cola ...
-      expect(_ids(pad(after)).first, 'x:tent:kim:cola');
-      // ... the open one does not move anything.
-      final merged = mergePadButtons(
-        shownIds: shown,
-        fresh: pad(after),
-        candidates: pad(after, limit: null),
-        substanceLimit: 2,
-      );
-      expect(_ids(merged), shown);
-    });
-
-    test('a substance that was removed from the list leaves the pad', () {
-      final candidates = buildMainPad(
-        tracks: [tent],
-        persons: const [kim],
-        scenePersonIds: const ['kim'],
-        sceneSubstanceIds: const ['water'],
-        substances: const [water],
-        limit: null,
-      );
-      final merged = mergePadButtons(
-        shownIds: const ['x:tent:kim:water', 'x:tent:kim:tea', 'o:tent:kim'],
-        fresh: candidates,
-        candidates: candidates,
-      );
-      expect(_ids(merged), ['x:tent:kim:water', 'o:tent:kim']);
     });
   });
 
@@ -413,37 +375,22 @@ void main() {
       );
     });
 
-    test('protocol: person opens, substance writes, "+" opens the sheet', () {
+    test('protocol: person opens, thing writes, "Anderes" opens', () {
       expect(
-        padTapAction(PadButton.person(tent, 'kim'), RunState.idle),
+        padTapAction(PadButton.person('kim'), RunState.idle),
         PadTapAction.openPerson,
       );
       expect(
         padTapAction(
-          PadButton.substance(tent, personId: 'kim', substanceId: 'tea'),
+          PadButton.substance(personId: 'kim', substanceId: 'tea'),
           RunState.running,
         ),
         PadTapAction.entry,
       );
       expect(
-        padTapAction(PadButton.more(tent), RunState.idle),
-        PadTapAction.openSheet,
-      );
-      expect(
-        padTapAction(PadButton.other(tent, personId: 'kim'), RunState.idle),
+        padTapAction(PadButton.other('kim'), RunState.idle),
         PadTapAction.openOther,
       );
-    });
-
-    test('"Anderes" lists every substance that is not on "Was?" yet, in '
-        'the order of the list', () {
-      final buttons = buildOtherPad(
-        track: tent,
-        personId: 'kim',
-        substances: const [water, tea],
-        shownIds: const {'water'},
-      );
-      expect(_ids(buttons), ['x:tent:kim:tea']);
     });
   });
 
@@ -523,26 +470,52 @@ void main() {
       );
     });
 
-    test('person and substance buttons count the entries of the open '
-        'session', () {
-      final log = EventLog(trackId: tent.id)
-        ..start(0)
-        ..entry(0, person: 'kim', substance: 'tea')
-        ..entry(min, person: 'kim', substance: 'water')
-        ..entry(2 * min, person: 'jacke', substance: 'tea')
-        ..entry(3 * min, person: 'kim', substance: 'tea');
-      final open = _open(tent, log);
-      final person = PadButton.person(tent, 'kim');
-      final kimTea = PadButton.substance(
-        tent,
-        personId: 'kim',
-        substanceId: 'tea',
+    test('a thing counts what its person had of it today', () {
+      const counts = {
+        'kim': {'tea': 2, 'water': 1},
+        'jacke': {'tea': 1},
+      };
+      PadButton thing(String person, String id) =>
+          PadButton.substance(personId: person, substanceId: id);
+      expect(padEntryCount(thing('kim', 'tea'), counts), 2);
+      expect(padEntryCount(thing('jacke', 'water'), counts), 0);
+      expect(padEntryCount(thing('gone', 'tea'), counts), 0);
+    });
+
+    test('person tile: time since the decisive entry, or the own lockout', () {
+      const things = {'tea': tea, 'water': water};
+      const facts = [
+        LastEntryFact(personId: 'kim', substanceId: 'tea', at: 0),
+        LastEntryFact(personId: 'kim', substanceId: 'water', at: 10 * min),
+      ];
+      final none = padPersonFace(personStand('jacke', facts, 20 * min), things);
+      expect(none.digits, TracksStrings.padNoEntry);
+      expect(none.line, TracksStrings.padNothingYet);
+      expect(none.any, isFalse);
+
+      final plain = padPersonFace(
+        personStand('kim', facts, 26 * min + 14 * sec),
+        things,
       );
-      expect(padCount(person, open), 3);
-      expect(padLastTapAt(person, open), 3 * min);
-      expect(padCount(kimTea, open), 2);
-      expect(padSubText(kimTea, open, 3 * min + 30 * sec), 'vor 30 s');
-      expect(padValue(PadButton.more(tent), open, 0), '+');
+      expect(plain.digits, '16:14');
+      expect(plain.line, 'seit Wasser');
+      expect(plain.warn, isFalse);
+
+      final locked = padPersonFace(
+        personStand(
+          'kim',
+          facts,
+          26 * min,
+          lockoutMsBySubstance: const {'tea': 60 * min},
+        ),
+        things,
+      );
+      expect(locked.digits, '26:00');
+      expect(locked.line, 'Tee: noch 34 min');
+      expect(locked.warn, isTrue);
+
+      expect(padLatestFact('kim', facts)!.substanceId, 'water');
+      expect(padLatestFact('jacke', facts), isNull);
     });
 
     test('a session of another mode (left over) does not count', () {
@@ -563,11 +536,7 @@ void main() {
   });
 
   group('padLockout', () {
-    final button = PadButton.substance(
-      tent,
-      personId: 'kim',
-      substanceId: 'tea',
-    );
+    final button = PadButton.substance(personId: 'kim', substanceId: 'tea');
     const lockouts = {'tea': 60 * min};
     const facts = [LastEntryFact(personId: 'kim', substanceId: 'tea', at: 0)];
 
@@ -594,7 +563,7 @@ void main() {
       );
       expect(
         padLockout(
-          PadButton.substance(tent, personId: 'jacke', substanceId: 'tea'),
+          PadButton.substance(personId: 'jacke', substanceId: 'tea'),
           facts: facts,
           lockouts: lockouts,
           nowMs: min,

@@ -7,6 +7,7 @@ import '../domain/domain.dart';
 import '../engine/engine.dart';
 import '../services/alarms/alarm_service.dart';
 import 'backup_repository.dart';
+import 'entry_repository.dart';
 import 'history_repository.dart';
 import 'models.dart';
 import 'people_repository.dart';
@@ -52,7 +53,7 @@ final trackRepositoryProvider = Provider<TrackRepository>(
   ),
 );
 
-/// The timer commands (start, pause, lap, tick, ack, addEntry, stop, ...).
+/// The timer commands (start, pause, lap, tick, ack, stop, ...).
 final trackCommandsProvider = Provider<TrackCommands>(
   (ref) => TrackCommands(
     ref.watch(appDatabaseProvider),
@@ -72,6 +73,14 @@ final historyRepositoryProvider = Provider<HistoryRepository>(
 
 final peopleRepositoryProvider = Provider<PeopleRepository>(
   (ref) => PeopleRepository(
+    ref.watch(appDatabaseProvider),
+    ref.watch(clockProvider),
+    ref.watch(idGeneratorProvider),
+  ),
+);
+
+final entryRepositoryProvider = Provider<EntryRepository>(
+  (ref) => EntryRepository(
     ref.watch(appDatabaseProvider),
     ref.watch(clockProvider),
     ref.watch(idGeneratorProvider),
@@ -144,8 +153,19 @@ final setProvider = Provider.family<TrackSet?, String>((ref, setId) {
 // -------------------------------------------------------------------- tracks
 
 /// Non-archived tracks of one set, ordered.
+///
+/// The protocol is no longer a track: one that is still stored from an
+/// earlier version is left out everywhere.
 final tracksInSetProvider = StreamProvider.family<List<Track>, String>(
-  (ref, setId) => ref.watch(trackRepositoryProvider).watchTracks(setId),
+  (ref, setId) => ref
+      .watch(trackRepositoryProvider)
+      .watchTracks(setId)
+      .map(
+        (tracks) => [
+          for (final t in tracks)
+            if (t.mode != TrackMode.protocol) t,
+        ],
+      ),
 );
 
 /// Non-archived tracks of the active set, ordered. Empty while loading.
@@ -216,6 +236,25 @@ final allSubstancesProvider = StreamProvider<List<Substance>>(
 );
 
 /// Person by id for name / colour lookups; empty while loading.
+/// When each person last had each thing, over all entries. The board and
+/// the page "Was?" derive time since and running lockouts from it.
+final entryFactsProvider = StreamProvider<List<LastEntryFact>>(
+  (ref) => ref.watch(entryRepositoryProvider).watchLastEntries(),
+);
+
+/// How often each person had each thing, over all entries. Orders the
+/// page "Anderes".
+final entryUseProvider = StreamProvider<List<SubstanceUse>>(
+  (ref) => ref.watch(entryRepositoryProvider).watchUse(),
+);
+
+/// The entries with `from <= at < to`, oldest first.
+final entriesInRangeProvider = StreamProvider.autoDispose
+    .family<List<Entry>, ({int from, int to})>(
+      (ref, range) =>
+          ref.watch(entryRepositoryProvider).watchRange(range.from, range.to),
+    );
+
 final personsByIdProvider = Provider<Map<String, Person>>((ref) {
   final list = ref.watch(allPersonsProvider).value ?? const <Person>[];
   return {for (final p in list) p.id: p};
@@ -304,6 +343,8 @@ final sessionDetailProvider = StreamProvider.autoDispose
 /// tracks.
 final appBootstrapProvider = FutureProvider<void>((ref) async {
   await ref.watch(setRepositoryProvider).ensureSeedData();
+  // The protocol was a track once; what is left of that goes.
+  await ref.watch(trackRepositoryProvider).purgeProtocolTracks();
   final alarms = ref.watch(alarmServiceProvider);
   try {
     await alarms.init();

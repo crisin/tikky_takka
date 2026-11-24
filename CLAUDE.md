@@ -4,8 +4,9 @@
 # Tikky Takka – Hinweise für Claude Code
 
 Mehrere Timer gleichzeitig als konfigurierbare Spuren: Stoppuhr, Timer,
-Intervall, Zähler, Erinnerung, Protokoll. Flutter, ein Code für iOS, Android,
-Web und Windows. Alles bleibt lokal auf dem Gerät.
+Intervall, Zähler, Erinnerung. Dazu das Protokoll (wer hatte wann was): keine
+Spur, sondern Einträge je Person und Sache. Flutter, ein Code für iOS,
+Android, Web und Windows. Alles bleibt lokal auf dem Gerät.
 
 ## Vor größerer Arbeit lesen
 
@@ -13,7 +14,8 @@ Web und Windows. Alles bleibt lokal auf dem Gerät.
 2. `docs/design/README.md` – das beschlossene Design „Pult“, offene Fragen.
 3. `docs/design/UMSETZUNG.md` – Arbeitspakete P1–P9 mit betroffenen Dateien.
 4. `docs/design/FLOWS.md` und `docs/design/DESIGNS.md` – Regeln je Bildschirm,
-   Design-Modell, Tokens.
+   Design-Modell, Tokens. Fürs Protokoll gilt `docs/design/PROTOKOLL.md`; es
+   ersetzt dort die Abschnitte 1.2 (Protokoll), 2.1–2.7 und die Karten in 3.1.
 5. `docs/ideen/BACKLOG.md` – alle Ideen mit Status.
 6. `docs/GERAETETEST.md` – was nur auf einem echten Gerät prüfbar ist.
 
