@@ -53,7 +53,7 @@ final trackRepositoryProvider = Provider<TrackRepository>(
   ),
 );
 
-/// The timer commands (start, pause, lap, tick, ack, addEntry, stop, ...).
+/// The timer commands (start, pause, lap, tick, ack, stop, ...).
 final trackCommandsProvider = Provider<TrackCommands>(
   (ref) => TrackCommands(
     ref.watch(appDatabaseProvider),
@@ -343,6 +343,8 @@ final sessionDetailProvider = StreamProvider.autoDispose
 /// tracks.
 final appBootstrapProvider = FutureProvider<void>((ref) async {
   await ref.watch(setRepositoryProvider).ensureSeedData();
+  // The protocol was a track once; what is left of that goes.
+  await ref.watch(trackRepositoryProvider).purgeProtocolTracks();
   final alarms = ref.watch(alarmServiceProvider);
   try {
     await alarms.init();

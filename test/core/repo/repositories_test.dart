@@ -236,7 +236,7 @@ void main() {
         durationMs: 3 * hour,
       );
       e.clock.setMs(DateTime(2026, 11, 11, 20).millisecondsSinceEpoch);
-      await e.commands.addEntry(log.id, personId: 'p');
+      await e.commands.startTrack(log.id);
       e.clock.advanceMs(hour);
       final s4 = (await e.commands.stopTrack(log.id))!;
       // Still running.
@@ -271,7 +271,7 @@ void main() {
       expect(all.last.track!.name, 'A');
       expect(all.last.set!.name, 'Arbeit');
       expect(all.last.summary.netMs, 2 * hour);
-      expect(all.first.summary.entryCount, 1);
+      expect(all.first.track!.mode, TrackMode.protocol);
 
       final days = groupSessionsByDay(all);
       expect(days.map((d) => d.day.toString()), [

@@ -157,63 +157,6 @@ class HistoryRepository {
     _db.trackSets,
   ], () => getSession(sessionId));
 
-  /// When each person last logged each substance on a track, over ALL its
-  /// sessions (open and closed): one aggregate query, the input of
-  /// `deriveLockouts`.
-  Future<List<LastEntryFact>> getLastEntries(String trackId) async {
-    final events = _db.events;
-    final lastAt = events.at.max();
-    final query = _db.selectOnly(events)
-      ..addColumns([events.personId, events.substanceId, lastAt])
-      ..where(
-        events.trackId.equals(trackId) &
-            events.type.equals(EventType.entry.name),
-      )
-      ..groupBy([events.personId, events.substanceId]);
-    return [
-      for (final row in await query.get())
-        if (row.read(lastAt) case final at?)
-          LastEntryFact(
-            personId: row.read(events.personId),
-            substanceId: row.read(events.substanceId),
-            at: at,
-          ),
-    ];
-  }
-
-  /// Like [getLastEntries], re-emitting whenever an event is written.
-  Stream<List<LastEntryFact>> watchLastEntries(String trackId) =>
-      watchTables(_db, [_db.events], () => getLastEntries(trackId));
-
-  /// How often each person logged each substance on a track, over ALL its
-  /// sessions (open and closed): one aggregate query.
-  Future<List<SubstanceUse>> getSubstanceUse(String trackId) async {
-    final events = _db.events;
-    final lastAt = events.at.max();
-    final count = events.id.count();
-    final query = _db.selectOnly(events)
-      ..addColumns([events.personId, events.substanceId, lastAt, count])
-      ..where(
-        events.trackId.equals(trackId) &
-            events.type.equals(EventType.entry.name),
-      )
-      ..groupBy([events.personId, events.substanceId]);
-    return [
-      for (final row in await query.get())
-        if (row.read(lastAt) case final at?)
-          SubstanceUse(
-            personId: row.read(events.personId),
-            substanceId: row.read(events.substanceId),
-            count: row.read(count) ?? 0,
-            lastAt: at,
-          ),
-    ];
-  }
-
-  /// Like [getSubstanceUse], re-emitting whenever an event is written.
-  Stream<List<SubstanceUse>> watchSubstanceUse(String trackId) =>
-      watchTables(_db, [_db.events], () => getSubstanceUse(trackId));
-
   /// Daily net sums per track for the sessions matching [filter].
   Future<List<TrackPeriodSum>> getDailySums(HistoryFilter filter) async =>
       sumPerTrackPerDay(await getSessions(filter));
