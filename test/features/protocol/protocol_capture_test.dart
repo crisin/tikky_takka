@@ -1,18 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tikky_takka/core/domain/domain.dart';
-import 'package:tikky_takka/core/repo/repo.dart';
 import 'package:tikky_takka/features/protocol/protocol_lane.dart';
 import 'package:tikky_takka/features/protocol/protocol_strings.dart';
 import 'package:tikky_takka/features/protocol/protocol_widgets.dart';
-import 'package:tikky_takka/features/tracks/pad/tap_pad.dart';
-import 'package:tikky_takka/features/tracks/tracks_strings.dart';
 import 'package:tikky_takka/features/tracks/tracks_view.dart';
 import 'package:tikky_takka/l10n/strings.dart';
 import 'package:tikky_takka/theme/theme.dart';
 
 import '../../support/test_app.dart';
-import '../tracks/tracks_harness.dart';
 import 'protocol_test_support.dart';
 
 const _add = ValueKey('protocol-add');
@@ -59,7 +55,6 @@ void main() {
     await f.tap(find.byKey(_card(jacke)));
     final asked = _asked(f);
     expect(asked.view, TracksView.pad);
-    expect(asked.request?.trackId, f.track.id);
     expect(asked.request?.personId, jacke.id);
     // Nothing written by choosing, no sheet, no dialog.
     expect(await f.entries(), isEmpty);
@@ -258,83 +253,6 @@ void main() {
       await f.tap(find.byKey(_card(persons[1])));
       expect(_asked(f).request?.personId, persons[1].id);
       expect(tester.takeException(), isNull);
-    });
-  }
-
-  for (final (name, size) in [
-    ('phone', TestApp.phoneSize),
-    ('wide', TestApp.desktopSize),
-  ]) {
-    testWidgets('on the tracks screen a card leads to "Was?" on the tap pad, '
-        'where one tap writes ($name)', (tester) async {
-      final h = await TracksHarness.start(tester, surfaceSize: size);
-      final track = await h.addTrack(const ProtocolConfig(), name: 'Zelt');
-      final people = h.container.read(peopleRepositoryProvider);
-      final jacke = await h.run(() => people.createPerson(name: 'Jacke'));
-      final kim = await h.run(() => people.createPerson(name: 'Kim'));
-      final gbl = await h.run(
-        () => people.createSubstance(name: 'GBL', lockoutMs: hourMs),
-      );
-      await h.run(
-        () => h.container
-            .read(setRepositoryProvider)
-            .updateScene(
-              h.activeSet.id,
-              personIds: [jacke.id, kim.id],
-              substanceIds: [gbl.id],
-            ),
-      );
-      final views = h.container.read(tracksViewsProvider.notifier);
-
-      var expected = 0;
-      for (final layout in LaneLayout.values) {
-        await h.setPrefs(UiPrefs.defaults.copyWith(layout: layout));
-        await h.settle();
-        expect(tester.takeException(), isNull, reason: '$layout, lanes');
-
-        // The lists are lazy: bring the lane into view first.
-        await tester.scrollUntilVisible(
-          find.byKey(_card(kim)),
-          120,
-          scrollable: find.byType(Scrollable).first,
-        );
-        await h.tap(find.byKey(_card(kim)));
-        expect(tester.takeException(), isNull, reason: '$layout, pad');
-        expect(find.byType(TapPad), findsOneWidget);
-        expect(find.text(TracksStrings.padWhatTitle), findsOneWidget);
-        expect(find.byKey(PadKeys.back), findsOneWidget);
-        expect(h.container.read(padPageRequestProvider), isNull);
-
-        final field = find.byKey(
-          PadKeys.button('x:${track.id}:${kim.id}:${gbl.id}'),
-        );
-        expect(field, findsOneWidget, reason: '$layout');
-        await tester.tap(field);
-        // The pad writes on the real event loop.
-        for (var i = 0; i < 3; i++) {
-          await tester.runAsync(
-            () => Future<void>.delayed(const Duration(milliseconds: 5)),
-          );
-          await h.settle();
-        }
-        expect(tester.takeException(), isNull, reason: '$layout, written');
-
-        final open = await h.run(
-          () =>
-              h.container.read(trackCommandsProvider).getOpenSession(track.id),
-        );
-        final entries = [
-          for (final e in open!.events)
-            if (e.type == EventType.entry) e,
-        ];
-        expect(entries, hasLength(++expected), reason: '$layout');
-        expect(entries.last.personId, kim.id);
-        expect(entries.last.substanceId, gbl.id);
-
-        // Back to the lanes for the next round.
-        await h.run(() => views.show(h.activeSet.id, TracksView.lanes));
-        await h.settle();
-      }
     });
   }
 

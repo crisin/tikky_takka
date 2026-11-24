@@ -217,8 +217,22 @@ abstract final class TracksStrings {
       track == title ? '$title, $value' : '$track: $title, $value';
 
   /// Semantics of a person button of the pad.
-  static String padPersonSemantics(String track, String person) =>
-      '$track: $person auswählen';
+  static String padPersonSemantics(String person, String time, String line) =>
+      '$person, $time, $line. Tippen: Was?';
+
+  /// A person without any entry.
+  static const padNoEntry = '–';
+  static const padNothingYet = 'noch kein Eintrag';
+
+  /// "seit Bier"
+  static String padSinceThing(String thing) => 'seit $thing';
+
+  /// "Kippe: noch 34 min"
+  static String padLockoutOf(String thing, String duration) =>
+      '$thing: noch $duration';
+
+  /// "zuletzt Bier · vor 26 min"
+  static String padLastOf(String thing, String ago) => 'zuletzt $thing · $ago';
   static String padMoreSemantics(String track) =>
       '$track: Eintrag mit allen Angaben';
 

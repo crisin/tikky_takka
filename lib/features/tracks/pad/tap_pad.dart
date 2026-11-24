@@ -8,13 +8,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../adaptive/adaptive.dart';
 import '../../../core/clock.dart';
 import '../../../core/domain/domain.dart';
+import '../../../core/engine/engine.dart';
 import '../../../core/now_ticker.dart';
 import '../../../core/repo/repo.dart';
 import '../../../core/services/haptics.dart';
 import '../../../l10n/formatters.dart';
 import '../../../l10n/strings.dart';
 import '../../../theme/theme.dart';
-import '../../protocol/protocol_entry_sheet.dart';
 import '../../protocol/protocol_logic.dart';
 import '../../protocol/protocol_widgets.dart';
 import '../lane_view.dart';
@@ -29,6 +29,9 @@ abstract final class PadKeys {
   static const pad = ValueKey('tap-pad');
   static const undoBar = ValueKey('pad-undo-bar');
   static const back = ValueKey('pad-back');
+
+  /// "zuletzt Bier · vor 26 min" under the name on the page "Was?".
+  static const last = ValueKey('pad-last');
   static const scroll = ValueKey('pad-scroll');
 
   /// The page "Anderes" and its field for a new substance.
@@ -94,31 +97,23 @@ enum _Step {
 
 /// The person whose page is shown.
 final class _Page {
-  const _Page(
-    this.trackId,
-    this.personId, {
-    this.step = _Step.what,
-    this.fromMain = false,
-  });
+  const _Page(this.personId, {this.step = _Step.what, this.fromMain = false});
 
-  final String trackId;
   final String personId;
   final _Step step;
 
   /// "Anderes" was opened from the main pad (a scene of one person shows
-  /// that person's substances right there): back goes to the pad.
+  /// that person's things right there): back goes to the pad.
   final bool fromMain;
 }
 
+/// The pad's state: which page is open, the last capture with its undo.
 class _TapPadState extends ConsumerState<TapPad>
     with SingleTickerProviderStateMixin {
   /// The buttons of the main pad in the order they were first shown.
   List<String> _mainIds = const [];
 
   _Page? _page;
-
-  /// The buttons of the page "Was?", frozen like [_mainIds].
-  List<String> _pageIds = const [];
 
   /// What is on screen right now (the keyboard shortcuts index into it).
   List<PadButton> _visible = const [];
@@ -165,12 +160,9 @@ class _TapPadState extends ConsumerState<TapPad>
     Future.microtask(() {
       if (mounted) ref.read(padPageRequestProvider.notifier).clear();
     });
-    final known = widget.tracks.any(
-      (t) => t.id == request.trackId && t.mode == TrackMode.protocol,
-    );
-    if (!known) return;
     _closePage();
-    _page = _Page(request.trackId, request.personId);
+    // A person that does not exist is dropped again in build.
+    _page = _Page(request.personId);
   }
 
   @override
@@ -217,7 +209,6 @@ class _TapPadState extends ConsumerState<TapPad>
     _returnTimer = null;
     _hitId = null;
     _page = null;
-    _pageIds = const [];
     _newName.clear();
   }
 
@@ -258,7 +249,7 @@ class _TapPadState extends ConsumerState<TapPad>
         _returnTimer?.cancel();
         _hitId = null;
         _newName.clear();
-        _page = _Page(page.trackId, page.personId);
+        _page = _Page(page.personId);
       } else {
         _closePage();
       }
@@ -271,6 +262,9 @@ class _TapPadState extends ConsumerState<TapPad>
         monotonic - _lastTapMonotonicMs < padSameButtonGuardMs) {
       return;
     }
+    // The field that was just captured does not fire again while it still
+    // says so: a double tap is one entry.
+    if (button.kind == PadButtonKind.substance && _hitId == button.id) return;
     _lastTapId = button.id;
     _lastTapMonotonicMs = monotonic;
 
@@ -279,7 +273,7 @@ class _TapPadState extends ConsumerState<TapPad>
         ref.read(hapticsProvider).selection();
         setState(() {
           _closePage();
-          _page = _Page(button.track.id, button.personId!);
+          _page = _Page(button.personId!);
         });
         return;
       case PadButtonKind.other:
@@ -290,16 +284,8 @@ class _TapPadState extends ConsumerState<TapPad>
         setState(() {
           _returnTimer?.cancel();
           _hitId = null;
-          _page = _Page(
-            button.track.id,
-            personId,
-            step: _Step.other,
-            fromMain: fromMain,
-          );
+          _page = _Page(personId, step: _Step.other, fromMain: fromMain);
         });
-        return;
-      case PadButtonKind.more:
-        unawaited(_openSheet(button));
         return;
       case PadButtonKind.counter ||
           PadButtonKind.stopwatch ||
@@ -309,10 +295,13 @@ class _TapPadState extends ConsumerState<TapPad>
     }
     // A running or paused timer does not react: no flash that would
     // pretend something was written.
-    final open = ref.read(openSessionProvider(button.track.id));
-    final now = ref.read(nowTickerProvider).value;
-    final state = laneSnapshot(button.track, open, now).state;
-    if (padTapAction(button, state) == PadTapAction.none) return;
+    final track = button.trackOrNull;
+    if (track != null) {
+      final open = ref.read(openSessionProvider(track.id));
+      final now = ref.read(nowTickerProvider).value;
+      final state = laneSnapshot(track, open, now).state;
+      if (padTapAction(button, state) == PadTapAction.none) return;
+    }
 
     _flashOf(button.id).value++;
     final persons = ref.read(personsByIdProvider);
@@ -341,6 +330,7 @@ class _TapPadState extends ConsumerState<TapPad>
     });
   }
 
+  /// Takes back the last capture; the bar then says so.
   void _undo() {
     final last = _last;
     if (last == null || last.undo == null) return;
@@ -360,90 +350,11 @@ class _TapPadState extends ConsumerState<TapPad>
 
   /// "Ändern": the entry that was just written, with time, amount and
   /// note.
-  Future<void> _edit() async {
-    final added = _last?.entry;
-    if (added == null) return;
-    Track? track;
-    for (final t in widget.tracks) {
-      if (t.id == added.event.trackId) track = t;
-    }
-    if (track == null) return;
-    final protocol = ref.read(protocolActionsProvider);
-    final saved = await showProtocolEntrySheet(
-      context,
-      track: track,
-      existing: added.event,
-      justAdded: true,
-      // The bar above shows the changed entry with its undo.
-      quiet: true,
-    );
-    if (!mounted) return;
-    final open = ref.read(openSessionProvider(track.id));
-    final gone =
-        saved == null &&
-        !(open?.events.any((e) => e.id == added.event.id) ?? false);
-    setState(() {
-      if (gone) {
-        // Deleted in the sheet: nothing left to take back here.
-        if (identical(_last?.entry, added)) _clearLast();
-        return;
-      }
-      if (saved == null) return;
-      final now = AddedEntry(saved, createdSession: added.createdSession);
-      _showLast(
-        PadResult(
-          what: TracksStrings.padEntry(
-            personLabel(saved.personId, ref.read(personsByIdProvider)),
-            entrySummary(saved, ref.read(substancesByIdProvider)),
-          ),
-          at: saved.at,
-          undo: () => protocol.undoAdd(now),
-          entry: now,
-        ),
-      );
-    });
-  }
+  Future<void> _edit() async {}
 
-  /// "+": the full entry sheet. What it saves shows up in the undo bar
-  /// like a tap (the sheet stays quiet: no snackbar over the pad).
-  Future<void> _openSheet(PadButton button) async {
-    final track = button.track;
-    final protocol = ref.read(protocolActionsProvider);
-    final persons = ref.read(personsByIdProvider);
-    final substances = ref.read(substancesByIdProvider);
-    final hadSession = ref.read(openSessionProvider(track.id)) != null;
-    unawaited(ref.read(hapticsProvider).primary());
-    final saved = await showProtocolEntrySheet(
-      context,
-      track: track,
-      initialPersonId: button.personId,
-      quiet: true,
-    );
-    if (saved == null || !mounted) return;
-    final added = AddedEntry(saved, createdSession: !hadSession);
-    // Read again: person or substance may have been created in the sheet.
-    final personsNow = {...persons, ...ref.read(personsByIdProvider)};
-    final substancesNow = {...substances, ...ref.read(substancesByIdProvider)};
-    setState(() {
-      _showLast(
-        PadResult(
-          what: TracksStrings.padEntry(
-            personLabel(saved.personId, personsNow),
-            entrySummary(saved, substancesNow),
-          ),
-          at: saved.at,
-          undo: () => protocol.undoAdd(added),
-          entry: added,
-        ),
-      );
-      _closePage();
-    });
-  }
-
-  /// "Eintragen" on the page "Anderes": the substance of that name (an
-  /// existing one, or a new one in the next colour of the palette), then
-  /// the entry as if its field had been tapped.
-  Future<void> _addNew(Track track, String personId) async {
+  /// "Neu anlegen" on the page "Anderes": the thing is created (or found
+  /// by its name) and entered right away.
+  Future<void> _addNew(String personId) async {
     final name = _newName.text.trim();
     if (name.isEmpty) return;
     final protocol = ref.read(protocolActionsProvider);
@@ -458,7 +369,7 @@ class _TapPadState extends ConsumerState<TapPad>
     if (substance == null || !mounted) return;
     _newName.clear();
     _onTap(
-      PadButton.substance(track, personId: personId, substanceId: substance.id),
+      PadButton.substance(personId: personId, substanceId: substance.id),
       substanceName: substance.name,
     );
   }
@@ -474,26 +385,22 @@ class _TapPadState extends ConsumerState<TapPad>
     final tracks = widget.tracks;
     final sessions = ref.watch(openSessionsProvider);
     final set = ref.watch(setProvider(widget.setId));
-    final protocolTracks = [
-      for (final track in tracks)
-        if (track.mode == TrackMode.protocol) track,
-    ];
+    final scenePersonIds = set?.scenePersonIds ?? const <String>[];
+    final sceneSubstanceIds = set?.sceneSubstanceIds ?? const <String>[];
     final personsAsync = ref.watch(personsProvider);
     final substancesAsync = ref.watch(substancesProvider);
     final personsById = ref.watch(personsByIdProvider);
     final substancesById = ref.watch(substancesByIdProvider);
-    final useByTrack = <String, List<SubstanceUse>>{};
+    final factsAsync = ref.watch(entryFactsProvider);
+    final useAsync = ref.watch(entryUseProvider);
     var ready = sessions.hasValue;
-    if (protocolTracks.isNotEmpty) {
-      ready = ready && personsAsync.hasValue && substancesAsync.hasValue;
-      for (final track in protocolTracks) {
-        final use = ref.watch(protocolSubstanceUseProvider(track.id));
-        if (use.hasValue) {
-          useByTrack[track.id] = use.value!;
-        } else {
-          ready = false;
-        }
-      }
+    if (scenePersonIds.isNotEmpty || _page != null) {
+      ready =
+          ready &&
+          personsAsync.hasValue &&
+          substancesAsync.hasValue &&
+          factsAsync.hasValue &&
+          useAsync.hasValue;
     }
     // Nothing is shown before everything is known: a button that arrives
     // late would have to be squeezed in between the others.
@@ -501,75 +408,77 @@ class _TapPadState extends ConsumerState<TapPad>
 
     final persons = personsAsync.value ?? const <Person>[];
     final substances = substancesAsync.value ?? const <Substance>[];
-    final scenePersonIds = set?.scenePersonIds ?? const <String>[];
-    final sceneSubstanceIds = set?.sceneSubstanceIds ?? const <String>[];
+    final facts = factsAsync.value ?? const <LastEntryFact>[];
 
-    List<PadButton> main({int? limit}) => buildMainPad(
+    final fresh = buildMainPad(
       tracks: tracks,
       persons: persons,
       scenePersonIds: scenePersonIds,
       sceneSubstanceIds: sceneSubstanceIds,
       substances: substances,
-      useByTrack: useByTrack,
-      limit: limit,
     );
-    final mainButtons = mergePadButtons(
-      shownIds: _mainIds,
-      fresh: main(limit: captureSubstanceLimit),
-      candidates: main(),
-    );
+    // With one person the main pad is that person's page "Was?": its
+    // things follow the scene. Everything else keeps its place.
+    final mainButtons = fresh.any((b) => b.kind == PadButtonKind.substance)
+        ? fresh
+        : mergePadButtons(shownIds: _mainIds, fresh: fresh);
     _mainIds = [for (final b in mainButtons) b.id];
 
     var page = _page;
-    Track? pageTrack;
-    if (page != null) {
-      for (final track in protocolTracks) {
-        if (track.id == page.trackId) pageTrack = track;
-      }
-      // The track or the person is gone: back to the main pad.
-      if (pageTrack == null || !personsById.containsKey(page.personId)) {
-        page = null;
-        _closePage();
-      }
+    // The person is gone: back to the main pad.
+    if (page != null && !personsById.containsKey(page.personId)) {
+      page = null;
+      _closePage();
     }
 
     final List<PadButton> buttons;
-    if (page == null || pageTrack == null) {
+    if (page == null) {
       buttons = mainButtons;
     } else {
-      List<PadButton> of({required int limit}) => buildSubstancePad(
-        track: pageTrack!,
-        personId: page!.personId,
-        sceneSubstanceIds: sceneSubstanceIds,
-        substances: substances,
-        use: useByTrack[pageTrack.id] ?? const [],
-        limit: limit,
-      );
       final what = page.fromMain
           ? mainButtons
-          : mergePadButtons(
-              shownIds: _pageIds,
-              fresh: of(limit: captureSubstanceLimit),
-              candidates: of(limit: substances.length),
+          : buildSubstancePad(
+              personId: page.personId,
+              sceneSubstanceIds: sceneSubstanceIds,
+              substances: substances,
             );
       if (page.step == _Step.what) {
-        _pageIds = [for (final b in what) b.id];
         buttons = what;
       } else {
+        final personId = page.personId;
         buttons = buildOtherPad(
-          track: pageTrack,
-          personId: page.personId,
+          personId: personId,
           substances: substances,
+          use: useAsync.value ?? const <SubstanceUse>[],
           shownIds: {
             for (final b in what)
-              if (b.kind == PadButtonKind.substance &&
-                  b.personId == page.personId)
+              if (b.kind == PadButtonKind.substance && b.personId == personId)
                 b.substanceId!,
           },
         );
       }
     }
     _visible = buttons;
+
+    // The counts of today, only when they are shown (O5).
+    final dayStart = t.prefs.dayStartMinutes;
+    final nowMs = ref.read(clockProvider).nowMs();
+    final day = logicalDayOf(nowMs, dayStart);
+    final counts = t.prefs.showEntryCounts
+        ? entryCountsOfDay(
+            ref
+                    .watch(
+                      entriesInRangeProvider((
+                        from: logicalDayStartMs(day, dayStart),
+                        to: logicalDayEndMs(day, dayStart),
+                      )),
+                    )
+                    .value ??
+                const <Entry>[],
+            nowMs,
+            dayStart,
+          )
+        : const <String, Map<String, int>>{};
 
     final open = sessions.value ?? const <String, OpenSession>{};
     final showShortcuts = isDesktop(context);
@@ -582,13 +491,16 @@ class _TapPadState extends ConsumerState<TapPad>
       final substance = button.substanceId == null
           ? null
           : substancesById[button.substanceId];
+      final track = button.trackOrNull;
       return _PadTile(
         key: PadKeys.button(button.id),
         button: button,
-        open: open[button.track.id],
+        open: track == null ? null : open[track.id],
         person: person,
         substance: substance,
         substances: substancesById,
+        facts: facts,
+        count: padEntryCount(button, counts),
         shape:
             shape ??
             (activePage == null ? _TileShape.regular : _TileShape.large),
@@ -610,14 +522,14 @@ class _TapPadState extends ConsumerState<TapPad>
         tile: (button, index) =>
             tile(button, index, shape: _TileShape.centered),
         controller: _newName,
-        onAdd: () => _addNew(pageTrack!, activePage.personId),
+        onAdd: () => _addNew(activePage.personId),
       );
     } else {
       body = LayoutBuilder(
         builder: (context, constraints) {
           final layout = computePadLayout(
-            // "Was?" always has the grid of its five substances and
-            // "Anderes": the fields keep their size however many there are.
+            // "Was?" always has the grid of its five things and "Anderes":
+            // the fields keep their size however many there are.
             count: activePage == null
                 ? buttons.length
                 : max(buttons.length, captureSubstanceLimit + 1),
@@ -630,6 +542,28 @@ class _TapPadState extends ConsumerState<TapPad>
           );
           return _grid(context, buttons, layout, tile);
         },
+      );
+    }
+
+    // "zuletzt Bier · vor 26 min": always there, so the fields below do
+    // not move when the first entry is written.
+    Widget lastLine(String personId) {
+      final latest = padLatestFact(personId, facts);
+      final thing = latest == null
+          ? null
+          : substancesById[latest.substanceId]?.name ?? Strings.unknown;
+      return NowSelector<String>(
+        enabled: latest != null,
+        selector: (nowMs) => latest == null || thing == null
+            ? TracksStrings.padNothingYet
+            : TracksStrings.padLastOf(thing, padSince(latest.at, nowMs)),
+        builder: (context, text) => Text(
+          text,
+          key: PadKeys.last,
+          style: t.text.caption,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
       );
     }
 
@@ -653,6 +587,7 @@ class _TapPadState extends ConsumerState<TapPad>
                   ? TracksStrings.padBack
                   : TracksStrings.padBackToPad,
               onBack: _back,
+              last: lastLine(activePage.personId),
             ),
             SizedBox(height: t.space.sm),
           ],
@@ -662,8 +597,8 @@ class _TapPadState extends ConsumerState<TapPad>
     );
   }
 
-  /// The bar at the top: what just happened (with "Rückgängig"), or what
-  /// this page is for. It always has the same height.
+  /// The fixed bar above the pad: the last capture with "Rückgängig", or
+  /// what this page is for.
   Widget _bar(BuildContext context, _Page? page) {
     final t = context.tikky;
     final last = _last;
@@ -758,11 +693,15 @@ class _PageHeader extends StatelessWidget {
     required this.person,
     required this.backLabel,
     required this.onBack,
+    required this.last,
   });
 
   final Person? person;
   final String backLabel;
   final VoidCallback onBack;
+
+  /// The line under the name: the person's last entry.
+  final Widget last;
 
   @override
   Widget build(BuildContext context) {
@@ -787,14 +726,21 @@ class _PageHeader extends StatelessWidget {
         ),
         SizedBox(width: t.space.md),
         Expanded(
-          child: Semantics(
-            header: true,
-            child: Text(
-              name,
-              style: t.text.pageTitleCompact,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Semantics(
+                header: true,
+                child: Text(
+                  name,
+                  style: t.text.pageTitleCompact,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              last,
+            ],
           ),
         ),
       ],
@@ -802,8 +748,7 @@ class _PageHeader extends StatelessWidget {
   }
 }
 
-/// "Anderes": the other substances as fields of fixed height (a tap
-/// writes, as on "Was?") and a field for one that is not there yet.
+/// The page "Anderes": the other things, and a field for a new one.
 class _OtherPage extends StatelessWidget {
   const _OtherPage({
     required this.buttons,
@@ -977,6 +922,8 @@ class _PadTile extends ConsumerStatefulWidget {
     required this.person,
     required this.substance,
     required this.substances,
+    required this.facts,
+    required this.count,
     required this.shape,
     required this.hit,
     required this.shortcut,
@@ -992,6 +939,12 @@ class _PadTile extends ConsumerStatefulWidget {
 
   /// For the last entry of a person ("Kippe · vor 8 min").
   final Map<String, Substance> substances;
+
+  /// When each person last had each thing (person tiles, lockouts).
+  final List<LastEntryFact> facts;
+
+  /// How often the person of a thing button had that thing today.
+  final int count;
   final _TileShape shape;
 
   /// Just written: "eingetragen".
@@ -1050,7 +1003,6 @@ class _PadTileState extends ConsumerState<_PadTile> {
       PadButtonKind.stopwatch || PadButtonKind.timer => button.track.name,
       PadButtonKind.person => widget.person?.name ?? Strings.unknown,
       PadButtonKind.substance => widget.substance?.name ?? Strings.unknown,
-      PadButtonKind.more => TracksStrings.padMoreEntry,
       PadButtonKind.other => TracksStrings.padMore,
     };
   }
@@ -1060,13 +1012,11 @@ class _PadTileState extends ConsumerState<_PadTile> {
     final t = context.tikky;
     final button = widget.button;
     switch (button.kind) {
-      case PadButtonKind.more || PadButtonKind.other:
+      case PadButtonKind.other:
         return _DashedTile(
           label: _title,
-          caption: button.kind == PadButtonKind.more ? button.track.name : null,
-          semanticLabel: button.kind == PadButtonKind.more
-              ? TracksStrings.padMoreSemantics(button.track.name)
-              : TracksStrings.padOtherSemantics,
+          caption: null,
+          semanticLabel: TracksStrings.padOtherSemantics,
           shortcut: widget.shortcut,
           onTap: widget.onTap,
         );
@@ -1102,9 +1052,9 @@ class _PadTileState extends ConsumerState<_PadTile> {
           selector: face,
           builder: (context, face) => _timed(context, face),
         );
-      case PadButtonKind.counter ||
-          PadButtonKind.person ||
-          PadButtonKind.substance:
+      case PadButtonKind.person:
+        return _person(context);
+      case PadButtonKind.counter || PadButtonKind.substance:
         return _capture(context);
     }
   }
@@ -1112,10 +1062,15 @@ class _PadTileState extends ConsumerState<_PadTile> {
   /// The roles of the field: the substance's colour on "Was?" and
   /// "Anderes", the track's otherwise.
   TrackRoles _roles(TikkyTokens t) {
-    final substance = widget.substance;
-    return widget.button.kind == PadButtonKind.substance && substance != null
-        ? t.roles(Color(substance.color))
-        : t.trackRoles(widget.button.track);
+    final button = widget.button;
+    final color = switch (button.kind) {
+      PadButtonKind.substance => widget.substance?.color,
+      PadButtonKind.person => widget.person?.color,
+      _ => null,
+    };
+    if (color != null) return t.roles(Color(color));
+    final track = button.trackOrNull;
+    return track == null ? t.roles(t.colors.primary) : t.trackRoles(track);
   }
 
   Widget _timed(BuildContext context, _TimedFace face) {
@@ -1177,6 +1132,7 @@ class _PadTileState extends ConsumerState<_PadTile> {
   );
 
   /// Counter, person and substance fields.
+  /// A counter or a thing: one tap writes.
   Widget _capture(BuildContext context) {
     final t = context.tikky;
     final button = widget.button;
@@ -1185,25 +1141,19 @@ class _PadTileState extends ConsumerState<_PadTile> {
     final lit = _lit || widget.hit;
     final paint = _TilePaint.of(t, roles, look: LaneLook.running, lit: lit);
     final title = _title;
-    final count = padCount(button, open);
+    final isCounter = button.kind == PadButtonKind.counter;
+    final count = isCounter ? padCount(button, open) : widget.count;
     final substanceId = button.substanceId;
 
-    // The count: always on a counter, on a substance only when asked for
-    // (and never "×0").
-    final showCount = switch (button.kind) {
-      PadButtonKind.counter => true,
-      PadButtonKind.substance => t.prefs.showEntryCounts && count > 0,
-      _ => false,
-    };
+    // The count: always on a counter, on a thing only when asked for (and
+    // never "×0").
+    final showCount = isCounter || (t.prefs.showEntryCounts && count > 0);
 
     // Only for a lockout the user set. Shown, never enforced.
     final lockouts = ref.watch(lockoutsProvider);
     final facts =
-        button.kind == PadButtonKind.substance &&
-            substanceId != null &&
-            lockouts.containsKey(substanceId)
-        ? ref.watch(protocolLastEntriesProvider(button.track.id)).value ??
-              lastEntriesOfSession(open)
+        !isCounter && substanceId != null && lockouts.containsKey(substanceId)
+        ? widget.facts
         : null;
     final now = ref.watch(nowTickerProvider).value;
     PadLockout? lockoutAt(int nowMs) => facts == null
@@ -1234,87 +1184,51 @@ class _PadTileState extends ConsumerState<_PadTile> {
       );
     }
 
-    final Widget top = switch (button.kind) {
-      PadButtonKind.person => Row(
-        children: [
-          PersonInitial(
-            name: title,
-            color: widget.person == null ? null : Color(widget.person!.color),
-            size: t.sizes.padAvatar,
-            style: t.text.padInitial,
-          ),
-          SizedBox(width: t.space.md),
-          Flexible(child: _name(t, paint, title)),
-        ],
-      ),
-      _ => Row(
-        crossAxisAlignment: CrossAxisAlignment.baseline,
-        textBaseline: TextBaseline.alphabetic,
-        children: [
-          Expanded(child: _name(t, paint, title)),
-          if (countText != null) ...[SizedBox(width: t.space.sm), countText],
-        ],
-      ),
-    };
+    final Widget top = Row(
+      crossAxisAlignment: CrossAxisAlignment.baseline,
+      textBaseline: TextBaseline.alphabetic,
+      children: [
+        Expanded(child: _name(t, paint, title)),
+        if (countText != null) ...[SizedBox(width: t.space.sm), countText],
+      ],
+    );
 
     final Widget? bottom;
-    switch (button.kind) {
-      case PadButtonKind.counter:
-        bottom = NowSelector<String>(
-          enabled: padIsLive(button, open, now),
-          selector: (nowMs) => padSubText(button, open, nowMs),
-          builder: (context, text) => _hint(t, paint, text, button.id),
-        );
-      case PadButtonKind.person:
-        final last = padLastEntry(button, open);
-        bottom = NowSelector<String>(
-          enabled: last != null,
-          selector: (nowMs) => last == null
-              ? ''
-              : TracksStrings.padPersonLast(
-                  entrySummary(last, widget.substances),
-                  padSince(last.at, nowMs),
-                ),
-          builder: (context, text) => _hint(t, paint, text, button.id),
-        );
-      case PadButtonKind.substance:
-        bottom = widget.hit
-            ? _captured(t, paint)
-            : facts == null
-            ? null
-            : NowSelector<PadLockout?>(
-                selector: lockoutAt,
-                builder: (context, lockout) => lockout == null
-                    ? const SizedBox.shrink()
-                    : _lockout(t, lockout),
-              );
-      case PadButtonKind.stopwatch ||
-          PadButtonKind.timer ||
-          PadButtonKind.more ||
-          PadButtonKind.other:
-        bottom = null;
+    if (isCounter) {
+      bottom = NowSelector<String>(
+        enabled: padIsLive(button, open, now),
+        selector: (nowMs) => padSubText(button, open, nowMs),
+        builder: (context, text) => _hint(t, paint, text, button.id),
+      );
+    } else if (widget.hit) {
+      bottom = _captured(t, paint);
+    } else if (facts == null) {
+      bottom = null;
+    } else {
+      bottom = NowSelector<PadLockout?>(
+        selector: lockoutAt,
+        builder: (context, lockout) =>
+            lockout == null ? const SizedBox.shrink() : _lockout(t, lockout),
+      );
     }
 
     final String semantics;
-    switch (button.kind) {
-      case PadButtonKind.person:
-        semantics = TracksStrings.padPersonSemantics(button.track.name, title);
-      case PadButtonKind.substance:
-        final lockout = lockoutAt(now);
-        semantics = TracksStrings.padSubstanceSemantics(
-          title,
-          count: showCount ? count : null,
-          lockout: lockout == null
-              ? null
-              : TracksStrings.padLockout(formatRemaining(lockout.remainingMs)),
-          captured: widget.hit,
-        );
-      default:
-        semantics = TracksStrings.padButtonSemantics(
-          button.track.name,
-          title,
-          Strings.countValue(count),
-        );
+    if (isCounter) {
+      semantics = TracksStrings.padButtonSemantics(
+        button.track.name,
+        title,
+        Strings.countValue(count),
+      );
+    } else {
+      final lockout = lockoutAt(now);
+      semantics = TracksStrings.padSubstanceSemantics(
+        title,
+        count: showCount ? count : null,
+        lockout: lockout == null
+            ? null
+            : TracksStrings.padLockout(formatRemaining(lockout.remainingMs)),
+        captured: widget.hit,
+      );
     }
 
     return _TileFrame(
@@ -1324,6 +1238,80 @@ class _PadTileState extends ConsumerState<_PadTile> {
       onTap: widget.onTap,
       top: top,
       bottom: bottom,
+    );
+  }
+
+  /// A person of the scene: where they stand, and the way to "Was?".
+  Widget _person(BuildContext context) {
+    final t = context.tikky;
+    final button = widget.button;
+    final personId = button.personId!;
+    final roles = _roles(t);
+    final title = _title;
+    final lockouts = ref.watch(lockoutsProvider);
+    final substances = widget.substances;
+    final facts = widget.facts;
+    PadPersonFace face(int nowMs) => padPersonFace(
+      personStand(personId, facts, nowMs, lockoutMsBySubstance: lockouts),
+      substances,
+    );
+    return NowSelector<PadPersonFace>(
+      enabled: padLatestFact(personId, facts) != null,
+      selector: face,
+      builder: (context, face) {
+        final paint = _TilePaint.of(
+          t,
+          roles,
+          look: face.any ? LaneLook.running : LaneLook.idle,
+          lit: _lit,
+        );
+        return _TileFrame(
+          paint: paint,
+          semanticLabel: TracksStrings.padPersonSemantics(
+            title,
+            face.digits,
+            face.line,
+          ),
+          shortcut: widget.shortcut,
+          onTap: widget.onTap,
+          top: Row(
+            children: [
+              PersonInitial(
+                name: title,
+                color: widget.person == null
+                    ? null
+                    : Color(widget.person!.color),
+                size: t.sizes.padAvatar,
+                style: t.text.padInitial,
+              ),
+              SizedBox(width: t.space.md),
+              Flexible(child: _name(t, paint, title)),
+            ],
+          ),
+          bottom: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                face.digits,
+                key: PadKeys.value(button.id),
+                style: t.text.padDigits.copyWith(color: paint.text),
+                maxLines: 1,
+              ),
+              Text(
+                face.line,
+                key: PadKeys.sub(button.id),
+                style: t.text.padHint.copyWith(
+                  color: face.warn ? t.colors.warningText : paint.ink,
+                  fontWeight: face.warn ? FontWeight.w600 : null,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 

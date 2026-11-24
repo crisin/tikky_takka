@@ -6,7 +6,6 @@ import '../../../core/now_ticker.dart';
 import '../../../core/repo/repo.dart';
 import '../../../core/repo/session_store.dart';
 import '../../../core/services/haptics.dart';
-import '../../protocol/protocol_logic.dart';
 import '../lane_view.dart';
 import '../tracks_strings.dart';
 import 'pad_model.dart';
@@ -32,7 +31,8 @@ final class PadResult {
   final Future<void> Function()? undo;
 
   /// The protocol entry that was written, for "Ändern".
-  final AddedEntry? entry;
+  /// The protocol entry that was written, for "Ändern".
+  final Entry? entry;
 }
 
 /// The write side of the tap pad. Every tap is ONE command (one database
@@ -61,7 +61,13 @@ class PadActions {
     String personName = '',
     String substanceName = '',
   }) async {
-    final track = button.track;
+    if (button.kind == PadButtonKind.substance) {
+      final result = await _entry(button, personName, substanceName);
+      _refresh();
+      return result;
+    }
+    final track = button.trackOrNull;
+    if (track == null) return null;
     final open = await _commands.getOpenSession(track.id);
     final now = _clock.nowMs();
     final state = laneSnapshot(track, open, now).state;
@@ -79,10 +85,8 @@ class PadActions {
         result = await _dismiss(track);
       case PadTapAction.ack:
         result = await _ack(track);
-      case PadTapAction.entry:
-        result = await _entry(button, personName, substanceName);
-      case PadTapAction.openPerson ||
-          PadTapAction.openSheet ||
+      case PadTapAction.entry ||
+          PadTapAction.openPerson ||
           PadTapAction.openOther ||
           PadTapAction.none:
         result = null;
@@ -201,25 +205,24 @@ class PadActions {
     String personName,
     String substanceName,
   ) async {
-    final protocol = _ref.read(protocolActionsProvider);
-    final added = await protocol.addEntry(
-      button.track.id,
-      personId: button.personId,
-      substanceId: button.substanceId,
+    final personId = button.personId;
+    final substanceId = button.substanceId;
+    if (personId == null || substanceId == null) return null;
+    final entries = _ref.read(entryRepositoryProvider);
+    final entry = await entries.add(
+      personId: personId,
+      substanceId: substanceId,
     );
-    if (added == null) return null;
     await _haptics.tick();
     return PadResult(
       what: TracksStrings.padEntry(personName, substanceName),
-      at: added.event.at,
-      undo: () => protocol.undoAdd(added),
-      entry: added,
+      at: entry.at,
+      undo: () async {
+        await entries.delete(entry.id);
+      },
     );
   }
 
-  /// Undo of a tap that had opened the session: removes the session again
-  /// - but only when it is still the same one and nothing but its start
-  /// (and pauses) is left in it.
   Future<void> _discardIfOnlyStarted(String trackId, String sessionId) async {
     final open = await _commands.getOpenSession(trackId);
     if (open == null || open.session.id != sessionId) return;
