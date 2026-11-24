@@ -49,7 +49,7 @@ abstract final class ProtocolStrings {
   static const sceneClear = 'Szene leeren';
   static const sceneHint =
       'Die Szene gilt für dieses Set. Was du hier antippst, steht bei der '
-      'Erfassung vorn; alles andere bleibt über + erreichbar.';
+      'Erfassung vorn; alles andere bleibt über „Anderes“ erreichbar.';
 
   /// Title of the scene editor: "Szene · Festival".
   static String sceneOf(String setName) => '$scene · $setName';

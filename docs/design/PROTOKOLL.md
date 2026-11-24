@@ -1,6 +1,7 @@
 # Protokoll – neues Bedienkonzept
 
-Stand: 24.11.2026. P1–P6 sind entschieden (Abschnitt 12).
+Stand: 24.11.2026. P1–P6 sind entschieden (Abschnitt 12) und umgesetzt
+(`PROTOKOLL-UMSETZUNG.md`); was dabei anders kam, steht in Abschnitt 15.
 Ersetzt die Abschnitte 1.2 (Protokoll-Spur), 2.1–2.7 und 3.1 (Karten) in
 `FLOWS.md`. Das Aussehen (Design „Pult“, Tokens) bleibt; neu ist nur, was wo
 liegt und wie man hinkommt.
@@ -245,3 +246,25 @@ und ein Abend am Gerät.
 Das sind überwiegend Herstellerseiten und Blogs, keine Studien. Eine
 Untersuchung dazu, wie gut Abstands-Anzeigen im Rausch funktionieren, habe
 ich nicht gefunden.
+
+## 15. Was beim Bauen anders kam
+
+- **Name im Streifen:** Ein Tipp auf den Namen klappt die Person weiter auf
+  und zu, wie in `FLOWS.md` 3.1. Der Sprung zum Brett (Abschnitt 10) ist
+  nicht gebaut; das Brett liegt einen Reiter weiter.
+- **Filter in der Zeitleiste:** keine eigene Reihe, sondern die Sachen der
+  Szene vorn in der bestehenden Filter-Reihe. Ein zweiter Tipp auf dieselbe
+  Sache zeigt wieder alles; „Alles“ gibt es dort nicht als Knopf. Eine
+  eigene Reihe hätte auf einem quer gehaltenen Telefon den Streifen
+  verdrängt.
+- **Entfernen in der Szene:** „Rückgängig“ steht in der Szene selbst. Eine
+  Leiste am unteren Rand läge hinter dem Blatt.
+- **Der erste Start:** Die App legt beim ersten Start weiter das Set
+  „Allgemein“ mit drei Spuren an. Den Weg „Protokoll starten“ zeigt deshalb
+  nur ein Set ohne Spuren; sonst führt der Set-Titel („Sets und Szene“) oder
+  „Protokoll“ in der Art-Auswahl einer neuen Spur zur Szene.
+- **Ohne Sachen in der Szene** zeigt „Was?“ nur „Anderes“. Das Brett
+  erfindet kein Feld.
+- **Export:** Die Liste der Ereignisse führt die Einträge unter der Spur
+  „Protokoll“. Die Liste der Sitzungen nennt das Protokoll nicht – es hat
+  keine Sitzungen.

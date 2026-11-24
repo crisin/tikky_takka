@@ -60,10 +60,8 @@ innen, 8 zwischen den Spuren.
   links. Die dünne Fortschrittsleiste (3 px) entfällt.
 - **Zähler mit Labels:** unter der Zeile drei Felder (48 hoch, `strong`,
   Radius 14) mit Name und Anzahl.
-- **Protokoll:** statt Ziffern die Frage „Wer bist du?“ und eine Kachel pro
-  Person (60 hoch): Kürzel im Kreis (Personenfarbe), Name, darunter letzter
-  Eintrag und Minuten seitdem. Rechts ein schmales Plus (48) für „Andere“ und
-  Szene. Tippen auf eine Person öffnet „Was?“ (2.2).
+- **Protokoll:** ist keine Spur mehr und steht nicht in dieser Liste. Es liegt
+  als Brett im Tippfeld, siehe `PROTOKOLL.md`.
 - **Bereite Spur:** keine Fläche, nur ein 1-px-Umriss in `border`; Lampe hohl;
   Name in Textfarbe, Ziffern klein (22) in Nebentext, Hauptknopf (48) nur als
   Umriss in Spurfarbe. Höhe 66 statt 101.
@@ -105,6 +103,10 @@ Pause (88) und „Neu“. Unten bleiben andere laufende Spuren als schmale Felde
 (52 hoch) erreichbar. Keine untere Leiste; der Pfeil oben links schließt.
 
 ## 2. Tippfeld und Protokoll
+
+> **Stand 24.11.2026:** Für das Protokoll gilt `PROTOKOLL.md`. Es ersetzt hier
+> 2.1 (Protokoll-Felder), 2.2–2.7 und in 3.1 die Karten je Person. Die Maße
+> und das Aussehen der hier beschriebenen Felder und Blätter gelten weiter.
 
 Grundsatz: Solange das Tippfeld offen ist, wechselt kein Feld seinen Platz und
 nichts schiebt sich davor. Der Hintergrund eines bewegten Designs steht hier

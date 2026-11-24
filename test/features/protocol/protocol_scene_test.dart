@@ -217,4 +217,27 @@ void main() {
     expect(persons.single.name, 'Kimi');
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('every new person gets the next colour of the palette', (
+    tester,
+  ) async {
+    final f = await ProtocolFixture.pump(tester);
+    await f.openScene();
+    for (final name in ['Krille', 'Jacke']) {
+      await f.tap(find.byKey(const ValueKey('scene-add-person')));
+      await tester.enterText(
+        find.descendant(
+          of: find.byKey(const ValueKey('scene-new-person')),
+          matching: find.byType(EditableText),
+        ),
+        name,
+      );
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await f.settle();
+    }
+    final persons = await f.run(f.people.getPersons);
+    expect(persons.map((p) => p.name), ['Krille', 'Jacke']);
+    expect(persons[0].color, isNot(persons[1].color));
+    expect(tester.takeException(), isNull);
+  });
 }

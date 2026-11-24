@@ -288,9 +288,12 @@ class _EditSheetState extends ConsumerState<_EditSheet> {
     _newPerson.clear();
     setState(() => _addingPerson = false);
     if (name.isEmpty) return;
-    final all = ref.read(allPersonsProvider).value ?? const <Person>[];
+    // Read from the database: nothing may be watching the list yet, and a
+    // stale count would give every new one the same colour.
+    final t = context.tikky;
     final people = ref.read(peopleRepositoryProvider);
-    final color = context.tikky.paletteColor(all.length).toARGB32();
+    final all = await people.getPersons(includeArchived: true);
+    final color = t.paletteColor(all.length).toARGB32();
     Person? match;
     for (final p in all) {
       if (p.name.toLowerCase() == name.toLowerCase()) match = p;
@@ -310,9 +313,12 @@ class _EditSheetState extends ConsumerState<_EditSheet> {
     _newSubstance.clear();
     setState(() => _addingSubstance = false);
     if (name.isEmpty) return;
-    final all = ref.read(allSubstancesProvider).value ?? const <Substance>[];
+    // Read from the database: nothing may be watching the list yet, and a
+    // stale count would give every new one the same colour.
+    final t = context.tikky;
     final people = ref.read(peopleRepositoryProvider);
-    final color = context.tikky.paletteColor(all.length).toARGB32();
+    final all = await people.getSubstances(includeArchived: true);
+    final color = t.paletteColor(all.length).toARGB32();
     Substance? match;
     for (final s in all) {
       if (s.name.toLowerCase() == name.toLowerCase()) match = s;

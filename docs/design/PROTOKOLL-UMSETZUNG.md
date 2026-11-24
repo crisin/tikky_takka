@@ -4,6 +4,33 @@ Stand: 24.11.2026. Setzt `PROTOKOLL.md` um (P1–P6 dort entschieden). Die
 Pakete heißen B1–B8, damit sie sich nicht mit P1–P9 aus `UMSETZUNG.md` und
 den Entscheidungen P1–P6 überschneiden.
 
+**Alle acht Pakete sind gebaut** (Zweig `protokoll`, ein Commit je Paket).
+Gebaut wurde in der Reihenfolge B1, B2, B3, B5, B4, B6, B7, B8. Was vom Plan
+unten abweicht, steht im nächsten Abschnitt; die Paket-Beschreibungen
+darunter sind der ursprüngliche Plan.
+
+## Stand und Abweichungen
+
+| Paket | Stand | Anders als geplant |
+|---|---|---|
+| B1 | gebaut | – |
+| B2 | gebaut | Das Tippfeld hatte den Weg Person → „Was?“ → „Anderes“ schon; er wurde von der Protokoll-Spur auf Szene und `entries` umgehängt. `tap_pad.dart` ist nicht aufgeteilt worden. |
+| B3 | gebaut | Enthält schon das Entfernen von Protokoll-Spur, Formular und Sitzungsliste (im Plan B8), weil das Blatt sonst zwei Arten von Einträgen hätte kennen müssen. |
+| B4 | gebaut | „Protokoll starten“ nur im Set ohne Spuren; „Rückgängig“ beim Entfernen steht in der Szene. Die Listen-Seite ist weg, die Editoren liegen in `protocol_editors.dart`. |
+| B5 | gebaut | Die Zeitleiste ist **nicht** umgeschrieben. Die Einträge kommen als eine Spur „Protokoll“ mit einer offenen Sitzung an (`lib/core/engine/protocol_lane.dart`), gebildet aus `entries`; gespeichert wird davon nichts. Streifen, Abend, Woche und Monat arbeiten darauf unverändert. |
+| B6 | gebaut | In der Zeitleiste stehen die Sachen vorn in der bestehenden Filter-Reihe statt in einer eigenen. |
+| B7 | gebaut | Einträge stehen in der Liste der Ereignisse, nicht in der Liste der Sitzungen. |
+| B8 | gebaut | `TrackMode.protocol` und `ProtocolConfig` **bleiben**: als Art der Spur „Protokoll“ in Zeitleiste und Export. Alte Protokoll-Spuren löscht kein Schema-Schritt, sondern `purgeProtocolTracks()` beim Start. `schemaVersion` ist 2 (nur die neue Tabelle). |
+
+**Nicht geprüft:** ein echtes Gerät, die Ansicht bei 375 × 812 (im Browser
+nur in der breiten Ansicht durchgeklickt), iOS/Cupertino über die
+vorhandenen Widget-Tests hinaus, große Systemschrift auf dem Brett.
+
+**Offen geblieben:** `lib/features/history/` (der alte Verlauf) existiert
+weiter. In der Rechnung (`derive.dart`, `snapshots.dart`, `summary.dart`)
+stehen die Protokoll-Zweige noch, weil die Spur „Protokoll“ sie für
+Zeitleiste und Export braucht.
+
 Reihenfolge so, dass die App nach jedem Paket läuft und `flutter analyze`
 und `flutter test` sauber sind. Die Dateiangaben stammen aus einer Suche im
 Stand vom 24.11.2026, nicht aus einem vollständigen Durchlesen; vor dem

@@ -421,8 +421,12 @@ class _TapPadState extends ConsumerState<TapPad>
     final name = _newName.text.trim();
     if (name.isEmpty) return;
     final protocol = ref.read(protocolActionsProvider);
-    final count = ref.read(allSubstancesProvider).value?.length ?? 0;
-    final color = context.tikky.paletteColor(count).toARGB32();
+    // Read from the database: nothing may be watching the list yet, and a
+    // stale count would give every new one the same colour.
+    final t = context.tikky;
+    final people = ref.read(peopleRepositoryProvider);
+    final count = (await people.getSubstances(includeArchived: true)).length;
+    final color = t.paletteColor(count).toARGB32();
     Substance? substance;
     try {
       substance = await protocol.ensureSubstance(name, color: color);

@@ -1,8 +1,14 @@
 # Tikky Takka
 
 Mehrere Timer gleichzeitig, als konfigurierbare Spuren nebeneinander:
-Stoppuhr, Timer (Countdown), Intervall, Zähler, Erinnerung und Protokoll.
+Stoppuhr, Timer (Countdown), Intervall, Zähler und Erinnerung. Dazu das
+Protokoll: wer hatte wann was.
 Alles bleibt lokal auf dem Gerät – kein Konto, kein Netzwerk.
+
+- **Protokoll:** Personen und Sachen der Szene liegen als Brett im
+  Tippfeld. Zwei Tipps tragen ein (wer, was); Zeit, Menge und Notiz kommen
+  nachträglich über „Ändern“. Das Protokoll ist keine Spur: ein Eintrag
+  gehört zu Person und Sache. Konzept: `docs/design/PROTOKOLL.md`.
 
 - **Spuren und Sets:** Spuren lassen sich zu Sets gruppieren, gemeinsam
   starten/pausieren, umsortieren und pro Set anders darstellen.
@@ -241,7 +247,7 @@ lib/
   features/
     tracks/         Spuren-Bildschirm, Spur-Editor, Sets, Tastenkürzel
     history/        Verlauf, Filter, Sitzungsdetails, Export-Dialog
-    protocol/       Protokoll-Spur, Personen und Substanzen
+    protocol/       Protokoll: Szene, Eintragsblatt „Ändern“, Filter, Editoren
     alarms/         Klingel-Zustand in der App, Berechtigungs-Hinweis
     settings/       Einstellungen, Design-Editor, Sperrbildschirm
   theme/            Design-Tokens, Vorlagen, Anzeige-Einstellungen

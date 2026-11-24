@@ -200,8 +200,12 @@ class _SceneEditorState extends ConsumerState<SceneEditor> {
 
   Future<void> _commitNewPerson() async {
     final actions = ref.read(protocolActionsProvider);
-    final count = ref.read(allPersonsProvider).value?.length ?? 0;
-    final color = context.tikky.paletteColor(count).toARGB32();
+    // Read from the database: nothing may be watching the list yet, and a
+    // stale count would give every new one the same colour.
+    final t = context.tikky;
+    final people = ref.read(peopleRepositoryProvider);
+    final count = (await people.getPersons(includeArchived: true)).length;
+    final color = t.paletteColor(count).toARGB32();
     final person = await actions.ensurePerson(_newPerson.text, color: color);
     _newPerson.clear();
     if (!mounted) return;
@@ -217,8 +221,12 @@ class _SceneEditorState extends ConsumerState<SceneEditor> {
 
   Future<void> _commitNewSubstance() async {
     final actions = ref.read(protocolActionsProvider);
-    final count = ref.read(allSubstancesProvider).value?.length ?? 0;
-    final color = context.tikky.paletteColor(count).toARGB32();
+    // Read from the database: nothing may be watching the list yet, and a
+    // stale count would give every new one the same colour.
+    final t = context.tikky;
+    final people = ref.read(peopleRepositoryProvider);
+    final count = (await people.getSubstances(includeArchived: true)).length;
+    final color = t.paletteColor(count).toARGB32();
     final substance = await actions.ensureSubstance(
       _newSubstance.text,
       color: color,
