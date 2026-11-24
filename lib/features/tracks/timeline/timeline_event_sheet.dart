@@ -11,6 +11,7 @@ import '../../../core/services/haptics.dart';
 import '../../../l10n/formatters.dart';
 import '../../../l10n/strings.dart';
 import '../../../theme/theme.dart';
+import '../../protocol/entry_edit_sheet.dart';
 import '../tracks_strings.dart';
 import 'timeline_logic.dart';
 
@@ -61,8 +62,14 @@ Future<void> openTimelineEvent(
   final haptics = ref.read(hapticsProvider);
   final event = row.event;
   unawaited(haptics.selection());
-  // An entry of an old protocol track: nothing to edit any more.
-  if (event.type == EventType.entry) return;
+  // A protocol entry: the one sheet "Ändern".
+  if (event.type == EventType.entry) {
+    final entry = await ref.read(entryRepositoryProvider).get(event.id);
+    if (entry != null && context.mounted) {
+      await showEntryEditSheet(context, entry: entry);
+    }
+    return;
+  }
   final result = await showAdaptiveSheet<_SheetResult>(
     context,
     builder: (context) => _EventSheet(row: row),

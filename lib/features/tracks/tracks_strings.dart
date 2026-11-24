@@ -233,6 +233,9 @@ abstract final class TracksStrings {
 
   static const padEditLast = 'Letzten Eintrag ändern';
 
+  /// Name of the lane that carries the protocol in the timeline.
+  static const protocolLaneName = 'Protokoll';
+
   /// "zuletzt Bier · vor 26 min"
   static String padLastOf(String thing, String ago) => 'zuletzt $thing · $ago';
   static String padMoreSemantics(String track) =>
