@@ -177,6 +177,34 @@ extension TrackEventToRowMapper on TrackEvent {
   );
 }
 
+extension EntryRowMapper on EntryRow {
+  Entry toDomain() => Entry(
+    id: id,
+    at: at,
+    personId: personId,
+    substanceId: substanceId,
+    amount: amount,
+    note: note,
+    createdAt: createdAt,
+    updatedAt: updatedAt,
+    extra: decodeJsonMap(extraJson),
+  );
+}
+
+extension EntryToRowMapper on Entry {
+  EntryRow toRow() => EntryRow(
+    id: id,
+    at: at,
+    personId: personId,
+    substanceId: substanceId,
+    amount: amount,
+    note: note,
+    createdAt: createdAt,
+    updatedAt: updatedAt,
+    extraJson: encodeJsonMapOrNull(extra),
+  );
+}
+
 extension PersonRowMapper on PersonRow {
   Person toDomain() => Person(
     id: id,

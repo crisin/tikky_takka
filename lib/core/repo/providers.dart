@@ -7,6 +7,7 @@ import '../domain/domain.dart';
 import '../engine/engine.dart';
 import '../services/alarms/alarm_service.dart';
 import 'backup_repository.dart';
+import 'entry_repository.dart';
 import 'history_repository.dart';
 import 'models.dart';
 import 'people_repository.dart';
@@ -72,6 +73,14 @@ final historyRepositoryProvider = Provider<HistoryRepository>(
 
 final peopleRepositoryProvider = Provider<PeopleRepository>(
   (ref) => PeopleRepository(
+    ref.watch(appDatabaseProvider),
+    ref.watch(clockProvider),
+    ref.watch(idGeneratorProvider),
+  ),
+);
+
+final entryRepositoryProvider = Provider<EntryRepository>(
+  (ref) => EntryRepository(
     ref.watch(appDatabaseProvider),
     ref.watch(clockProvider),
     ref.watch(idGeneratorProvider),
@@ -216,6 +225,25 @@ final allSubstancesProvider = StreamProvider<List<Substance>>(
 );
 
 /// Person by id for name / colour lookups; empty while loading.
+/// When each person last had each thing, over all entries. The board and
+/// the page "Was?" derive time since and running lockouts from it.
+final entryFactsProvider = StreamProvider<List<LastEntryFact>>(
+  (ref) => ref.watch(entryRepositoryProvider).watchLastEntries(),
+);
+
+/// How often each person had each thing, over all entries. Orders the
+/// page "Anderes".
+final entryUseProvider = StreamProvider<List<SubstanceUse>>(
+  (ref) => ref.watch(entryRepositoryProvider).watchUse(),
+);
+
+/// The entries with `from <= at < to`, oldest first.
+final entriesInRangeProvider = StreamProvider.autoDispose
+    .family<List<Entry>, ({int from, int to})>(
+      (ref, range) =>
+          ref.watch(entryRepositoryProvider).watchRange(range.from, range.to),
+    );
+
 final personsByIdProvider = Provider<Map<String, Person>>((ref) {
   final list = ref.watch(allPersonsProvider).value ?? const <Person>[];
   return {for (final p in list) p.id: p};

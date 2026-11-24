@@ -280,6 +280,10 @@ class _DevScreenState extends ConsumerState<DevScreen> {
                 value: _count(counts?.events),
               ),
               AdaptiveTile(
+                title: SettingsStrings.devEntries,
+                value: _count(counts?.entries),
+              ),
+              AdaptiveTile(
                 title: Strings.persons,
                 value: _count(counts?.persons),
               ),

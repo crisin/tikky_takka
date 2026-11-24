@@ -228,6 +228,7 @@ abstract final class SettingsStrings {
   static const devData = 'Daten';
   static const devDbSize = 'Datenbank';
   static const devEvents = 'Ereignisse';
+  static const devEntries = 'Einträge';
   static const devSessions = 'Sitzungen';
   static const devTracks = 'Spuren';
   static const devSettingsRows = 'Einstellungen';

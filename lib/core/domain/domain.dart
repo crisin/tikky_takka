@@ -1,6 +1,7 @@
 /// Barrel file for the domain layer.
 library;
 
+export 'entry.dart';
 export 'enums.dart';
 export 'json_utils.dart';
 export 'person.dart';

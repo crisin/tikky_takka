@@ -140,6 +140,34 @@ class Events extends Table {
 }
 
 /// Persons for protocol entries.
+/// Protocol entries: who had what, when. Not tied to a set, track or
+/// session (see `Entry`).
+@DataClassName('EntryRow')
+@TableIndex(name: 'idx_entries_at', columns: {#at})
+@TableIndex(name: 'idx_entries_person', columns: {#personId, #at})
+@TableIndex(name: 'idx_entries_substance', columns: {#substanceId})
+class Entries extends Table {
+  @override
+  String get tableName => 'entries';
+
+  TextColumn get id => text()();
+
+  /// Wall time, UTC milliseconds.
+  IntColumn get at => integer()();
+  TextColumn get personId => text()();
+  TextColumn get substanceId => text()();
+
+  /// Free text; never summed up.
+  TextColumn get amount => text().nullable()();
+  TextColumn get note => text().nullable()();
+  IntColumn get createdAt => integer().withDefault(const Constant(0))();
+  IntColumn get updatedAt => integer().withDefault(const Constant(0))();
+  TextColumn get extraJson => text().nullable()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
 @DataClassName('PersonRow')
 class Persons extends Table {
   @override

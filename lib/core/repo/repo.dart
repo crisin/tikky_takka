@@ -2,6 +2,7 @@
 library;
 
 export 'backup_repository.dart';
+export 'entry_repository.dart';
 export 'history_repository.dart';
 export 'models.dart';
 export 'people_repository.dart';

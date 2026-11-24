@@ -3,6 +3,7 @@ library;
 
 export 'alarm_plan.dart';
 export 'derive.dart';
+export 'entry_math.dart';
 export 'history_math.dart';
 export 'logical_day.dart';
 export 'period_counts.dart';
