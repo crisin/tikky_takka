@@ -31,11 +31,9 @@ class SetRepository {
 
   /// Sets ordered by `sortIndex`.
   Stream<List<TrackSet>> watchSets({bool includeArchived = false}) =>
-      watchTables(
-        _db,
-        [_db.trackSets],
-        () => getSets(includeArchived: includeArchived),
-      );
+      watchTables(_db, [
+        _db.trackSets,
+      ], () => getSets(includeArchived: includeArchived));
 
   Future<TrackSet?> getSet(String id) async {
     final row = await (_db.select(

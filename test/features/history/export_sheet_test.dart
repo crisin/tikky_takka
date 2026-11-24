@@ -99,9 +99,10 @@ void main() {
     );
     container(tester).read(historyFilterProvider.notifier).set(filter);
     await tester.runAsync(
-      () => container(tester)
-          .read(uiPrefsProvider.notifier)
-          .change((p) => p.copyWith(csvSeparator: CsvSeparator.comma)),
+      () =>
+          container(tester)
+              .read(uiPrefsProvider.notifier)
+              .change((p) => p.copyWith(csvSeparator: CsvSeparator.comma)),
     );
     await settleUi(tester, app);
     await openSheet(tester);
@@ -232,9 +233,7 @@ void main() {
 
   test('describeImport: nothing new', () {
     expect(
-      describeImport(
-        const ImportReport(skipped: {'sets': 2, 'tracks': 4}),
-      ),
+      describeImport(const ImportReport(skipped: {'sets': 2, 'tracks': 4})),
       HistoryStrings.importNothingNew,
     );
   });

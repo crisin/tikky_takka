@@ -260,12 +260,12 @@ class _TextPromptDialog extends StatefulWidget {
 }
 
 class _TextPromptDialogState extends State<_TextPromptDialog> {
-  late final TextEditingController _controller = TextEditingController(
-    text: widget.initialValue,
-  )..selection = TextSelection(
-    baseOffset: 0,
-    extentOffset: widget.initialValue.length,
-  );
+  late final TextEditingController _controller =
+      TextEditingController(text: widget.initialValue)
+        ..selection = TextSelection(
+          baseOffset: 0,
+          extentOffset: widget.initialValue.length,
+        );
 
   @override
   void dispose() {

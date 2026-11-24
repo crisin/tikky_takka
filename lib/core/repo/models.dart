@@ -132,8 +132,7 @@ final class SubstanceUse {
   int get hashCode => Object.hash(personId, substanceId, count, lastAt);
 
   @override
-  String toString() =>
-      'SubstanceUse($personId, $substanceId x$count @$lastAt)';
+  String toString() => 'SubstanceUse($personId, $substanceId x$count @$lastAt)';
 }
 
 /// A removed session with its events, kept by the UI to offer "Rückgängig".

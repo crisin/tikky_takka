@@ -65,9 +65,8 @@ class _ProtocolPeopleScreenState extends ConsumerState<ProtocolPeopleScreen> {
 
   bool get _persons => _tab == ProtocolPeopleTab.persons;
 
-  void _add() => _persons
-      ? showPersonEditor(context)
-      : showSubstanceEditor(context);
+  void _add() =>
+      _persons ? showPersonEditor(context) : showSubstanceEditor(context);
 
   // -------------------------------------------------------------- persons
 
@@ -484,9 +483,8 @@ class _EditorSheetState extends ConsumerState<_EditorSheet> {
     );
     if (picked == null || !mounted) return;
     setState(
-      () => _lockoutMs = picked.inMilliseconds > 0
-          ? picked.inMilliseconds
-          : null,
+      () =>
+          _lockoutMs = picked.inMilliseconds > 0 ? picked.inMilliseconds : null,
     );
   }
 
@@ -528,14 +526,9 @@ class _EditorSheetState extends ConsumerState<_EditorSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Semantics(
-                header: true,
-                child: Text(title, style: t.text.title),
-              ),
+              Semantics(header: true, child: Text(title, style: t.text.title)),
               ProtocolSectionLabel(
-                widget.isSubstance
-                    ? Strings.substanceName
-                    : Strings.personName,
+                widget.isSubstance ? Strings.substanceName : Strings.personName,
               ),
               TextField(
                 key: const ValueKey('editor-name'),
@@ -610,9 +603,8 @@ class _EditorSheetState extends ConsumerState<_EditorSheet> {
                 AdaptiveTextButton(
                   label: ProtocolStrings.remove,
                   destructive: true,
-                  onPressed: () => Navigator.of(
-                    context,
-                  ).pop(const _EditorResult.removed()),
+                  onPressed: () =>
+                      Navigator.of(context).pop(const _EditorResult.removed()),
                 ),
               ],
             ],

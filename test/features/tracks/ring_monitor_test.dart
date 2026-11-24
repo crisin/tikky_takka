@@ -145,22 +145,28 @@ void main() {
       expect(methods, contains('HapticFeedback.vibrate'));
     });
 
-    test('the track switches and the haptics preference are honoured', () async {
-      expect(
-        await ring(track(sound: false)),
-        isNot(contains('SystemSound.play')),
-      );
-      expect(await ring(track(sound: false)), contains('HapticFeedback.vibrate'));
+    test(
+      'the track switches and the haptics preference are honoured',
+      () async {
+        expect(
+          await ring(track(sound: false)),
+          isNot(contains('SystemSound.play')),
+        );
+        expect(
+          await ring(track(sound: false)),
+          contains('HapticFeedback.vibrate'),
+        );
 
-      final noVibration = await ring(track(vibration: false));
-      expect(noVibration, contains('SystemSound.play'));
-      expect(noVibration, isNot(contains('HapticFeedback.vibrate')));
+        final noVibration = await ring(track(vibration: false));
+        expect(noVibration, contains('SystemSound.play'));
+        expect(noVibration, isNot(contains('HapticFeedback.vibrate')));
 
-      final noHaptics = await ring(track(), haptics: false);
-      expect(noHaptics, contains('SystemSound.play'));
-      expect(noHaptics, isNot(contains('HapticFeedback.vibrate')));
+        final noHaptics = await ring(track(), haptics: false);
+        expect(noHaptics, contains('SystemSound.play'));
+        expect(noHaptics, isNot(contains('HapticFeedback.vibrate')));
 
-      expect(await ring(track(sound: false, vibration: false)), isEmpty);
-    });
+        expect(await ring(track(sound: false, vibration: false)), isEmpty);
+      },
+    );
   });
 }

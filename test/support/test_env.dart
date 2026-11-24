@@ -45,15 +45,12 @@ class TestEnv {
   Future<TrackSet> makeSet([String name = 'Set']) => sets.createSet(name: name);
 
   /// Creates a track in [set] and returns it.
-  Future<Track> makeTrack(
-    TrackSet set,
-    TrackConfig config, {
-    String? name,
-  }) => tracks.createTrack(
-    setId: set.id,
-    name: name ?? config.mode.name,
-    config: config,
-  );
+  Future<Track> makeTrack(TrackSet set, TrackConfig config, {String? name}) =>
+      tracks.createTrack(
+        setId: set.id,
+        name: name ?? config.mode.name,
+        config: config,
+      );
 
   /// The derived snapshot of a track's open session at the fake "now".
   Future<TrackSnapshot?> snapshot(String trackId) async {

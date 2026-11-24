@@ -62,9 +62,8 @@ class _SetOverridesScreenState extends ConsumerState<SetOverridesScreen> {
     );
   }
 
-  void _setOverride(JsonMap map) => _save(
-    _set.copyWith(uiPrefsOverride: () => map.isEmpty ? null : map),
-  );
+  void _setOverride(JsonMap map) =>
+      _save(_set.copyWith(uiPrefsOverride: () => map.isEmpty ? null : map));
 
   void _changeField(String key, UiPrefs next) =>
       _setOverride({..._override, key: next.toJson()[key]});

@@ -162,7 +162,8 @@ void main() {
     expect(security.calls, [true]);
 
     await tester.runAsync(
-      () => containerOf(tester).read(appLockEnabledProvider.notifier).set(false),
+      () =>
+          containerOf(tester).read(appLockEnabledProvider.notifier).set(false),
     );
     await settle(tester, app);
     expect(security.calls, [true, false]);
@@ -198,23 +199,26 @@ void main() {
     await const NoopScreenSecurity().setSecure(true);
   });
 
-  test('lockSupportedProvider: an exception is an error, never "false"', () async {
-    final lock = _Lock()..checkError = StateError('plugin');
-    final container = ProviderContainer(
-      overrides: [lockServiceProvider.overrideWithValue(lock)],
-    );
-    addTearDown(container.dispose);
+  test(
+    'lockSupportedProvider: an exception is an error, never "false"',
+    () async {
+      final lock = _Lock()..checkError = StateError('plugin');
+      final container = ProviderContainer(
+        overrides: [lockServiceProvider.overrideWithValue(lock)],
+      );
+      addTearDown(container.dispose);
 
-    await expectLater(
-      container.read(lockSupportedProvider.future),
-      throwsStateError,
-    );
-    expect(container.read(lockSupportedProvider).hasError, isTrue);
-    await Future<void>.delayed(const Duration(milliseconds: 300));
-    expect(lock.checks, 1, reason: 'no automatic retries');
+      await expectLater(
+        container.read(lockSupportedProvider.future),
+        throwsStateError,
+      );
+      expect(container.read(lockSupportedProvider).hasError, isTrue);
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      expect(lock.checks, 1, reason: 'no automatic retries');
 
-    lock.checkError = null;
-    container.invalidate(lockSupportedProvider);
-    expect(await container.read(lockSupportedProvider.future), isTrue);
-  });
+      lock.checkError = null;
+      container.invalidate(lockSupportedProvider);
+      expect(await container.read(lockSupportedProvider.future), isTrue);
+    },
+  );
 }

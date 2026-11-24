@@ -65,13 +65,16 @@ void main() {
     expect(newFile('.migrating').existsSync(), isFalse);
   });
 
-  test('a rollback journal moves too; missing side files are no problem', () async {
-    oldFile().writeAsStringSync('main');
-    oldFile('-journal').writeAsStringSync('journal');
-    expect(await migrate(), newFile().path);
-    expect(newFile('-journal').readAsStringSync(), 'journal');
-    expect(newFile('-wal').existsSync(), isFalse);
-  });
+  test(
+    'a rollback journal moves too; missing side files are no problem',
+    () async {
+      oldFile().writeAsStringSync('main');
+      oldFile('-journal').writeAsStringSync('journal');
+      expect(await migrate(), newFile().path);
+      expect(newFile('-journal').readAsStringSync(), 'journal');
+      expect(newFile('-wal').existsSync(), isFalse);
+    },
+  );
 
   test('runs once: afterwards the new place is simply used', () async {
     oldFile().writeAsStringSync('main');
@@ -81,19 +84,22 @@ void main() {
     expect(newFile().readAsStringSync(), 'changed by the app');
   });
 
-  test('a database at the new place is never overwritten by an old file', () async {
-    support.createSync(recursive: true);
-    newFile().writeAsStringSync('current');
-    oldFile().writeAsStringSync('stale');
-    oldFile('-wal').writeAsStringSync('stale wal');
+  test(
+    'a database at the new place is never overwritten by an old file',
+    () async {
+      support.createSync(recursive: true);
+      newFile().writeAsStringSync('current');
+      oldFile().writeAsStringSync('stale');
+      oldFile('-wal').writeAsStringSync('stale wal');
 
-    expect(await migrate(), newFile().path);
+      expect(await migrate(), newFile().path);
 
-    expect(newFile().readAsStringSync(), 'current');
-    expect(newFile('-wal').existsSync(), isFalse);
-    // Left alone, not deleted.
-    expect(oldFile().readAsStringSync(), 'stale');
-  });
+      expect(newFile().readAsStringSync(), 'current');
+      expect(newFile('-wal').existsSync(), isFalse);
+      // Left alone, not deleted.
+      expect(oldFile().readAsStringSync(), 'stale');
+    },
+  );
 
   test('an interrupted move (side files already over, main file not) is '
       'continued', () async {
@@ -108,18 +114,21 @@ void main() {
     expect(oldFile().existsSync(), isFalse);
   });
 
-  test('when the move is impossible the old database keeps being used', () async {
-    oldFile().writeAsStringSync('main');
-    oldFile('-wal').writeAsStringSync('wal');
-    // A FILE where the new directory would have to be created.
-    Directory(p.dirname(support.path)).createSync(recursive: true);
-    File(support.path).writeAsStringSync('in the way');
+  test(
+    'when the move is impossible the old database keeps being used',
+    () async {
+      oldFile().writeAsStringSync('main');
+      oldFile('-wal').writeAsStringSync('wal');
+      // A FILE where the new directory would have to be created.
+      Directory(p.dirname(support.path)).createSync(recursive: true);
+      File(support.path).writeAsStringSync('in the way');
 
-    expect(await migrate(), oldFile().path);
+      expect(await migrate(), oldFile().path);
 
-    expect(oldFile().readAsStringSync(), 'main');
-    expect(oldFile('-wal').readAsStringSync(), 'wal');
-  });
+      expect(oldFile().readAsStringSync(), 'main');
+      expect(oldFile('-wal').readAsStringSync(), 'wal');
+    },
+  );
 
   test('same directory or no documents directory: nothing to do', () async {
     oldFile().writeAsStringSync('main');

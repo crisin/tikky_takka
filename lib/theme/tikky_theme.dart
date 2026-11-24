@@ -406,7 +406,8 @@ final class TikkyTheme {
   };
 
   /// Pretty-printed JSON for a theme file.
-  String toFileContent() => const JsonEncoder.withIndent('  ').convert(toJson());
+  String toFileContent() =>
+      const JsonEncoder.withIndent('  ').convert(toJson());
 
   @override
   bool operator ==(Object other) =>

@@ -416,8 +416,14 @@ void main() {
       expect(day.endMs, DateTime(2026, 11, 12).millisecondsSinceEpoch);
       // 2026-11-11 is a Wednesday.
       expect(day.weekStart, const LocalDay(2026, 11, 9));
-      expect(const LocalDay(2026, 11, 9).weekStart, const LocalDay(2026, 11, 9));
-      expect(const LocalDay(2026, 11, 15).weekStart, const LocalDay(2026, 11, 9));
+      expect(
+        const LocalDay(2026, 11, 9).weekStart,
+        const LocalDay(2026, 11, 9),
+      );
+      expect(
+        const LocalDay(2026, 11, 15).weekStart,
+        const LocalDay(2026, 11, 9),
+      );
       expect(const LocalDay(2026, 3, 1).weekStart, const LocalDay(2026, 2, 23));
       expect(
         const LocalDay(2026, 1, 2).compareTo(const LocalDay(2025, 12, 31)),

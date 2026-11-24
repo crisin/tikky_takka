@@ -221,8 +221,7 @@ class _ColorPickerPanelState extends State<ColorPickerPanel> {
                       semanticLabel: SettingsStrings.swatchLabel(
                         colorToHex(swatch),
                       ),
-                      selected:
-                          _opaque(swatch).toARGB32() == color.toARGB32(),
+                      selected: _opaque(swatch).toARGB32() == color.toARGB32(),
                       onTap: () => _pick(swatch),
                     ),
                 ],

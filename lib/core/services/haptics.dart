@@ -47,5 +47,6 @@ class Haptics {
 
 /// Haptics configured from the UI preferences.
 final hapticsProvider = Provider<Haptics>(
-  (ref) => Haptics(enabled: ref.watch(uiPrefsProvider.select((p) => p.haptics))),
+  (ref) =>
+      Haptics(enabled: ref.watch(uiPrefsProvider.select((p) => p.haptics))),
 );

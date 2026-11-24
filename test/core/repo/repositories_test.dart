@@ -24,10 +24,7 @@ void main() {
         TrackMode.countdown,
         TrackMode.counter,
       ]);
-      expect(
-        (tracks[1].config as CountdownConfig).durationMs,
-        10 * 60 * 1000,
-      );
+      expect((tracks[1].config as CountdownConfig).durationMs, 10 * 60 * 1000);
       expect(tracks.map((t) => t.sortIndex), [0, 1, 2]);
       expect(tracks.every((t) => t.logEnabled && !t.archived), isTrue);
 
@@ -110,30 +107,36 @@ void main() {
   });
 
   group('tracks', () {
-    test('create appends, cycles colours and round-trips every field', () async {
-      final e = env();
-      final set = await e.makeSet();
-      final a = await e.makeTrack(set, const StopwatchConfig(exclusive: true));
-      final b = await e.tracks.createTrack(
-        setId: set.id,
-        name: 'Tabata',
-        config: const IntervalConfig(workMs: 20000, restMs: 10000, rounds: 8),
-        customColor: 0xFF112233,
-        alarmSound: false,
-        vibration: false,
-      );
-      expect((a.sortIndex, a.colorIndex), (0, 0));
-      expect((b.sortIndex, b.colorIndex), (1, 1));
+    test(
+      'create appends, cycles colours and round-trips every field',
+      () async {
+        final e = env();
+        final set = await e.makeSet();
+        final a = await e.makeTrack(
+          set,
+          const StopwatchConfig(exclusive: true),
+        );
+        final b = await e.tracks.createTrack(
+          setId: set.id,
+          name: 'Tabata',
+          config: const IntervalConfig(workMs: 20000, restMs: 10000, rounds: 8),
+          customColor: 0xFF112233,
+          alarmSound: false,
+          vibration: false,
+        );
+        expect((a.sortIndex, a.colorIndex), (0, 0));
+        expect((b.sortIndex, b.colorIndex), (1, 1));
 
-      final stored = await e.tracks.getTrack(b.id);
-      expect(stored, b);
-      expect(stored!.mode, TrackMode.interval);
-      expect(stored.customColor, 0xFF112233);
-      expect(stored.alarmSound, isFalse);
-      expect(stored.vibration, isFalse);
-      expect(stored.logEnabled, isTrue);
-      expect((await e.tracks.getTrack(a.id))!.config, a.config);
-    });
+        final stored = await e.tracks.getTrack(b.id);
+        expect(stored, b);
+        expect(stored!.mode, TrackMode.interval);
+        expect(stored.customColor, 0xFF112233);
+        expect(stored.alarmSound, isFalse);
+        expect(stored.vibration, isFalse);
+        expect(stored.logEnabled, isTrue);
+        expect((await e.tracks.getTrack(a.id))!.config, a.config);
+      },
+    );
 
     test('reorder, move, duplicate, archive', () async {
       final e = env();
@@ -262,10 +265,7 @@ void main() {
         ),
         [s2],
       );
-      expect(
-        (await ids(const HistoryFilter(includeOpen: true))).length,
-        5,
-      );
+      expect((await ids(const HistoryFilter(includeOpen: true))).length, 5);
 
       final all = await e.history.getSessions(HistoryFilter.all);
       expect(all.last.track!.name, 'A');
@@ -309,16 +309,19 @@ void main() {
       );
       expect(HistoryFilter.all.isUnrestricted, isTrue);
       expect(
-        const HistoryFilter(
-          setId: 'x',
-        ).copyWith(setId: () => null).isUnrestricted,
+        const HistoryFilter(setId: 'x')
+            .copyWith(setId: () => null)
+            .isUnrestricted,
         isTrue,
       );
     });
 
     test('note editing, delete with undo', () async {
       final e = env();
-      final track = await e.makeTrack(await e.makeSet(), const StopwatchConfig());
+      final track = await e.makeTrack(
+        await e.makeSet(),
+        const StopwatchConfig(),
+      );
       await e.commands.startTrack(track.id);
       e.clock.advanceMs(sec);
       await e.commands.lap(track.id);
@@ -343,7 +346,10 @@ void main() {
 
     test('restoring an open session next to a newer one closes it', () async {
       final e = env();
-      final track = await e.makeTrack(await e.makeSet(), const StopwatchConfig());
+      final track = await e.makeTrack(
+        await e.makeSet(),
+        const StopwatchConfig(),
+      );
       await e.commands.startTrack(track.id);
       e.clock.advanceMs(5 * sec);
       final discarded = await e.commands.resetTrack(track.id, discard: true);
@@ -360,7 +366,10 @@ void main() {
 
     test('editing event times keeps the session bounds in sync', () async {
       final e = env();
-      final track = await e.makeTrack(await e.makeSet(), const StopwatchConfig());
+      final track = await e.makeTrack(
+        await e.makeSet(),
+        const StopwatchConfig(),
+      );
       final t0 = e.clock.nowMs();
       await e.commands.startTrack(track.id);
       e.clock.advanceMs(10 * min);
@@ -383,7 +392,10 @@ void main() {
 
     test('watchSessions follows edits', () async {
       final e = env();
-      final track = await e.makeTrack(await e.makeSet(), const StopwatchConfig());
+      final track = await e.makeTrack(
+        await e.makeSet(),
+        const StopwatchConfig(),
+      );
       final seen = <int>[];
       final sub = e.history
           .watchSessions(HistoryFilter.all)
@@ -401,12 +413,17 @@ void main() {
   group('persons and substances', () {
     test('CRUD, ordering, archive, delete with undo', () async {
       final e = env();
-      final alex = await e.people.createPerson(name: ' Alex ', color: 0xFF010203);
+      final alex = await e.people.createPerson(
+        name: ' Alex ',
+        color: 0xFF010203,
+      );
       final kim = await e.people.createPerson(name: 'Kim');
       expect(alex.name, 'Alex');
       expect((await e.people.getPersons()).map((p) => p.name), ['Alex', 'Kim']);
 
-      await e.people.updatePerson(kim.copyWith(name: 'Kimi', color: 0xFFAABBCC));
+      await e.people.updatePerson(
+        kim.copyWith(name: 'Kimi', color: 0xFFAABBCC),
+      );
       await e.people.reorderPersons([kim.id, alex.id]);
       final persons = await e.people.getPersons();
       expect(persons.map((p) => p.name), ['Kimi', 'Alex']);
@@ -424,34 +441,37 @@ void main() {
       expect(await e.people.deletePerson('missing'), isNull);
     });
 
-    test('substances keep the user-set lockout; none is ever invented', () async {
-      final e = env();
-      expect(await e.people.getSubstances(), isEmpty);
-      final plain = await e.people.createSubstance(name: 'A');
-      final locked = await e.people.createSubstance(
-        name: 'B',
-        lockoutMs: 2 * hour,
-      );
-      expect(plain.lockoutMs, isNull);
-      expect((await e.people.getSubstances()).map((s) => s.lockoutMs), [
-        null,
-        2 * hour,
-      ]);
+    test(
+      'substances keep the user-set lockout; none is ever invented',
+      () async {
+        final e = env();
+        expect(await e.people.getSubstances(), isEmpty);
+        final plain = await e.people.createSubstance(name: 'A');
+        final locked = await e.people.createSubstance(
+          name: 'B',
+          lockoutMs: 2 * hour,
+        );
+        expect(plain.lockoutMs, isNull);
+        expect((await e.people.getSubstances()).map((s) => s.lockoutMs), [
+          null,
+          2 * hour,
+        ]);
 
-      await e.people.updateSubstance(locked.copyWith(lockoutMs: () => null));
-      expect(
-        (await e.people.getSubstances()).every((s) => s.lockoutMs == null),
-        isTrue,
-      );
+        await e.people.updateSubstance(locked.copyWith(lockoutMs: () => null));
+        expect(
+          (await e.people.getSubstances()).every((s) => s.lockoutMs == null),
+          isTrue,
+        );
 
-      await e.people.reorderSubstances([locked.id, plain.id]);
-      expect((await e.people.getSubstances()).map((s) => s.name), ['B', 'A']);
-      await e.people.setSubstanceArchived(plain.id, archived: true);
-      expect((await e.people.getSubstances()).single.name, 'B');
-      final deleted = await e.people.deleteSubstance(locked.id);
-      await e.people.restoreSubstance(deleted!);
-      expect((await e.people.getSubstances()).single, deleted);
-    });
+        await e.people.reorderSubstances([locked.id, plain.id]);
+        expect((await e.people.getSubstances()).map((s) => s.name), ['B', 'A']);
+        await e.people.setSubstanceArchived(plain.id, archived: true);
+        expect((await e.people.getSubstances()).single.name, 'B');
+        final deleted = await e.people.deleteSubstance(locked.id);
+        await e.people.restoreSubstance(deleted!);
+        expect((await e.people.getSubstances()).single, deleted);
+      },
+    );
   });
 
   group('settings store', () {
@@ -553,36 +573,39 @@ void main() {
       expect(full.substances.single.lockoutMs, hour);
     });
 
-    test('JSON round trip into an empty database restores everything', () async {
-      final e = env();
-      await populate(e);
-      final data = await e.backup.readAll(includeProtocol: true);
-      final json = jsonEncode(data.toJson());
+    test(
+      'JSON round trip into an empty database restores everything',
+      () async {
+        final e = env();
+        await populate(e);
+        final data = await e.backup.readAll(includeProtocol: true);
+        final json = jsonEncode(data.toJson());
 
-      final target = TestEnv();
-      addTearDown(target.dispose);
-      final parsed = BackupData.fromJson(jsonMap(jsonDecode(json)));
-      expect(parsed.schemaVersion, BackupData.currentSchemaVersion);
-      final report = await target.backup.merge(parsed);
-      expect(report.inserted['sets'], 1);
-      expect(report.inserted['tracks'], 4);
-      expect(report.inserted['sessions'], 3);
-      expect(report.inserted['events'], data.events.length);
-      expect(report.inserted['persons'], 1);
-      expect(report.inserted['substances'], 1);
-      expect(report.updatedTotal, 0);
+        final target = TestEnv();
+        addTearDown(target.dispose);
+        final parsed = BackupData.fromJson(jsonMap(jsonDecode(json)));
+        expect(parsed.schemaVersion, BackupData.currentSchemaVersion);
+        final report = await target.backup.merge(parsed);
+        expect(report.inserted['sets'], 1);
+        expect(report.inserted['tracks'], 4);
+        expect(report.inserted['sessions'], 3);
+        expect(report.inserted['events'], data.events.length);
+        expect(report.inserted['persons'], 1);
+        expect(report.inserted['substances'], 1);
+        expect(report.updatedTotal, 0);
 
-      final again = await target.backup.readAll(includeProtocol: true);
-      expect(again.sets, data.sets);
-      expect(again.tracks.toSet(), data.tracks.toSet());
-      expect(again.sessions.toSet(), data.sessions.toSet());
-      expect(again.events.toSet(), data.events.toSet());
-      expect(again.persons, data.persons);
-      expect(again.substances, data.substances);
-      expect(again.settings[SettingsKeys.uiPrefs], '{"layout":"tiles"}');
-      // The seed flag is never imported.
-      expect(again.settings.containsKey(SettingsKeys.seedDone), isFalse);
-    });
+        final again = await target.backup.readAll(includeProtocol: true);
+        expect(again.sets, data.sets);
+        expect(again.tracks.toSet(), data.tracks.toSet());
+        expect(again.sessions.toSet(), data.sessions.toSet());
+        expect(again.events.toSet(), data.events.toSet());
+        expect(again.persons, data.persons);
+        expect(again.substances, data.substances);
+        expect(again.settings[SettingsKeys.uiPrefs], '{"layout":"tiles"}');
+        // The seed flag is never imported.
+        expect(again.settings.containsKey(SettingsKeys.seedDone), isFalse);
+      },
+    );
 
     test('merge by id never destroys newer or unrelated local data', () async {
       final e = env();
@@ -593,7 +616,11 @@ void main() {
       e.clock.advanceMs(hour);
       final set = (await e.sets.getSets()).single;
       await e.sets.renameSet(set.id, 'Umbenannt');
-      final extra = await e.makeTrack(set, const StopwatchConfig(), name: 'Neu');
+      final extra = await e.makeTrack(
+        set,
+        const StopwatchConfig(),
+        name: 'Neu',
+      );
       final store = await SettingsStore.load(e.db, clock: e.clock);
       await store.setString(SettingsKeys.uiPrefs, '{"layout":"rows"}');
 
@@ -646,8 +673,10 @@ void main() {
       );
       expect(all.length, 2);
       expect(all.where((s) => s.session.isOpen).length, 1);
-      expect(all.firstWhere((s) => !s.session.isOpen).events.last.type,
-          EventType.stop);
+      expect(
+        all.firstWhere((s) => !s.session.isOpen).events.last.type,
+        EventType.stop,
+      );
     });
 
     test('rejects foreign or too new files', () {
@@ -663,10 +692,7 @@ void main() {
         throwsFormatException,
       );
       expect(
-        BackupData.fromJson({
-          'app': BackupData.appId,
-          'schemaVersion': 1,
-        }).sets,
+        BackupData.fromJson({'app': BackupData.appId, 'schemaVersion': 1}).sets,
         isEmpty,
       );
     });

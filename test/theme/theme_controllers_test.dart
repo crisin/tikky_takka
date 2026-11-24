@@ -211,63 +211,72 @@ void main() {
     sub2.close();
   });
 
-  test('tracks, open sessions and lockouts flow through the providers', () async {
-    final h = await _Harness.create();
-    await h.read(setRepositoryProvider).ensureSeedData();
-    final subs = [
-      h.container.listen(setsProvider, (_, _) {}),
-      h.container.listen(openSessionsProvider, (_, _) {}),
-      h.container.listen(allTracksProvider, (_, _) {}),
-      h.container.listen(allSubstancesProvider, (_, _) {}),
-    ];
-    final sets = await h.container.read(setsProvider.future);
-    final setId = sets.single.id;
-    final subTracks = h.container.listen(tracksInSetProvider(setId), (_, _) {});
-    await h.container.read(tracksInSetProvider(setId).future);
-    await h.container.read(allTracksProvider.future);
-    await h.container.read(openSessionsProvider.future);
+  test(
+    'tracks, open sessions and lockouts flow through the providers',
+    () async {
+      final h = await _Harness.create();
+      await h.read(setRepositoryProvider).ensureSeedData();
+      final subs = [
+        h.container.listen(setsProvider, (_, _) {}),
+        h.container.listen(openSessionsProvider, (_, _) {}),
+        h.container.listen(allTracksProvider, (_, _) {}),
+        h.container.listen(allSubstancesProvider, (_, _) {}),
+      ];
+      final sets = await h.container.read(setsProvider.future);
+      final setId = sets.single.id;
+      final subTracks = h.container.listen(
+        tracksInSetProvider(setId),
+        (_, _) {},
+      );
+      await h.container.read(tracksInSetProvider(setId).future);
+      await h.container.read(allTracksProvider.future);
+      await h.container.read(openSessionsProvider.future);
 
-    final tracks = h.read(activeTracksProvider);
-    expect(tracks.map((t) => t.mode), [
-      TrackMode.stopwatch,
-      TrackMode.countdown,
-      TrackMode.counter,
-    ]);
-    final watch = tracks.first;
-    expect(h.read(trackProvider(watch.id)), watch);
-    expect(h.read(trackProvider('missing')), isNull);
-    expect(h.read(openSessionProvider(watch.id)), isNull);
+      final tracks = h.read(activeTracksProvider);
+      expect(tracks.map((t) => t.mode), [
+        TrackMode.stopwatch,
+        TrackMode.countdown,
+        TrackMode.counter,
+      ]);
+      final watch = tracks.first;
+      expect(h.read(trackProvider(watch.id)), watch);
+      expect(h.read(trackProvider('missing')), isNull);
+      expect(h.read(openSessionProvider(watch.id)), isNull);
 
-    await h.read(trackCommandsProvider).startTrack(watch.id);
-    await pumpEventQueue();
-    final open = h.read(openSessionProvider(watch.id));
-    expect(open!.events.single.type, EventType.start);
-    expect(h.read(openSessionProvider(tracks[1].id)), isNull);
+      await h.read(trackCommandsProvider).startTrack(watch.id);
+      await pumpEventQueue();
+      final open = h.read(openSessionProvider(watch.id));
+      expect(open!.events.single.type, EventType.start);
+      expect(h.read(openSessionProvider(tracks[1].id)), isNull);
 
-    final people = h.read(peopleRepositoryProvider);
-    final locked = await people.createSubstance(name: 'A', lockoutMs: 5000);
-    await people.createSubstance(name: 'B');
-    await pumpEventQueue();
-    expect(h.read(lockoutsProvider), {locked.id: 5000});
-    expect(h.read(substancesByIdProvider).length, 2);
+      final people = h.read(peopleRepositoryProvider);
+      final locked = await people.createSubstance(name: 'A', lockoutMs: 5000);
+      await people.createSubstance(name: 'B');
+      await pumpEventQueue();
+      expect(h.read(lockoutsProvider), {locked.id: 5000});
+      expect(h.read(substancesByIdProvider).length, 2);
 
-    await h.container.read(appBootstrapProvider.future);
-    for (final s in subs) {
-      s.close();
-    }
-    subTracks.close();
-  });
+      await h.container.read(appBootstrapProvider.future);
+      for (final s in subs) {
+        s.close();
+      }
+      subTracks.close();
+    },
+  );
 
-  test('app lock switch persists; noop lock service is a pass-through', () async {
-    final h = await _Harness.create();
-    expect(h.read(appLockEnabledProvider), isFalse);
-    expect(await h.container.read(lockSupportedProvider.future), isFalse);
-    expect(
-      await h.read(lockServiceProvider).authenticate(reason: 'x'),
-      isTrue,
-    );
-    await h.read(appLockEnabledProvider.notifier).set(true);
-    await h.restart();
-    expect(h.read(appLockEnabledProvider), isTrue);
-  });
+  test(
+    'app lock switch persists; noop lock service is a pass-through',
+    () async {
+      final h = await _Harness.create();
+      expect(h.read(appLockEnabledProvider), isFalse);
+      expect(await h.container.read(lockSupportedProvider.future), isFalse);
+      expect(
+        await h.read(lockServiceProvider).authenticate(reason: 'x'),
+        isTrue,
+      );
+      await h.read(appLockEnabledProvider.notifier).set(true);
+      await h.restart();
+      expect(h.read(appLockEnabledProvider), isTrue);
+    },
+  );
 }

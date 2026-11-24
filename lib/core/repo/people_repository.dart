@@ -88,11 +88,9 @@ class PeopleRepository {
   }
 
   Stream<List<Person>> watchPersons({bool includeArchived = false}) =>
-      watchTables(
-        _db,
-        [_db.persons],
-        () => getPersons(includeArchived: includeArchived),
-      );
+      watchTables(_db, [
+        _db.persons,
+      ], () => getPersons(includeArchived: includeArchived));
 
   Future<Person> createPerson({
     required String name,
@@ -182,11 +180,9 @@ class PeopleRepository {
   }
 
   Stream<List<Substance>> watchSubstances({bool includeArchived = false}) =>
-      watchTables(
-        _db,
-        [_db.substances],
-        () => getSubstances(includeArchived: includeArchived),
-      );
+      watchTables(_db, [
+        _db.substances,
+      ], () => getSubstances(includeArchived: includeArchived));
 
   /// [lockoutMs] is only ever a value the user entered; `null` = none.
   Future<Substance> createSubstance({
@@ -246,9 +242,7 @@ class PeopleRepository {
 
   Future<void> restoreSubstance(Substance substance) async {
     await _db.transaction(() async {
-      await _db
-          .into(_db.substances)
-          .insertOnConflictUpdate(substance.toRow());
+      await _db.into(_db.substances).insertOnConflictUpdate(substance.toRow());
       await _restoreToScenes(substance.id, person: false);
     });
   }

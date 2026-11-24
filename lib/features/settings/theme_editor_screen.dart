@@ -262,8 +262,11 @@ class _ThemeEditorScreenState extends ConsumerState<ThemeEditorScreen> {
 
   // ---------------------------------------------------------------- palette
 
-  void _setPalette(TikkyTheme draft, List<Color> palette, {bool commit = true}) =>
-      _update(draft.copyWith(trackPalette: palette), commit: commit);
+  void _setPalette(
+    TikkyTheme draft,
+    List<Color> palette, {
+    bool commit = true,
+  }) => _update(draft.copyWith(trackPalette: palette), commit: commit);
 
   void _addPaletteColor(TikkyTheme draft) {
     final palette = [...draft.trackPalette, draft.trackPalette.last];
@@ -425,9 +428,8 @@ class _ThemeEditorScreenState extends ConsumerState<ThemeEditorScreen> {
                   value: draft.borderWidth,
                   max: 4,
                   divisions: 8,
-                  onChanged: (v) => _update(
-                    draft.copyWith(borderWidth: (v * 2).round() / 2),
-                  ),
+                  onChanged: (v) =>
+                      _update(draft.copyWith(borderWidth: (v * 2).round() / 2)),
                 ),
               ],
             ),
@@ -620,8 +622,7 @@ class ContrastWarning extends StatelessWidget {
     ContrastPair.textOnBackground => SettingsStrings.contrastTextOnBackground,
     ContrastPair.textOnSurface => SettingsStrings.contrastTextOnSurface,
     ContrastPair.mutedOnSurface => SettingsStrings.contrastMutedOnSurface,
-    ContrastPair.mutedOnBackground =>
-      SettingsStrings.contrastMutedOnBackground,
+    ContrastPair.mutedOnBackground => SettingsStrings.contrastMutedOnBackground,
     ContrastPair.onPrimaryOnPrimary => SettingsStrings.contrastOnPrimary,
     ContrastPair.inkOnTint => SettingsStrings.contrastInkOnTint,
     ContrastPair.inkOnStrong => SettingsStrings.contrastInkOnStrong,

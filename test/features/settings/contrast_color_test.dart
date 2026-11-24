@@ -54,7 +54,10 @@ void main() {
     test('muted text and the accent pair use the lower threshold', () {
       // 3.5:1 against white: fine for muted text, too low for body text.
       const grey = Color(0xFF888888);
-      expect(contrastRatio(grey, const Color(0xFFFFFFFF)), inInclusiveRange(3, 4.5));
+      expect(
+        contrastRatio(grey, const Color(0xFFFFFFFF)),
+        inInclusiveRange(3, 4.5),
+      );
       final muted = ThemePresets.light.copyWith(
         colors: ThemePresets.light.colors.copyWith(
           textMuted: grey,
@@ -68,10 +71,9 @@ void main() {
           onPrimary: ThemePresets.light.colors.primary,
         ),
       );
-      expect(
-        contrastIssues(accent).map((i) => i.pair),
-        [ContrastPair.onPrimaryOnPrimary],
-      );
+      expect(contrastIssues(accent).map((i) => i.pair), [
+        ContrastPair.onPrimaryOnPrimary,
+      ]);
     });
   });
 
@@ -90,7 +92,15 @@ void main() {
     });
 
     test('parseHexColor rejects everything else', () {
-      for (final bad in ['', '#', '#12', '#12345', '#1234567', 'blau', '#GGGGGG']) {
+      for (final bad in [
+        '',
+        '#',
+        '#12',
+        '#12345',
+        '#1234567',
+        'blau',
+        '#GGGGGG',
+      ]) {
         expect(parseHexColor(bad), isNull, reason: bad);
       }
     });

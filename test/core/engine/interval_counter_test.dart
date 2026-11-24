@@ -6,7 +6,11 @@ import '../../support/events.dart';
 
 void main() {
   group('interval', () {
-    const config = IntervalConfig(workMs: 30 * sec, restMs: 10 * sec, rounds: 3);
+    const config = IntervalConfig(
+      workMs: 30 * sec,
+      restMs: 10 * sec,
+      rounds: 3,
+    );
 
     test('total duration has no rest after the last round', () {
       expect(config.totalMs, 3 * 30 * sec + 2 * 10 * sec);
@@ -31,33 +35,29 @@ void main() {
       IntervalSnapshot at(int ms) => deriveInterval(config, log.events, ms);
 
       var s = at(0);
-      expect((s.round, s.phase, s.phaseRemainingMs), (
-        1,
-        IntervalPhase.work,
-        30 * sec,
-      ));
+      expect(
+        (s.round, s.phase, s.phaseRemainingMs),
+        (1, IntervalPhase.work, 30 * sec),
+      );
 
       s = at(29 * sec);
-      expect((s.round, s.phase, s.phaseRemainingMs), (
-        1,
-        IntervalPhase.work,
-        1 * sec,
-      ));
+      expect(
+        (s.round, s.phase, s.phaseRemainingMs),
+        (1, IntervalPhase.work, 1 * sec),
+      );
       expect(s.nextBoundaryAt, 30 * sec);
 
       s = at(30 * sec);
-      expect((s.round, s.phase, s.phaseRemainingMs), (
-        1,
-        IntervalPhase.rest,
-        10 * sec,
-      ));
+      expect(
+        (s.round, s.phase, s.phaseRemainingMs),
+        (1, IntervalPhase.rest, 10 * sec),
+      );
 
       s = at(45 * sec);
-      expect((s.round, s.phase, s.phaseElapsedMs), (
-        2,
-        IntervalPhase.work,
-        5 * sec,
-      ));
+      expect(
+        (s.round, s.phase, s.phaseElapsedMs),
+        (2, IntervalPhase.work, 5 * sec),
+      );
       expect(s.phaseProgress, closeTo(5 / 30, 1e-9));
       expect(s.finishAt, 110 * sec);
 
@@ -83,10 +83,7 @@ void main() {
       expect(s.nextBoundaryAt, isNull);
 
       log.stop(120 * sec);
-      expect(
-        deriveInterval(config, log.events, hour).state,
-        RunState.stopped,
-      );
+      expect(deriveInterval(config, log.events, hour).state, RunState.stopped);
     });
 
     test('rest 0: rounds follow each other directly', () {

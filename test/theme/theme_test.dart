@@ -30,7 +30,11 @@ void main() {
         ),
         trackPalette: const [Color(0xFF111111), Color(0x22222222)],
         fontFamily: TikkyFonts.mono,
-        digitStyle: const DigitStyle(tabular: false, monospace: true, weight: 700),
+        digitStyle: const DigitStyle(
+          tabular: false,
+          monospace: true,
+          weight: 700,
+        ),
         cornerRadius: 3.5,
         borderWidth: 2,
       );
@@ -107,7 +111,11 @@ void main() {
     });
 
     test('presets', () {
-      expect(ThemePresets.all.map((t) => t.name), ['Hell', 'Dunkel', 'Schwarz']);
+      expect(ThemePresets.all.map((t) => t.name), [
+        'Hell',
+        'Dunkel',
+        'Schwarz',
+      ]);
       expect(ThemePresets.all.map((t) => t.id).toSet().length, 3);
       expect(ThemePresets.light.brightness, Brightness.light);
       expect(ThemePresets.dark.brightness, Brightness.dark);
@@ -338,7 +346,10 @@ void main() {
         expect(tokens.theme, preset);
         expect(tokens.colors.textMuted, preset.colors.textMuted);
         expect(data.cupertinoOverrideTheme!.brightness, preset.brightness);
-        expect(data.cupertinoOverrideTheme!.primaryColor, preset.colors.primary);
+        expect(
+          data.cupertinoOverrideTheme!.primaryColor,
+          preset.colors.primary,
+        );
       }
     });
 

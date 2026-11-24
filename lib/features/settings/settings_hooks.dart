@@ -2,8 +2,10 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Opens a screen or sheet that another feature owns.
-typedef SettingsNavigation =
-    Future<void> Function(BuildContext context, WidgetRef ref);
+typedef SettingsNavigation = Future<void> Function(
+  BuildContext context,
+  WidgetRef ref,
+);
 
 /// INTEGRATION HOOKS of the settings screen.
 ///

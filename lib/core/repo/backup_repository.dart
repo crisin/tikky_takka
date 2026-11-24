@@ -57,10 +57,7 @@ class BackupRepository {
         ? [for (final r in await _db.select(_db.persons).get()) r.toDomain()]
         : const <Person>[];
     final substances = includeProtocol
-        ? [
-            for (final r in await _db.select(_db.substances).get())
-              r.toDomain(),
-          ]
+        ? [for (final r in await _db.select(_db.substances).get()) r.toDomain()]
         : const <Substance>[];
     final settings = {
       for (final r in await _db.select(_db.settings).get())

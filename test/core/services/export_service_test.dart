@@ -173,7 +173,10 @@ void main() {
       expect(ExportFormat.csvSafeText('-2 Tabletten'), "'-2 Tabletten");
       expect(ExportFormat.csvSafeText('@SUM(A1)'), "'@SUM(A1)");
       // Also behind leading blanks, tabs and line breaks.
-      expect(ExportFormat.csvSafeText('  =HYPERLINK("x")'), "'  =HYPERLINK(\"x\")");
+      expect(
+        ExportFormat.csvSafeText('  =HYPERLINK("x")'),
+        "'  =HYPERLINK(\"x\")",
+      );
       expect(ExportFormat.csvSafeText('\t=cmd'), "'\t=cmd");
       expect(ExportFormat.csvSafeText('\r\n@x'), "'\r\n@x");
       expect(ExportFormat.csvSafeText('\tTab'), "'\tTab");

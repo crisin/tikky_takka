@@ -374,5 +374,6 @@ abstract final class ExportFormat {
   static String _trackName(HistorySession s) =>
       s.track?.name ?? Strings.deletedTrack;
 
-  static String _isoOrEmpty(int? ms) => ms == null ? '' : Fmt.isoLocalWithOffset(ms);
+  static String _isoOrEmpty(int? ms) =>
+      ms == null ? '' : Fmt.isoLocalWithOffset(ms);
 }

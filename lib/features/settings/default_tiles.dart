@@ -121,7 +121,9 @@ class _DefaultNotificationTilesState
           subtitle: granted
               ? hint
               : '$hint ${SettingsStrings.notificationsRequest}',
-          value: granted ? Strings.permissionGranted : Strings.permissionMissing,
+          value: granted
+              ? Strings.permissionGranted
+              : Strings.permissionMissing,
           onTap: granted ? null : _request,
         );
 

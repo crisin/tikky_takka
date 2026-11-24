@@ -207,9 +207,8 @@ void main() {
       expect(find.text(Strings.themeLightForSystem), findsNothing);
       // Applied at once.
       expect(
-        Theme.of(
-          tester.element(find.byType(SettingsScreen)),
-        ).scaffoldBackgroundColor,
+        Theme.of(tester.element(find.byType(SettingsScreen)))
+            .scaffoldBackgroundColor,
         ThemePresets.black.colors.background,
       );
 
@@ -219,7 +218,10 @@ void main() {
       await h.settle(tester);
       expect(container.read(themeSettingsProvider).followSystem, isTrue);
       // The fixed choice is remembered for later.
-      expect(container.read(themeSettingsProvider).themeId, ThemePresets.blackId);
+      expect(
+        container.read(themeSettingsProvider).themeId,
+        ThemePresets.blackId,
+      );
       expect(tester.takeException(), isNull);
     });
 

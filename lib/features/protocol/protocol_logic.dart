@@ -290,10 +290,7 @@ class ProtocolActions {
 
   /// Like [ensurePerson], for substances. A new substance never gets a
   /// lockout here; that is set by the user in the substance list.
-  Future<Substance?> ensureSubstance(
-    String name, {
-    required int color,
-  }) async {
+  Future<Substance?> ensureSubstance(String name, {required int color}) async {
     final trimmed = name.trim();
     if (trimmed.isEmpty) return null;
     Substance? match;

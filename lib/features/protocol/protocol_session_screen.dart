@@ -16,11 +16,13 @@ import 'protocol_strings.dart';
 import 'protocol_widgets.dart';
 
 /// Opens the entry list of the open session of a protocol track.
-Future<void> openProtocolSession(BuildContext context, {required Track track}) =>
-    pushAdaptivePage<void>(
-      context,
-      builder: (_) => ProtocolSessionScreen(track: track),
-    );
+Future<void> openProtocolSession(
+  BuildContext context, {
+  required Track track,
+}) => pushAdaptivePage<void>(
+  context,
+  builder: (_) => ProtocolSessionScreen(track: track),
+);
 
 /// The entries of the open session of a protocol track, newest first.
 ///
@@ -167,9 +169,7 @@ class ProtocolSessionScreen extends ConsumerWidget {
             ],
             body: Center(
               child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth: t.sizes.maxContentWidth,
-                ),
+                constraints: BoxConstraints(maxWidth: t.sizes.maxContentWidth),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -283,11 +283,7 @@ class _EntryRow extends StatelessWidget {
     final note = entry.note?.trim() ?? '';
     final name = personLabel(entry.personId, persons);
     final summary = entrySummary(entry, substances);
-    final time = entryTimeLabel(
-      entry.at,
-      nowMs: nowMs,
-      use24h: t.prefs.use24h,
-    );
+    final time = entryTimeLabel(entry.at, nowMs: nowMs, use24h: t.prefs.use24h);
     final headline = t.text.headline;
     final lineHeight = (headline.fontSize ?? 0) * (headline.height ?? 1);
     final dotInset = lineHeight > t.sizes.dot

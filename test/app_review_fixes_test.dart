@@ -64,7 +64,6 @@ void main() {
         tester.element(find.byType(TracksScreen, skipOffstage: false)),
       );
 
-
   Future<void> lifecycle(
     WidgetTester tester,
     TestApp app,

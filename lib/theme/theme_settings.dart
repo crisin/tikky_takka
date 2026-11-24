@@ -123,7 +123,10 @@ TikkyTheme resolveAppTheme({
   if (settings.followSystem) {
     final dark = platformBrightness == Brightness.dark;
     theme =
-        findTheme(themes, dark ? settings.darkThemeId : settings.lightThemeId) ??
+        findTheme(
+          themes,
+          dark ? settings.darkThemeId : settings.lightThemeId,
+        ) ??
         ThemePresets.forBrightness(platformBrightness);
   } else {
     theme = findTheme(themes, settings.themeId) ?? ThemePresets.light;
@@ -137,7 +140,9 @@ TikkyTheme applyDynamicPalette(TikkyTheme theme, DynamicPalette palette) =>
     theme.copyWith(
       colors: theme.colors.copyWith(
         primary: theme.isDark ? palette.darkPrimary : palette.lightPrimary,
-        onPrimary: theme.isDark ? palette.darkOnPrimary : palette.lightOnPrimary,
+        onPrimary: theme.isDark
+            ? palette.darkOnPrimary
+            : palette.lightOnPrimary,
       ),
     );
 

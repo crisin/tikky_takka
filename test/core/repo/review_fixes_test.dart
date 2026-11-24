@@ -157,17 +157,20 @@ void main() {
       expect(all.where((s) => !s.session.isOpen), hasLength(1));
     });
 
-    test('an idle track is simply started; exclusivity still applies', () async {
-      final e = env();
-      final set = await e.makeSet();
-      const exclusive = StopwatchConfig(exclusive: true);
-      final a = await e.makeTrack(set, exclusive);
-      final b = await e.makeTrack(set, exclusive);
-      await e.commands.startTrack(a.id);
-      expect(await e.commands.restartTrack(b.id), TrackAction.started);
-      expect((await e.snapshot(a.id))!.isPaused, isTrue);
-      expect(await e.commands.restartTrack('missing'), TrackAction.none);
-    });
+    test(
+      'an idle track is simply started; exclusivity still applies',
+      () async {
+        final e = env();
+        final set = await e.makeSet();
+        const exclusive = StopwatchConfig(exclusive: true);
+        final a = await e.makeTrack(set, exclusive);
+        final b = await e.makeTrack(set, exclusive);
+        await e.commands.startTrack(a.id);
+        expect(await e.commands.restartTrack(b.id), TrackAction.started);
+        expect((await e.snapshot(a.id))!.isPaused, isTrue);
+        expect(await e.commands.restartTrack('missing'), TrackAction.none);
+      },
+    );
   });
 
   group('session.updatedAt', () {
@@ -258,19 +261,13 @@ void main() {
       expect(merged.events.last.at, endedAt);
       // The summary no longer grows with the clock.
       e.clock.advanceMs(hour);
-      expect(
-        (await e.history.getSession(open.session.id))!.summary.netMs,
-        min,
-      );
+      expect((await e.history.getSession(open.session.id))!.summary.netMs, min);
       expect(await e.commands.startTrack(track.id), TrackAction.started);
     });
 
     test('a session that is already stuck heals itself on start', () async {
       final e = env();
-      final track = await e.makeTrack(
-        await e.makeSet(),
-        const CounterConfig(),
-      );
+      final track = await e.makeTrack(await e.makeSet(), const CounterConfig());
       await e.commands.tick(track.id);
       final open = (await e.commands.getOpenSession(track.id))!;
       // Simulates the state an old import left behind: row open, stop in
@@ -319,28 +316,31 @@ void main() {
       expect(report.inserted['events'], 0);
     });
 
-    test('a deleted event stays deleted, a restored one may come back', () async {
-      final e = env();
-      final track = await e.makeTrack(
-        await e.makeSet(),
-        const StopwatchConfig(),
-      );
-      await e.commands.startTrack(track.id);
-      final lap = (await e.commands.lap(track.id))!;
-      final backup = await e.backup.readAll();
+    test(
+      'a deleted event stays deleted, a restored one may come back',
+      () async {
+        final e = env();
+        final track = await e.makeTrack(
+          await e.makeSet(),
+          const StopwatchConfig(),
+        );
+        await e.commands.startTrack(track.id);
+        final lap = (await e.commands.lap(track.id))!;
+        final backup = await e.backup.readAll();
 
-      await e.history.deleteEvent(lap.id);
-      await e.backup.merge(backup);
-      expect(await e.eventTypes(track.id), [EventType.start]);
+        await e.history.deleteEvent(lap.id);
+        await e.backup.merge(backup);
+        expect(await e.eventTypes(track.id), [EventType.start]);
 
-      // Undo of the deletion lifts the tombstone again.
-      await e.history.restoreEvent(lap);
-      await e.history.deleteSession(
-        (await e.commands.getOpenSession(track.id))!.session.id,
-      );
-      await e.backup.merge(backup);
-      expect(await e.eventTypes(track.id), [EventType.start, EventType.lap]);
-    });
+        // Undo of the deletion lifts the tombstone again.
+        await e.history.restoreEvent(lap);
+        await e.history.deleteSession(
+          (await e.commands.getOpenSession(track.id))!.session.id,
+        );
+        await e.backup.merge(backup);
+        expect(await e.eventTypes(track.id), [EventType.start, EventType.lap]);
+      },
+    );
 
     test('a reopened session is not closed again by an older backup', () async {
       final e = env();

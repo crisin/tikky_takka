@@ -71,9 +71,8 @@ class LocalAuthLockService implements LockService {
 
   @override
   Future<bool> authenticate({required String reason}) {
-    return _pending ??= _authenticate(reason).whenComplete(
-      () => _pending = null,
-    );
+    return _pending ??= _authenticate(reason)
+        .whenComplete(() => _pending = null);
   }
 
   Future<bool> _authenticate(String reason) async {

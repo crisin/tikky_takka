@@ -68,10 +68,7 @@ void main() {
     // --- name
     await tester.tap(find.text(Strings.name));
     await h.settle(tester);
-    await tester.enterText(
-      find.byType(TextField),
-      'Mein Blau',
-    );
+    await tester.enterText(find.byType(TextField), 'Mein Blau');
     await tester.tap(find.text(Strings.save));
     await h.settle(tester);
     expect(theme().name, 'Mein Blau');
@@ -173,19 +170,28 @@ void main() {
     expect(theme().digitStyle.tabular, isFalse);
 
     await h.reveal(tester, _sliderOf(Strings.tokenDigitWeight));
-    await tester.drag(_sliderOf(Strings.tokenDigitWeight), const Offset(100, 0));
+    await tester.drag(
+      _sliderOf(Strings.tokenDigitWeight),
+      const Offset(100, 0),
+    );
     await h.settle(tester);
     expect(theme().digitStyle.weight, greaterThan(400));
     expect(theme().digitStyle.weight % 100, 0);
 
     // --- shape
     await h.reveal(tester, _sliderOf(Strings.tokenCornerRadius));
-    await tester.drag(_sliderOf(Strings.tokenCornerRadius), const Offset(100, 0));
+    await tester.drag(
+      _sliderOf(Strings.tokenCornerRadius),
+      const Offset(100, 0),
+    );
     await h.settle(tester);
     expect(theme().cornerRadius, greaterThan(ThemePresets.light.cornerRadius));
 
     await h.reveal(tester, _sliderOf(Strings.tokenBorderWidth));
-    await tester.drag(_sliderOf(Strings.tokenBorderWidth), const Offset(100, 0));
+    await tester.drag(
+      _sliderOf(Strings.tokenBorderWidth),
+      const Offset(100, 0),
+    );
     await h.settle(tester);
     expect(theme().borderWidth, greaterThan(ThemePresets.light.borderWidth));
 
@@ -225,7 +231,10 @@ void main() {
     expect(
       tester
           .widget<IconButton>(
-            find.widgetWithIcon(IconButton, Icons.settings_backup_restore_rounded),
+            find.widgetWithIcon(
+              IconButton,
+              Icons.settings_backup_restore_rounded,
+            ),
           )
           .onPressed,
       isNull,
@@ -342,10 +351,7 @@ void main() {
     }
 
     await action('Mein Blau', Strings.rename);
-    await tester.enterText(
-      find.byType(TextField),
-      'Nachtblau',
-    );
+    await tester.enterText(find.byType(TextField), 'Nachtblau');
     await tester.tap(find.text(Strings.save));
     await h.settle(tester);
     expect(container.read(customThemesProvider).single.name, 'Nachtblau');
@@ -365,7 +371,10 @@ void main() {
     await action('Nachtblau', Strings.delete);
     expect(container.read(customThemesProvider), isEmpty);
     // The app falls back to a preset instead of breaking.
-    expect(ThemePresets.isPresetId(container.read(appThemeProvider).id), isTrue);
+    expect(
+      ThemePresets.isPresetId(container.read(appThemeProvider).id),
+      isTrue,
+    );
 
     await tester.tap(find.text(Strings.undo));
     await h.settle(tester);
@@ -398,7 +407,10 @@ void main() {
 
   testWidgets('the editor refuses presets and unknown ids', (tester) async {
     final h = await SettingsHarness.create(tester);
-    await h.pump(tester, const ThemeEditorScreen(themeId: ThemePresets.lightId));
+    await h.pump(
+      tester,
+      const ThemeEditorScreen(themeId: ThemePresets.lightId),
+    );
     expect(find.text(SettingsStrings.themeNotFound), findsOneWidget);
     expect(find.byType(ThemePreview), findsNothing);
     expect(tester.takeException(), isNull);

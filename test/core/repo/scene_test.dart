@@ -234,26 +234,29 @@ void main() {
       expect((await target.sets.getSet(set.id))!.hasScene, isFalse);
     });
 
-    test('importing a backup without protocol data keeps the local scene', () async {
-      final e = env();
-      final (set, alex, water) = await populate(e);
-      final plain = await e.backup.readAll();
-      // The backup's set is newer than the local row, so it replaces it.
-      final newer = BackupData(
-        sets: [
-          plain.sets.single.copyWith(
-            name: 'Umbenannt',
-            updatedAt: set.updatedAt + 1000,
-          ),
-        ],
-      );
-      final report = await e.backup.merge(newer);
-      expect(report.updated['sets'], 1);
-      final stored = (await e.sets.getSet(set.id))!;
-      expect(stored.name, 'Umbenannt');
-      expect(stored.scenePersonIds, [alex.id]);
-      expect(stored.sceneSubstanceIds, [water.id]);
-    });
+    test(
+      'importing a backup without protocol data keeps the local scene',
+      () async {
+        final e = env();
+        final (set, alex, water) = await populate(e);
+        final plain = await e.backup.readAll();
+        // The backup's set is newer than the local row, so it replaces it.
+        final newer = BackupData(
+          sets: [
+            plain.sets.single.copyWith(
+              name: 'Umbenannt',
+              updatedAt: set.updatedAt + 1000,
+            ),
+          ],
+        );
+        final report = await e.backup.merge(newer);
+        expect(report.updated['sets'], 1);
+        final stored = (await e.sets.getSet(set.id))!;
+        expect(stored.name, 'Umbenannt');
+        expect(stored.scenePersonIds, [alex.id]);
+        expect(stored.sceneSubstanceIds, [water.id]);
+      },
+    );
   });
 
   group('substance use', () {

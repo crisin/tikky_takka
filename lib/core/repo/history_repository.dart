@@ -28,8 +28,7 @@ class HistoryRepository {
       for (final r in await _db.select(_db.tracks).get()) r.id: r.toDomain(),
     };
     final sets = {
-      for (final r in await _db.select(_db.trackSets).get())
-        r.id: r.toDomain(),
+      for (final r in await _db.select(_db.trackSets).get()) r.id: r.toDomain(),
     };
 
     final query = _db.select(_db.sessions)
@@ -121,11 +120,12 @@ class HistoryRepository {
     String setId, {
     int? Function()? sinceMs,
     int? untilMs,
-  }) => watchTables(
-    _db,
-    [_db.sessions, _db.events, _db.tracks, _db.trackSets],
-    () => getSetActivity(setId, sinceMs: sinceMs?.call(), untilMs: untilMs),
-  );
+  }) => watchTables(_db, [
+    _db.sessions,
+    _db.events,
+    _db.tracks,
+    _db.trackSets,
+  ], () => getSetActivity(setId, sinceMs: sinceMs?.call(), untilMs: untilMs));
 
   /// One session with its events (open sessions included), or `null`.
   Future<HistorySession?> getSession(String sessionId) async {

@@ -13,7 +13,10 @@ void main() {
     clock.advanceMs(-500);
     expect(clock.nowMs(), 2500);
     clock.setMs(42);
-    expect(clock.nowUtc(), DateTime.fromMillisecondsSinceEpoch(42, isUtc: true));
+    expect(
+      clock.nowUtc(),
+      DateTime.fromMillisecondsSinceEpoch(42, isUtc: true),
+    );
     expect(clock.nowUtc().isUtc, isTrue);
     expect(clock.nowLocal().isUtc, isFalse);
     expect(FakeClock.at(DateTime.utc(1970, 1, 1, 0, 0, 1)).nowMs(), 1000);

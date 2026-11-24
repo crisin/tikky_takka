@@ -250,8 +250,10 @@ final appThemeProvider = Provider<TikkyTheme>(
 
 /// The app-wide Material theme (with `TikkyTokens` and the Cupertino theme).
 final appThemeDataProvider = Provider<ThemeData>(
-  (ref) =>
-      buildMaterialTheme(ref.watch(appThemeProvider), ref.watch(uiPrefsProvider)),
+  (ref) => buildMaterialTheme(
+    ref.watch(appThemeProvider),
+    ref.watch(uiPrefsProvider),
+  ),
 );
 
 TrackSet? _setById(Ref ref, String? setId) {

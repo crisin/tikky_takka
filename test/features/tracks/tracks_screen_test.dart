@@ -124,9 +124,7 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('the head counts the tracks and how many run', (
-      tester,
-    ) async {
+    testWidgets('the head counts the tracks and how many run', (tester) async {
       final h = await TracksHarness.start(tester);
       expect(find.text(TracksStrings.setSummary(3, 0)), findsOneWidget);
       await h.tap(h.primary(h.stopwatch));

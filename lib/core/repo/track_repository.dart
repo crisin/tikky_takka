@@ -39,11 +39,9 @@ class TrackRepository {
   Stream<List<Track>> watchTracks(
     String setId, {
     bool includeArchived = false,
-  }) => watchTables(
-    _db,
-    [_db.tracks],
-    () => getTracks(setId, includeArchived: includeArchived),
-  );
+  }) => watchTables(_db, [
+    _db.tracks,
+  ], () => getTracks(setId, includeArchived: includeArchived));
 
   /// Every track of every set (archived ones included by default), ordered
   /// by set and `sortIndex`. For history filters and name lookups.
@@ -59,11 +57,9 @@ class TrackRepository {
   }
 
   Stream<List<Track>> watchAllTracks({bool includeArchived = true}) =>
-      watchTables(
-        _db,
-        [_db.tracks],
-        () => getAllTracks(includeArchived: includeArchived),
-      );
+      watchTables(_db, [
+        _db.tracks,
+      ], () => getAllTracks(includeArchived: includeArchived));
 
   Future<Track?> getTrack(String id) async {
     final row = await (_db.select(

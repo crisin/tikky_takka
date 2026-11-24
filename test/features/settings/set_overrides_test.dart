@@ -89,7 +89,10 @@ void main() {
     await h.settle(tester);
     expect((await h.storedSet(tester, set.id))!.themeId, ThemePresets.blackId);
     expect(preview().theme.id, ThemePresets.blackId);
-    expect(container.read(themeForSetProvider(set.id)).id, ThemePresets.blackId);
+    expect(
+      container.read(themeForSetProvider(set.id)).id,
+      ThemePresets.blackId,
+    );
     // The app itself keeps its theme.
     expect(container.read(appThemeProvider).id, ThemePresets.lightId);
 
@@ -147,9 +150,7 @@ void main() {
     final set = await h.createSet(tester, 'Küche');
     await h.pump(
       tester,
-      SetOverridesScreen(
-        initialSet: set.copyWith(themeId: () => 'gone'),
-      ),
+      SetOverridesScreen(initialSet: set.copyWith(themeId: () => 'gone')),
     );
     expect(
       tester.widget<ThemePreview>(find.byType(ThemePreview)).theme.id,

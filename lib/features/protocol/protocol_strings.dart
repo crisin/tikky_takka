@@ -29,7 +29,6 @@ abstract final class ProtocolStrings {
   /// Semantics of a person card.
   static String choosePerson(String person) => '$person auswählen';
 
-
   // --------------------------------------------------------------- scene
   static const scene = 'Szene';
   static const sceneEdit = 'Szene bearbeiten';

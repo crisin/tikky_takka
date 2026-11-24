@@ -36,20 +36,39 @@ NotificationSpec _spec(
 void main() {
   group('platform support', () {
     test('Android, iOS, macOS and Windows only', () {
-      expect(PluginNotificationBackend.isSupported(TargetPlatform.android), isTrue);
+      expect(
+        PluginNotificationBackend.isSupported(TargetPlatform.android),
+        isTrue,
+      );
       expect(PluginNotificationBackend.isSupported(TargetPlatform.iOS), isTrue);
-      expect(PluginNotificationBackend.isSupported(TargetPlatform.macOS), isTrue);
-      expect(PluginNotificationBackend.isSupported(TargetPlatform.windows), isTrue);
-      expect(PluginNotificationBackend.isSupported(TargetPlatform.linux), isFalse);
-      expect(PluginNotificationBackend.isSupported(TargetPlatform.fuchsia), isFalse);
+      expect(
+        PluginNotificationBackend.isSupported(TargetPlatform.macOS),
+        isTrue,
+      );
+      expect(
+        PluginNotificationBackend.isSupported(TargetPlatform.windows),
+        isTrue,
+      );
+      expect(
+        PluginNotificationBackend.isSupported(TargetPlatform.linux),
+        isFalse,
+      );
+      expect(
+        PluginNotificationBackend.isSupported(TargetPlatform.fuchsia),
+        isFalse,
+      );
     });
 
-    test('an unsupported platform is refused before touching the plugin',
-        () async {
-      final backend = PluginNotificationBackend(platform: TargetPlatform.linux);
-      expect(await backend.init((_) {}), isFalse);
-      expect(backend.maxPending, isNull);
-    });
+    test(
+      'an unsupported platform is refused before touching the plugin',
+      () async {
+        final backend = PluginNotificationBackend(
+          platform: TargetPlatform.linux,
+        );
+        expect(await backend.init((_) {}), isFalse);
+        expect(backend.maxPending, isNull);
+      },
+    );
 
     test('only Apple platforms have a pending budget', () {
       expect(
@@ -114,7 +133,9 @@ void main() {
       expect(
         windows.guid,
         matches(
-          RegExp(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'),
+          RegExp(
+            r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+          ),
         ),
       );
     });

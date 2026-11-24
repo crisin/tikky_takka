@@ -100,7 +100,9 @@ ThemeData buildMaterialTheme(
         borderRadius: tokens.radii.mdAll,
         borderSide: BorderSide(color: color, width: width),
       );
-  final hairlineWidth = tokens.sizes.hairline <= 0 ? 1.0 : tokens.sizes.hairline;
+  final hairlineWidth = tokens.sizes.hairline <= 0
+      ? 1.0
+      : tokens.sizes.hairline;
 
   return ThemeData(
     useMaterial3: true,
@@ -182,7 +184,10 @@ ThemeData buildMaterialTheme(
       backgroundColor: c.surface,
       elevation: 0,
       indicatorColor: c.surfaceAlt,
-      selectedIconTheme: IconThemeData(color: c.text, size: tokens.sizes.iconMd),
+      selectedIconTheme: IconThemeData(
+        color: c.text,
+        size: tokens.sizes.iconMd,
+      ),
       unselectedIconTheme: IconThemeData(
         color: c.textMuted,
         size: tokens.sizes.iconMd,
@@ -333,7 +338,10 @@ ThemeData buildMaterialTheme(
       ),
     ),
     tooltipTheme: TooltipThemeData(
-      decoration: BoxDecoration(color: c.text, borderRadius: tokens.radii.smAll),
+      decoration: BoxDecoration(
+        color: c.text,
+        borderRadius: tokens.radii.smAll,
+      ),
       textStyle: tokens.text.caption.copyWith(color: c.background),
     ),
     cupertinoOverrideTheme: buildCupertinoTheme(theme, prefs, platform: target),
@@ -350,8 +358,7 @@ CupertinoThemeData buildCupertinoTheme(
 }) {
   final target = platform ?? defaultTargetPlatform;
   final c = theme.colors;
-  final apple =
-      target == TargetPlatform.iOS || target == TargetPlatform.macOS;
+  final apple = target == TargetPlatform.iOS || target == TargetPlatform.macOS;
   final family =
       TikkyFonts.family(theme.fontFamily, target) ??
       (apple ? 'CupertinoSystemText' : null);

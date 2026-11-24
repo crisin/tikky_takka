@@ -308,9 +308,8 @@ class _AlarmPermissionBannerState extends ConsumerState<AlarmPermissionBanner>
           SizedBox(width: t.space.md),
           AdaptiveFilledButton(
             label: AlarmStrings.permissionAllow,
-            onPressed: () => unawaited(
-              ref.read(alarmPermissionProvider.notifier).request(),
-            ),
+            onPressed: () =>
+                unawaited(ref.read(alarmPermissionProvider.notifier).request()),
           ),
         ],
       ),

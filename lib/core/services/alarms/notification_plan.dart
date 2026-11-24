@@ -375,13 +375,14 @@ List<NotificationSpec> buildNotificationPlan({
       : AlarmIds.slotsPerTrack;
   if (limit <= 0) return const [];
 
-  final future = [
-    for (final alarm in alarms)
-      if (alarm.at > nowMs) alarm,
-  ]..sort((a, b) {
-    final byTime = a.at.compareTo(b.at);
-    return byTime != 0 ? byTime : a.index.compareTo(b.index);
-  });
+  final future =
+      [
+        for (final alarm in alarms)
+          if (alarm.at > nowMs) alarm,
+      ]..sort((a, b) {
+        final byTime = a.at.compareTo(b.at);
+        return byTime != 0 ? byTime : a.index.compareTo(b.index);
+      });
   final kept = truncateAlarms(future, limit);
   if (kept.isEmpty) return const [];
 
