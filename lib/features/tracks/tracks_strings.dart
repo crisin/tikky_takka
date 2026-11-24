@@ -233,6 +233,11 @@ abstract final class TracksStrings {
 
   static const padEditLast = 'Letzten Eintrag ändern';
 
+  /// The way into the protocol from a set that has nothing yet.
+  static const startProtocol = 'Protokoll starten';
+  static const emptyStartBody =
+      'Lege eine Spur an – oder starte ein Protokoll: wer hatte wann was.';
+
   /// Name of the lane that carries the protocol in the timeline.
   static const protocolLaneName = 'Protokoll';
 

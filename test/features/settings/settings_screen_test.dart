@@ -295,8 +295,6 @@ void main() {
             SettingsHooks(
               openExport: (context, ref) async => calls.add('export'),
               openImport: (context, ref) async => calls.add('import'),
-              openPersons: (context, ref) async => calls.add('persons'),
-              openSubstances: (context, ref) async => calls.add('substances'),
               privacyTiles: (context) => const [
                 ListTile(title: Text('lock tile from the privacy feature')),
               ],
@@ -307,13 +305,13 @@ void main() {
       );
       await h.pump(tester, const SettingsScreen());
 
-      for (final key in ['export', 'import', 'persons', 'substances']) {
+      for (final key in ['export', 'import']) {
         final tile = find.byKey(ValueKey('settings.$key'));
         await h.reveal(tester, tile);
         await tester.tap(tile);
         await h.settle(tester);
       }
-      expect(calls, ['export', 'import', 'persons', 'substances']);
+      expect(calls, ['export', 'import']);
       expect(h.export.delivered, isEmpty);
 
       await h.reveal(tester, find.text('lock tile from the privacy feature'));
@@ -375,17 +373,6 @@ void main() {
       await h.settle(tester);
       expect(h.export.imported, hasLength(1));
       expect(find.textContaining(Strings.importDone), findsOneWidget);
-      expect(tester.takeException(), isNull);
-    });
-
-    testWidgets('persons and substances say so while unwired', (tester) async {
-      final h = await SettingsHarness.create(tester);
-      await h.pump(tester, const SettingsScreen());
-      final tile = find.byKey(const ValueKey('settings.persons'));
-      await h.reveal(tester, tile);
-      await tester.tap(tile);
-      await h.settle(tester);
-      expect(find.text(Strings.comingSoon), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 

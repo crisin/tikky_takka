@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,6 +13,7 @@ import '../../l10n/strings.dart';
 import '../../theme/theme.dart';
 import 'color_picker.dart';
 import 'track_undo.dart';
+import 'protocol_start.dart';
 import 'tracks_strings.dart';
 
 /// Keys of the editor's controls (for tests).
@@ -270,14 +273,23 @@ class _TrackEditorSheetState extends ConsumerState<TrackEditorSheet> {
       title: Strings.trackMode,
       actions: [
         for (final m in TrackMode.values)
-          AdaptiveSheetAction(
-            value: m,
-            label: Strings.modeName(m),
-            selected: m == _mode,
-          ),
+          // The protocol is not a track. Where a track is added it is
+          // offered as the way to set it up.
+          if (m != TrackMode.protocol || _isNew)
+            AdaptiveSheetAction(
+              value: m,
+              label: Strings.modeName(m),
+              selected: m == _mode,
+            ),
       ],
     );
     if (mode == null || !mounted) return;
+    if (mode == TrackMode.protocol) {
+      final navigator = Navigator.of(context);
+      navigator.pop();
+      unawaited(startProtocol(navigator.context, setId: widget.setId));
+      return;
+    }
     ref.read(hapticsProvider).selection();
     setState(() => _mode = mode);
   }

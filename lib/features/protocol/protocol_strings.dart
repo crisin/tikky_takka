@@ -32,6 +32,11 @@ abstract final class ProtocolStrings {
   // --------------------------------------------------------------- scene
   static const scene = 'Szene';
   static const sceneEdit = 'Szene bearbeiten';
+
+  /// "Wasser entfernt"
+  static String sceneRemoved(String name) => '$name entfernt';
+  static const sceneLongPress =
+      'Lange drücken: Name, Farbe und eigenen Abstand ändern oder entfernen.';
   static const sceneWho = 'Wer ist dabei?';
   static const sceneWhat = 'Was ist heute dran?';
   static const sceneClear = 'Szene leeren';

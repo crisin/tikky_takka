@@ -277,10 +277,6 @@ class _DataSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final prefs = ref.watch(uiPrefsProvider);
 
-    void unavailable() => showInfoSnackBar(context, Strings.comingSoon);
-    VoidCallback open(SettingsNavigation? hook) =>
-        hook == null ? unavailable : () => hook(context, ref);
-
     return AdaptiveSection(
       header: Strings.settingsData,
       children: [
@@ -307,20 +303,6 @@ class _DataSection extends ConsumerWidget {
           fieldKey: UiPrefsKeys.csvSeparator,
           prefs: prefs,
           onChanged: ref.read(uiPrefsProvider.notifier).set,
-        ),
-        AdaptiveTile(
-          key: const ValueKey('settings.persons'),
-          leading: Icon(AdaptiveIcons.person(context)),
-          title: Strings.persons,
-          subtitle: SettingsStrings.dataPersonsHint,
-          onTap: open(hooks.openPersons),
-        ),
-        AdaptiveTile(
-          key: const ValueKey('settings.substances'),
-          leading: Icon(SettingsIcons.substances(context)),
-          title: Strings.substances,
-          subtitle: SettingsStrings.dataSubstancesHint,
-          onTap: open(hooks.openSubstances),
         ),
       ],
     );

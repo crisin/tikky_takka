@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:tikky_takka/core/domain/domain.dart';
 import 'package:tikky_takka/core/repo/repo.dart';
 import 'package:tikky_takka/features/protocol/protocol_strings.dart';
+import 'package:tikky_takka/l10n/strings.dart';
 import 'package:tikky_takka/features/protocol/protocol_widgets.dart';
 import 'package:tikky_takka/features/tracks/set_switcher.dart';
 import 'package:tikky_takka/theme/theme.dart';
@@ -163,6 +164,57 @@ void main() {
     expect(stored!.scenePersonIds, [alex.id]);
     // The provider the lanes read has it as well.
     expect(h.container.read(setProvider(h.activeSet.id))!.hasScene, isTrue);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a long press edits a thing: name and the own lockout; it is '
+      'removed without a dialog, with undo', (tester) async {
+    final f = await ProtocolFixture.pump(tester);
+    final water = await f.substance('Wasser');
+    await f.scene(substances: [water]);
+    Future<List<Substance>> all() =>
+        f.run(() => f.people.getSubstances(includeArchived: true));
+
+    await f.openScene();
+    expect(find.text(ProtocolStrings.sceneLongPress), findsOneWidget);
+    await tester.longPress(find.byKey(_substance(water)));
+    await f.settle();
+    // The lockout starts without any value: the app suggests nothing.
+    expect(find.text(Strings.lockoutNone), findsOneWidget);
+    expect(find.text(Strings.lockoutHint), findsOneWidget);
+    await tester.enterText(find.byKey(const ValueKey('editor-name')), 'Mate');
+    await tester.pump();
+    await f.tap(find.byKey(const ValueKey('editor-save')));
+    expect((await all()).single.name, 'Mate');
+    expect((await all()).single.lockoutMs, isNull);
+    expect(find.byKey(_substance(water)), findsOneWidget);
+
+    // Remove: gone from the choices, no dialog, undo brings it back.
+    await tester.longPress(find.byKey(_substance(water)));
+    await f.settle();
+    await f.tap(find.text(ProtocolStrings.remove));
+    expect(find.byType(AlertDialog), findsNothing);
+    expect((await all()).single.archived, isTrue);
+    expect(find.byKey(_substance(water)), findsNothing);
+    // "Rückgängig" sits in the scene itself, not behind the sheet.
+    expect(find.text(ProtocolStrings.sceneRemoved('Mate')), findsOneWidget);
+    await f.tap(find.byKey(const ValueKey('scene-undo-remove')));
+    expect(find.byKey(_substance(water)), findsOneWidget);
+    expect((await all()).single.archived, isFalse);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a long press edits a person', (tester) async {
+    final f = await ProtocolFixture.pump(tester);
+    final kim = await f.person('Kim');
+    await f.openScene();
+    await tester.longPress(find.byKey(_person(kim)));
+    await f.settle();
+    await tester.enterText(find.byKey(const ValueKey('editor-name')), 'Kimi');
+    await tester.pump();
+    await f.tap(find.byKey(const ValueKey('editor-save')));
+    final persons = await f.run(f.people.getPersons);
+    expect(persons.single.name, 'Kimi');
     expect(tester.takeException(), isNull);
   });
 }

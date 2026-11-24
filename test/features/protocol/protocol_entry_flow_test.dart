@@ -1,15 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:tikky_takka/core/domain/domain.dart';
-import 'package:tikky_takka/core/repo/repo.dart';
 import 'package:tikky_takka/features/protocol/entry_edit_sheet.dart';
-import 'package:tikky_takka/features/protocol/protocol_people_screen.dart';
 import 'package:tikky_takka/features/protocol/protocol_strings.dart';
 import 'package:tikky_takka/l10n/strings.dart';
 import 'package:tikky_takka/theme/theme.dart';
 
-import '../../support/test_app.dart';
 import 'protocol_test_support.dart';
 
 void main() {
@@ -179,55 +174,6 @@ void main() {
     final mate = (await f.run(f.people.getSubstances))
         .singleWhere((s) => s.name == 'Mate');
     expect((await f.entries()).single.substanceId, mate.id);
-    expect(tester.takeException(), isNull);
-  });
-
-  testWidgets('persons and substances are managed by the user only', (
-    tester,
-  ) async {
-    final app = await TestApp.create(tester);
-    await app.pumpWidget(tester, const ProtocolPeopleScreen());
-    final people = ProviderScope.containerOf(
-      tester.element(find.byType(ProtocolPeopleScreen)),
-    ).read(peopleRepositoryProvider);
-    Future<void> tap(Finder finder) async {
-      await tester.tap(finder);
-      await settleUi(tester, app);
-    }
-
-    Future<List<Substance>> substances() async => (await tester.runAsync(
-      () => people.getSubstances(includeArchived: true),
-    ))!;
-
-    // Empty lists and the neutral note.
-    expect(find.text(ProtocolStrings.personsEmptyTitle), findsOneWidget);
-    expect(find.text(ProtocolStrings.neutralNote), findsOneWidget);
-
-    // Add a substance; the lockout field starts without any value.
-    await tap(find.text(Strings.substances));
-    expect(find.text(ProtocolStrings.substancesEmptyTitle), findsOneWidget);
-    await tap(find.byTooltip(ProtocolStrings.newSubstance));
-    expect(find.text(Strings.lockoutNone), findsOneWidget);
-    expect(find.text(Strings.lockoutHint), findsOneWidget);
-    await tester.enterText(find.byKey(const ValueKey('editor-name')), 'Wasser');
-    await tester.pump();
-    await tap(find.byKey(const ValueKey('editor-save')));
-
-    expect((await substances()).single.name, 'Wasser');
-    expect((await substances()).single.lockoutMs, isNull);
-    expect(find.text('Wasser'), findsOneWidget);
-
-    // Remove it from the list: no dialog, undo snackbar.
-    await tap(find.text('Wasser'));
-    await tap(find.text(ProtocolStrings.remove));
-    expect(find.byType(AlertDialog), findsNothing);
-    expect(find.text(ProtocolStrings.substanceRemoved), findsOneWidget);
-    expect((await substances()).single.archived, isTrue);
-    expect(find.text(ProtocolStrings.removedSection), findsOneWidget);
-
-    await tap(find.text(Strings.undo));
-    expect((await substances()).single.archived, isFalse);
-    expect(find.text(ProtocolStrings.removedSection), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }

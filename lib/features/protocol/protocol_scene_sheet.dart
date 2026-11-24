@@ -7,6 +7,7 @@ import '../../core/repo/providers.dart';
 import '../../core/services/haptics.dart';
 import '../../l10n/strings.dart';
 import '../../theme/theme.dart';
+import 'protocol_editors.dart';
 import 'protocol_logic.dart';
 import 'protocol_strings.dart';
 import 'protocol_widgets.dart';
@@ -151,6 +152,52 @@ class _SceneEditorState extends ConsumerState<SceneEditor> {
     _store();
   }
 
+  /// What was just removed in an editor, for "Rückgängig" right here: a
+  /// snackbar would lie behind this sheet.
+  ({String id, String name, bool person})? _removed;
+
+  Future<void> _editPerson(Person person) async {
+    final people = ref.read(peopleRepositoryProvider);
+    await showPersonEditor(context, person: person, undoSnackBar: false);
+    final all = await people.getPersons(includeArchived: true);
+    if (!mounted) return;
+    if (all.any((p) => p.id == person.id && p.archived)) {
+      setState(
+        () => _removed = (id: person.id, name: person.name, person: true),
+      );
+    }
+  }
+
+  Future<void> _editSubstance(Substance substance) async {
+    final people = ref.read(peopleRepositoryProvider);
+    await showSubstanceEditor(
+      context,
+      substance: substance,
+      undoSnackBar: false,
+    );
+    final all = await people.getSubstances(includeArchived: true);
+    if (!mounted) return;
+    if (all.any((s) => s.id == substance.id && s.archived)) {
+      setState(
+        () =>
+            _removed = (id: substance.id, name: substance.name, person: false),
+      );
+    }
+  }
+
+  Future<void> _restoreRemoved() async {
+    final removed = _removed;
+    if (removed == null) return;
+    final people = ref.read(peopleRepositoryProvider);
+    ref.read(hapticsProvider).selection();
+    setState(() => _removed = null);
+    if (removed.person) {
+      await people.setPersonArchived(removed.id, archived: false);
+    } else {
+      await people.setSubstanceArchived(removed.id, archived: false);
+    }
+  }
+
   Future<void> _commitNewPerson() async {
     final actions = ref.read(protocolActionsProvider);
     final count = ref.read(allPersonsProvider).value?.length ?? 0;
@@ -241,6 +288,7 @@ class _SceneEditorState extends ConsumerState<SceneEditor> {
                   color: Color(p.color),
                   selected: personIds.contains(p.id),
                   onTap: () => _toggle(personIds, p.id),
+                  onLongPress: () => _editPerson(p),
                 ),
             if (ready && !_addingPerson)
               ProtocolChoice(
@@ -283,6 +331,7 @@ class _SceneEditorState extends ConsumerState<SceneEditor> {
                   color: Color(s.color),
                   selected: substanceIds.contains(s.id),
                   onTap: () => _toggle(substanceIds, s.id),
+                  onLongPress: () => _editSubstance(s),
                 ),
             if (ready && !_addingSubstance)
               ProtocolChoice(
@@ -305,6 +354,25 @@ class _SceneEditorState extends ConsumerState<SceneEditor> {
               _addingSubstance = false;
             }),
           ),
+        SizedBox(height: t.space.md),
+        if (_removed case final removed?)
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  ProtocolStrings.sceneRemoved(removed.name),
+                  style: t.text.body,
+                ),
+              ),
+              AdaptiveTextButton(
+                key: const ValueKey('scene-undo-remove'),
+                label: Strings.undo,
+                onPressed: _restoreRemoved,
+              ),
+            ],
+          )
+        else
+          Text(ProtocolStrings.sceneLongPress, style: t.text.caption),
         SizedBox(height: t.space.sm),
         Align(
           alignment: AlignmentDirectional.centerStart,

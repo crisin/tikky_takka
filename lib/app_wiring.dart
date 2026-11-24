@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/misc.dart' show Override;
 import 'core/services/export_service.dart';
 import 'core/services/export_service_impl.dart';
 import 'features/history/export_sheet.dart';
-import 'features/protocol/protocol_people_screen.dart';
 import 'features/settings/data_actions.dart';
 import 'features/settings/lock_gate.dart';
 import 'features/settings/settings_hooks.dart';
@@ -18,10 +17,6 @@ import 'features/settings/settings_hooks.dart';
 final appSettingsHooks = SettingsHooks(
   openExport: (context, ref) => showExportSheet(context),
   openImport: runDefaultImport,
-  openPersons: (context, ref) =>
-      openProtocolPeople(context, tab: ProtocolPeopleTab.persons),
-  openSubstances: (context, ref) =>
-      openProtocolPeople(context, tab: ProtocolPeopleTab.substances),
   privacyTiles: (context) => const [AppLockTile()],
 );
 

@@ -77,13 +77,9 @@ void main() {
 
   test('amounts are the own earlier inputs of that thing', () async {
     final e = env();
-    Future<void> add(String person, String thing, int at, String amount) =>
-        e.entries.add(
-          personId: person,
-          substanceId: thing,
-          at: at,
-          amount: amount,
-        );
+    Future<void> add(String person, String thing, int at, String amount) => e
+        .entries
+        .add(personId: person, substanceId: thing, at: at, amount: amount);
     await add('p1', 'bier', 1, '0,3');
     await add('p2', 'bier', 2, '0,5');
     await add('p1', 'bier', 3, '0,3');

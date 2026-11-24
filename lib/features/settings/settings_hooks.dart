@@ -19,10 +19,6 @@ typedef SettingsNavigation = Future<void> Function(
 /// settingsHooksProvider.overrideWithValue(
 ///   SettingsHooks(
 ///     openExport: (context, ref) => showExportSheet(context),
-///     openPersons: (context, ref) =>
-///         pushAdaptivePage(context, builder: (_) => const PersonsScreen()),
-///     openSubstances: (context, ref) =>
-///         pushAdaptivePage(context, builder: (_) => const SubstancesScreen()),
 ///     privacyTiles: (context) => const [AppLockTile()],
 ///   ),
 /// ),
@@ -34,8 +30,6 @@ typedef SettingsNavigation = Future<void> Function(
 /// * [openExport]: a plain action sheet builds the three exports through
 ///   `exportServiceProvider` (everything, protocol tracks excluded);
 /// * [openImport]: `ExportService.pickJsonFile` + `importJsonBackup`;
-/// * [openPersons] / [openSubstances]: the tile tells the user that the
-///   area is not available yet;
 /// * [privacyTiles]: a simple switch bound to `appLockEnabledProvider`
 ///   (disabled when `lockSupportedProvider` says the device cannot lock);
 /// * [notificationTiles]: permission rows driven by `alarmServiceProvider`.
@@ -44,8 +38,6 @@ final class SettingsHooks {
   const SettingsHooks({
     this.openExport,
     this.openImport,
-    this.openPersons,
-    this.openSubstances,
     this.privacyTiles,
     this.notificationTiles,
     this.extraSections,
@@ -64,12 +56,6 @@ final class SettingsHooks {
 
   /// Starts the JSON backup import.
   final SettingsNavigation? openImport;
-
-  /// Opens the "Personen" management screen.
-  final SettingsNavigation? openPersons;
-
-  /// Opens the "Substanzen" management screen.
-  final SettingsNavigation? openSubstances;
 
   /// Rows of the "Privatsphäre" section (the app lock tile).
   final List<Widget> Function(BuildContext context)? privacyTiles;

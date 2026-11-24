@@ -105,6 +105,7 @@ class ProtocolChoice extends StatelessWidget {
   const ProtocolChoice({
     required this.label,
     required this.onTap,
+    this.onLongPress,
     this.selected = false,
     this.color,
     this.icon,
@@ -115,6 +116,9 @@ class ProtocolChoice extends StatelessWidget {
 
   final String label;
   final VoidCallback? onTap;
+
+  /// A second way on the same choice (the scene: edit name and colour).
+  final VoidCallback? onLongPress;
   final bool selected;
 
   /// Shows a [ColorDot] in front of the label.
@@ -150,6 +154,7 @@ class ProtocolChoice extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
+          onLongPress: onLongPress,
           child: ConstrainedBox(
             constraints: BoxConstraints(minHeight: minSize, minWidth: minSize),
             child: Padding(
